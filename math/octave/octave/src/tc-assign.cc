@@ -25,11 +25,12 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 #pragma implementation
 #endif
 
+#include "idx-vector.h"
 #include "user-prefs.h"
-#include "error.h"
-#include "gripes.h"
-#include "utils.h"
 #include "tree-const.h"
+#include "utils.h"
+#include "gripes.h"
+#include "error.h"
 
 #include "tc-inlines.cc"
 
@@ -88,7 +89,7 @@ tree_constant_rep::do_scalar_assignment (tree_constant& rhs,
 	  else
 	    {
 	      error ("invalid assignment to scalar");
-	      jump_to_top_level ();
+	      return;
 	    }
 	}
       else
@@ -106,12 +107,14 @@ tree_constant_rep::do_scalar_assignment (tree_constant& rhs,
 	  else
 	    {
 	      error ("invalid assignment to scalar");
-	      jump_to_top_level ();
+	      return;
 	    }
 	}
     }
   else if (user_pref.resize_on_range_error)
     {
+      tree_constant_rep::constant_type old_type_tag = type_tag;
+
       if (type_tag == complex_scalar_constant)
 	{
 	  Complex *old_complex = complex_scalar;
@@ -124,18 +127,30 @@ tree_constant_rep::do_scalar_assignment (tree_constant& rhs,
 	  matrix = new Matrix (1, 1, scalar);
 	  type_tag = matrix_constant;
 	}
+
+// If there is an error, the call to do_matrix_assignment should not
+// destroy the current value.  tree_constant_rep::eval(int) will take
+// care of converting single element matrices back to scalars.
+
       do_matrix_assignment (rhs, args, nargs);
+
+// I don't think there's any other way to revert back to unknown
+// constant types, so here it is.
+
+      if (old_type_tag == unknown_constant && error_state)
+	{
+	  if (type_tag == matrix_constant)
+	    delete matrix;
+	  else if (type_tag == complex_matrix_constant)
+	    delete complex_matrix;
+
+	  type_tag = unknown_constant;
+	}
     }
   else if (nargs > 3 || nargs < 2)
-    {
-      error ("invalid index expression for scalar type");
-      jump_to_top_level ();
-    }
+    error ("invalid index expression for scalar type");
   else
-    {
-      error ("index invalid or out of range for scalar type");
-      jump_to_top_level ();
-    }
+    error ("index invalid or out of range for scalar type");
 }
 
 void
@@ -228,11 +243,16 @@ tree_constant_rep::fortran_style_matrix_assignment (tree_constant& rhs,
     case scalar_constant:
       {
 	int i = NINT (tmp_i.double_value ());
-	index_check (i-1, "");
+	if (index_check (i-1, "") < 0)
+	  return;
 	if (nr <= 1 || nc <= 1)
-	  maybe_resize (i-1);
-	else
-	  range_max_check (i-1, nr * nc);
+	  {
+	    maybe_resize (i-1);
+	    if (error_state)
+	      return;
+	  }
+	else if (range_max_check (i-1, nr * nc) < 0)
+	  return;
 
 	nr = rows ();
 	nc = columns ();
@@ -240,7 +260,7 @@ tree_constant_rep::fortran_style_matrix_assignment (tree_constant& rhs,
 	if (! indexed_assign_conforms (1, 1, rhs_nr, rhs_nc))
 	  {
 	    error ("for A(int) = X: X must be a scalar");
-	    jump_to_top_level ();
+	    return;
 	  }
 	int ii = fortran_row (i, nr) - 1;
 	int jj = fortran_column (i, nr) - 1;
@@ -253,18 +273,25 @@ tree_constant_rep::fortran_style_matrix_assignment (tree_constant& rhs,
 	Matrix mi = tmp_i.matrix_value ();
 	int len = nr * nc;
 	idx_vector ii (mi, 1, "", len);  // Always do fortran indexing here...
+	if (! ii)
+	  return;
+
 	int imax = ii.max ();
 
 	if (nr <= 1 || nc <= 1)
-	  maybe_resize (imax-1);
-	else
-	  range_max_check (imax-1, len);
+	  {
+	    maybe_resize (imax-1);
+	    if (error_state)
+	      return;
+	  }
+	else if (range_max_check (imax-1, len) < 0)
+	  return;
 
 	if (ii.capacity () != rhs_nr * rhs_nc)
 	  {
 	    error ("A(matrix) = X: X and matrix must have the same\
  number of elements"); 
-	    jump_to_top_level ();
+	    return;
 	  }
 	fortran_style_matrix_assignment (rhs, ii);
       }
@@ -303,7 +330,8 @@ tree_constant_rep::vector_assignment (tree_constant& rhs, tree_constant& i_arg)
     case scalar_constant:
       {
 	int i = tree_to_mat_idx (tmp_i.double_value ());
-	index_check (i, "");
+	if (index_check (i, "") < 0)
+	  return;
 	do_vector_assign (rhs, i);
       }
       break;
@@ -313,6 +341,9 @@ tree_constant_rep::vector_assignment (tree_constant& rhs, tree_constant& i_arg)
 	Matrix mi = tmp_i.matrix_value ();
 	int len = nr * nc;
 	idx_vector iv (mi, user_pref.do_fortran_indexing, "", len);
+	if (! iv)
+	  return;
+
 	do_vector_assign (rhs, iv);
       }
       break;
@@ -329,7 +360,8 @@ tree_constant_rep::vector_assignment (tree_constant& rhs, tree_constant& i_arg)
 	else
 	  {
 	    int imax;
-	    index_check (ri, imax, "");
+	    if (index_check (ri, imax, "") < 0)
+	      return;
 	    do_vector_assign (rhs, ri, imax);
 	  }
       }
@@ -342,7 +374,7 @@ tree_constant_rep::vector_assignment (tree_constant& rhs, tree_constant& i_arg)
 	if (! indexed_assign_conforms (nr, nc, rhs_nr, rhs_nc))
 	  {
 	    error ("A(:) = X: X and A must have the same dimensions");
-	    jump_to_top_level ();
+	    return;
 	  }
 	do_matrix_assignment (rhs, magic_colon, magic_colon);
       }
@@ -355,7 +387,7 @@ tree_constant_rep::vector_assignment (tree_constant& rhs, tree_constant& i_arg)
 
 void
 tree_constant_rep::check_vector_assign (int rhs_nr, int rhs_nc,
-					int ilen, char *rm)
+					int ilen, const char *rm)
 {
   int nr = rows ();
   int nc = columns ();
@@ -363,29 +395,20 @@ tree_constant_rep::check_vector_assign (int rhs_nr, int rhs_nc,
   if (nr == 1 && nc == 1)  // No orientation to preserve
     {
       if (! ( ilen == rhs_nr || ilen == rhs_nc))
-	{
-	  error ("A(%s) = X: X and %s must have the same number of\
+	error ("A(%s) = X: X and %s must have the same number of\
  elements", rm, rm); 
-	  jump_to_top_level ();
-	}
     }
   else if (nr == 1)  // Preserve current row orientation
     {
       if (! (rhs_nr == 1 && rhs_nc == ilen))
-	{
-	  error ("A(%s) = X: where A is a row vector, X must also be a\
+	error ("A(%s) = X: where A is a row vector, X must also be a\
  row vector with the same number of elements as %s", rm, rm); 
-	  jump_to_top_level ();
-	}
     }
   else if (nc == 1)  // Preserve current column orientation
     {
       if (! (rhs_nc == 1 && rhs_nr == ilen))
-	{
-	  error ("A(%s) = X: where A is a column vector, X must also\
+	error ("A(%s) = X: where A is a column vector, X must also\
  be a column vector with the same number of elements as %s", rm, rm); 
-	  jump_to_top_level ();
-	}
     }
   else
     panic_impossible ();
@@ -400,10 +423,12 @@ tree_constant_rep::do_vector_assign (tree_constant& rhs, int i)
   if (! indexed_assign_conforms (1, 1, rhs_nr, rhs_nc))
     {
       error ("for A(int) = X: X must be a scalar");
-      jump_to_top_level ();
+      return;
     }
 
   maybe_resize (i);
+  if (error_state)
+    return;
 
   int nr = rows ();
   int nc = columns ();
@@ -429,6 +454,8 @@ tree_constant_rep::do_vector_assign (tree_constant& rhs, idx_vector& iv)
 
   int ilen = iv.capacity ();
   check_vector_assign (rhs_nr, rhs_nc, ilen, "matrix");
+  if (error_state)
+    return;
 
   force_orient f_orient = no_orient;
   if (rhs_nr == 1 && rhs_nc != 1)
@@ -437,6 +464,8 @@ tree_constant_rep::do_vector_assign (tree_constant& rhs, idx_vector& iv)
     f_orient = column_orient;
 
   maybe_resize (iv.max (), f_orient);
+  if (error_state)
+    return;
 
   int nr = rows ();
   int nc = columns ();
@@ -464,6 +493,8 @@ tree_constant_rep::do_vector_assign (tree_constant& rhs, Range& ri, int imax)
 
   int ilen = ri.nelem ();
   check_vector_assign (rhs_nr, rhs_nc, ilen, "range");
+  if (error_state)
+    return;
 
   force_orient f_orient = no_orient;
   if (rhs_nr == 1 && rhs_nc != 1)
@@ -472,6 +503,8 @@ tree_constant_rep::do_vector_assign (tree_constant& rhs, Range& ri, int imax)
     f_orient = column_orient;
 
   maybe_resize (imax, f_orient);
+  if (error_state)
+    return;
 
   int nr = rows ();
   int nc = columns ();
@@ -530,7 +563,7 @@ tree_constant_rep::fortran_style_matrix_assignment
   else if (nr*nc != rhs_size)
     {
       error ("A(:) = X: X and A must have the same number of elements");
-      jump_to_top_level ();
+      return;
     }
 
   if (rhs.const_type () == matrix_constant)
@@ -588,10 +621,7 @@ tree_constant_rep::fortran_style_matrix_assignment (tree_constant& rhs,
 	}
     }
   else
-    {
-      error ("number of rows and columns must match for indexed assignment");
-      jump_to_top_level ();
-    }
+    error ("number of rows and columns must match for indexed assignment");
 }
 
 void
@@ -603,16 +633,14 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 
   tree_constant_rep::constant_type itype = tmp_i.const_type ();
 
-// index_check() and matrix_to_index_vector() jump to the top level on
-// errors.
-
   switch (itype)
     {
     case complex_scalar_constant:
     case scalar_constant:
       {
 	int i = tree_to_mat_idx (tmp_i.double_value ());
-	index_check (i, "row");
+	if (index_check (i, "row") < 0)
+	  return;
 	do_matrix_assignment (rhs, i, j_arg);
       }
       break;
@@ -621,6 +649,9 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
       {
 	Matrix mi = tmp_i.matrix_value ();
 	idx_vector iv (mi, user_pref.do_fortran_indexing, "row", rows ());
+	if (! iv)
+	  return;
+
 	do_matrix_assignment (rhs, iv, j_arg);
       }
       break;
@@ -637,7 +668,8 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 	else
 	  {
 	    int imax;
-	    index_check (ri, imax, "row");
+	    if (index_check (ri, imax, "row") < 0)
+	      return;
 	    do_matrix_assignment (rhs, ri, imax, j_arg);
 	  }
       }
@@ -662,22 +694,23 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, int i,
   int rhs_nr = rhs.rows ();
   int rhs_nc = rhs.columns ();
 
-// index_check() and matrix_to_index_vector() jump to the top level on
-// errors.
-
   switch (jtype)
     {
     case complex_scalar_constant:
     case scalar_constant:
       {
 	int j = tree_to_mat_idx (tmp_j.double_value ());
-	index_check (j, "column");
+	if (index_check (j, "column") < 0)
+	  return;
 	if (! indexed_assign_conforms (1, 1, rhs_nr, rhs_nc))
 	  {
 	    error ("A(int,int) = X, X must be a scalar");
-	    jump_to_top_level ();
+	    return;
 	  }
 	maybe_resize (i, j);
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, i, j);
       }
       break;
@@ -687,13 +720,19 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, int i,
 	Matrix mj = tmp_j.matrix_value ();
 	idx_vector jv (mj, user_pref.do_fortran_indexing, "column",
 		       columns ());
+	if (! jv)
+	  return;
+
 	if (! indexed_assign_conforms (1, jv.capacity (), rhs_nr, rhs_nc))
 	  {
 	    error ("A(int,matrix) = X: X must be a row vector with the\
  same number of elements as matrix"); 
-	    jump_to_top_level ();
+	    return;
 	  }
 	maybe_resize (i, jv.max ());
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, i, jv);
       }
       break;
@@ -707,8 +746,9 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, int i,
 	  {
 	    error ("A(int,range) = X: X must be a row vector with the\
  same number of elements as range"); 
-	    jump_to_top_level ();
+	    return;
 	  }
+
 	if (columns () == 2 && is_zero_one (rj) && rhs_nc == 1)
 	  {
 	    do_matrix_assignment (rhs, i, 1);
@@ -716,8 +756,12 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, int i,
 	else
 	  {
 	    int jmax;
-	    index_check (rj, jmax, "column");
+	    if (index_check (rj, jmax, "column") < 0)
+	      return;
 	    maybe_resize (i, jmax);
+	    if (error_state)
+	      return;
+
 	    do_matrix_assignment (rhs, i, rj);
 	  }
       }
@@ -738,14 +782,20 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, int i,
 		type_tag = matrix_constant;
 	      }
 	    maybe_resize (i, rhs_nc-1);
+	    if (error_state)
+	      return;
 	  }
 	else if (indexed_assign_conforms (1, nc, rhs_nr, rhs_nc))
-	  maybe_resize (i, nc-1);
+	  {
+	    maybe_resize (i, nc-1);
+	    if (error_state)
+	      return;
+	  }
 	else
 	  {
 	    error ("A(int,:) = X: X must be a row vector with the\
  same number of columns as A"); 
-	    jump_to_top_level ();
+	    return;
 	  }
 
 	do_matrix_assignment (rhs, i, magic_colon);
@@ -768,23 +818,24 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, idx_vector& iv,
   int rhs_nr = rhs.rows ();
   int rhs_nc = rhs.columns ();
 
-// index_check() and matrix_to_index_vector() jump to the top level on
-// errors.
-
   switch (jtype)
     {
     case complex_scalar_constant:
     case scalar_constant:
       {
 	int j = tree_to_mat_idx (tmp_j.double_value ());
-	index_check (j, "column");
+	if (index_check (j, "column") < 0)
+	  return;
 	if (! indexed_assign_conforms (iv.capacity (), 1, rhs_nr, rhs_nc))
 	  {
 	    error ("A(matrix,int) = X: X must be a column vector with\
  the same number of elements as matrix");  
-	    jump_to_top_level ();
+	    return;
 	  }
 	maybe_resize (iv.max (), j);
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, iv, j);
       }
       break;
@@ -794,15 +845,21 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, idx_vector& iv,
 	Matrix mj = tmp_j.matrix_value ();
 	idx_vector jv (mj, user_pref.do_fortran_indexing, "column",
 		       columns ());
+	if (! jv)
+	  return;
+
 	if (! indexed_assign_conforms (iv.capacity (), jv.capacity (),
 				       rhs_nr, rhs_nc))
 	  {
 	    error ("A(r_matrix,c_matrix) = X: the number of rows in X\
  must match the number of elements in r_matrix and the number of\
  columns in X must match the number of elements in c_matrix");  
-	    jump_to_top_level ();
+	    return;
 	  }
 	maybe_resize (iv.max (), jv.max ());
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, iv, jv);
       }
       break;
@@ -818,8 +875,9 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, idx_vector& iv,
 	    error ("A(matrix,range) = X: the number of rows in X must\
  match the number of elements in matrix and the number of columns in X\
  must match the number of elements in range");  
-	    jump_to_top_level ();
+	    return;
 	  }
+
 	if (columns () == 2 && is_zero_one (rj) && rhs_nc == 1)
 	  {
 	    do_matrix_assignment (rhs, iv, 1);
@@ -827,8 +885,12 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, idx_vector& iv,
 	else
 	  {
 	    int jmax;
-	    index_check (rj, jmax, "column");
+	    if (index_check (rj, jmax, "column") < 0)
+	      return;
 	    maybe_resize (iv.max (), jmax);
+	    if (error_state)
+	      return;
+
 	    do_matrix_assignment (rhs, iv, rj);
 	  }
       }
@@ -836,14 +898,22 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs, idx_vector& iv,
     case magic_colon:
       {
 	int nc = columns ();
-	if (! indexed_assign_conforms (iv.capacity (), nc, rhs_nr, rhs_nc))
+	int new_nc = nc;
+	if (nc == 0)
+	  new_nc = rhs_nc;
+
+	if (! indexed_assign_conforms (iv.capacity (), new_nc,
+				       rhs_nr, rhs_nc))
 	  {
 	    error ("A(matrix,:) = X: the number of rows in X must\
  match the number of elements in matrix, and the number of columns in\
  X must match the number of columns in A");
-	    jump_to_top_level ();
+	    return;
 	  }
-	maybe_resize (iv.max (), nc-1);
+	maybe_resize (iv.max (), new_nc-1);
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, iv, magic_colon);
       }
       break;
@@ -865,24 +935,24 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
   int rhs_nr = rhs.rows ();
   int rhs_nc = rhs.columns ();
 
-// index_check() and matrix_to_index_vector() jump to the top level on
-// errors.
-
   switch (jtype)
     {
     case complex_scalar_constant:
     case scalar_constant:
       {
 	int j = tree_to_mat_idx (tmp_j.double_value ());
-	index_check (j, "column");
+	if (index_check (j, "column") < 0)
+	  return;
 	if (! indexed_assign_conforms (ri.nelem (), 1, rhs_nr, rhs_nc))
 	  {
 	    error ("A(range,int) = X: X must be a column vector with\
  the same number of elements as range");
-	    jump_to_top_level ();
-	    jump_to_top_level ();
+	    return;
 	  }
 	maybe_resize (imax, j);
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, ri, j);
       }
       break;
@@ -892,15 +962,21 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 	Matrix mj = tmp_j.matrix_value ();
 	idx_vector jv (mj, user_pref.do_fortran_indexing, "column",
 		       columns ());
+	if (! jv)
+	  return;
+
 	if (! indexed_assign_conforms (ri.nelem (), jv.capacity (),
 				       rhs_nr, rhs_nc))
 	  {
 	    error ("A(range,matrix) = X: the number of rows in X must\
  match the number of elements in range and the number of columns in X\
  must match the number of elements in matrix");
-	    jump_to_top_level ();
+	    return;
 	  }
 	maybe_resize (imax, jv.max ());
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, ri, jv);
       }
       break;
@@ -916,8 +992,9 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 	    error ("A(r_range,c_range) = X: the number of rows in X\
  must match the number of elements in r_range and the number of\
  columns in X must match the number of elements in c_range\n");
-	    jump_to_top_level ();
+	    return;
 	  }
+
 	if (columns () == 2 && is_zero_one (rj) && rhs_nc == 1)
 	  {
 	    do_matrix_assignment (rhs, ri, 1);
@@ -925,8 +1002,12 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 	else
 	  {
 	    int jmax;
-	    index_check (rj, jmax, "column");
+	    if (index_check (rj, jmax, "column") < 0)
+	      return;
 	    maybe_resize (imax, jmax);
+	    if (error_state)
+	      return;
+
 	    do_matrix_assignment (rhs, ri, rj);
 	  }
       }
@@ -934,14 +1015,21 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
     case magic_colon:
       {
 	int nc = columns ();
-	if (! indexed_assign_conforms (ri.nelem (), nc, rhs_nr, rhs_nc))
+	int new_nc = nc;
+	if (nc == 0)
+	  new_nc = rhs_nc;
+
+	if (! indexed_assign_conforms (ri.nelem (), new_nc, rhs_nr, rhs_nc))
 	  {
 	    error ("A(range,:) = X: the number of rows in X must match\
  the number of elements in range, and the number of columns in X must\
  match the number of columns in A");  
-	    jump_to_top_level ();
+	    return;
 	  }
-	maybe_resize (imax, nc-1);
+	maybe_resize (imax, new_nc-1);
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, ri, magic_colon);
       }
       break;
@@ -963,16 +1051,14 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
   int rhs_nr = rhs.rows ();
   int rhs_nc = rhs.columns ();
 
-// index_check() and matrix_to_index_vector() jump to the top level on
-// errors.
-
   switch (jtype)
     {
     case complex_scalar_constant:
     case scalar_constant:
       {
 	int j = tree_to_mat_idx (tmp_j.double_value ());
-	index_check (j, "column");
+	if (index_check (j, "column") < 0)
+	  return;
 	int nr = rows ();
 	if (nr == 0 && columns () == 0 && rhs_nc == 1)
 	  {
@@ -987,14 +1073,20 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 		type_tag = matrix_constant;
 	      }
 	    maybe_resize (rhs_nr-1, j);
+	    if (error_state)
+	      return;
 	  }
 	else if (indexed_assign_conforms (nr, 1, rhs_nr, rhs_nc))
-	  maybe_resize (nr-1, j);
+	  {
+	    maybe_resize (nr-1, j);
+	    if (error_state)
+	      return;
+	  }
 	else
 	  {
 	    error ("A(:,int) = X: X must be a column vector with the\
  same number of rows as A"); 
-	    jump_to_top_level ();
+	    return;
 	  }
 
 	do_matrix_assignment (rhs, magic_colon, j);
@@ -1006,15 +1098,26 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 	Matrix mj = tmp_j.matrix_value ();
 	idx_vector jv (mj, user_pref.do_fortran_indexing, "column",
 		       columns ());
+	if (! jv)
+	  return;
+
 	int nr = rows ();
-	if (! indexed_assign_conforms (nr, jv.capacity (), rhs_nr, rhs_nc))
+	int new_nr = nr;
+	if (nr == 0)
+	  new_nr = rhs_nr;
+
+	if (! indexed_assign_conforms (new_nr, jv.capacity (),
+				       rhs_nr, rhs_nc))
 	  {
 	    error ("A(:,matrix) = X: the number of rows in X must\
  match the number of rows in A, and the number of columns in X must\
  match the number of elements in matrix");   
-	    jump_to_top_level ();
+	    return;
 	  }
-	maybe_resize (nr-1, jv.max ());
+	maybe_resize (new_nr-1, jv.max ());
+	if (error_state)
+	  return;
+
 	do_matrix_assignment (rhs, magic_colon, jv);
       }
       break;
@@ -1025,13 +1128,18 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
       {
 	Range rj = tmp_j.range_value ();
 	int nr = rows ();
-	if (! indexed_assign_conforms (nr, rj.nelem (), rhs_nr, rhs_nc))
+	int new_nr = nr;
+	if (nr == 0)
+	  new_nr = rhs_nr;
+
+	if (! indexed_assign_conforms (new_nr, rj.nelem (), rhs_nr, rhs_nc))
 	  {
 	    error ("A(:,range) = X: the number of rows in X must match\
  the number of rows in A, and the number of columns in X must match\
  the number of elements in range");
-	    jump_to_top_level ();
+	    return;
 	  }
+
 	if (columns () == 2 && is_zero_one (rj) && rhs_nc == 1)
 	  {
 	    do_matrix_assignment (rhs, magic_colon, 1);
@@ -1039,8 +1147,12 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 	else
 	  {
 	    int jmax;
-	    index_check (rj, jmax, "column");
-	    maybe_resize (nr-1, jmax);
+	    if (index_check (rj, jmax, "column") < 0)
+	      return;
+	    maybe_resize (new_nr-1, jmax);
+	    if (error_state)
+	      return;
+
 	    do_matrix_assignment (rhs, magic_colon, rj);
 	  }
       }
@@ -1417,4 +1529,3 @@ tree_constant_rep::do_matrix_assignment (tree_constant& rhs,
 ;;; page-delimiter: "^/\\*" ***
 ;;; End: ***
 */
-

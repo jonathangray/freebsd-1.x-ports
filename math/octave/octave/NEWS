@@ -1,3 +1,217 @@
+Summary of changes for version 0.79:
+-----------------------------------
+
+  * New control systems functions:
+
+     dgram -- Returns the discrete controllability and observability gramian.
+     dlqr  -- Discrete linear quadratic regulator design.
+     dlqe  -- Discrete linear quadratic estimator (Kalman Filter) design.
+     c2d   -- Convert continuous system description to discrete time
+              description assuming zero-order hold and given sample time.
+
+  * The max (min) functions can now return the index of the max (min)
+    value as a second return value.
+
+Summary of changes for version 0.78:
+-----------------------------------
+
+  * Octave's handling of global variables has been completely
+    rewritten.  To access global variables inside a function, you must
+    now declare them to be global within the function body.  Likewise,
+    if you do not declare a variable as global at the command line,
+    you will not have access to it within a function, even if it is
+    declared global there.  For example, given the function
+
+      function f ()
+        global x = 1;
+        y = 2;
+      endfunction
+
+    the global variable `x' is not visible at the top level until the
+    command
+
+      octave:13> global x
+
+    has been evaluated, and the variable `y' remains local to the
+    function f() even if it is declared global at the top level.
+
+    Clearing a global variable at the top level will remove its global
+    scope and leave it undefined.  For example,
+
+      octave:1> function f ()   # Define a function that accesses
+      >  global x;              #   the global variable `x'.
+      >  x
+      > endfunction
+      octave:2> global x = 1    # Give the variable `x' a value.
+      octave:3> f ()            # Evaluating the function accesses the
+      x = 1                     #   global `x'.
+      octave:4> clear x         # Remove `x' from global scope, clear value.
+      octave:5> x = 2           # Define new local `x' at the top level
+      x = 2
+      octave:6> f               # The global `x' is no longer defined.
+      error: `x' undefined near line 1 column 25
+      error: evaluating expression near line 1, column 25
+      error: called from `f'
+      octave:7> x               # But the local one is.
+      x = 2
+
+  * The new function, `is_global (string)' returns 1 if the variable
+    named by string is globally visible.  Otherwise, returns 0.
+
+  * The implementation of `who' has changed.  It now accepts the
+    following options:
+
+      -b -builtins   -- display info for builtin variables and functions
+      -f -functions  -- display info for currently compiled functions
+      -v -variables  -- display info for user variables
+      -l -long       -- display long info
+
+    The long output looks like this:
+
+      octave:5> who -l
+
+      *** currently compiled functions:
+
+      prot  type               rows   cols  name
+      ====  ====               ====   ====  ====
+       wd   user function         -      -  f
+
+      *** local user variables:
+
+      prot  type               rows   cols  name
+      ====  ====               ====   ====  ====
+       wd   real scalar           1      1  y
+
+      *** globally visible user variables:
+
+      prot  type               rows   cols  name
+      ====  ====               ====   ====  ====
+       wd   complex matrix       13     13  x
+
+    where the first character of the `protection' field is `w' if the
+    symbol can be redefined, and `-' if it has read-only access.  The
+    second character may be `d' if the symbol can be deleted, or `-'
+    if the symbol cannot be cleared.
+
+  * The new built-in variable ignore_function_time_stamp can be used
+    to prevent Octave from calling stat() each time it looks up
+    functions defined in M-files.  If set to "system", Octave will not
+    automatically recompile M-files in subdirectories of
+    $OCTAVE_HOME/lib/VERSION if they have changed since they were last
+    compiled, but will recompile other M-files in the LOADPATH if they
+    change.  If set to "all", Octave will not recompile any M-files
+    unless their definitions are removed with clear.  For any other
+    value of ignore_function_time_stamp, Octave will always check to
+    see if functions defined in M-files need to recompiled.  The
+    default value of ignore_function_time_stamp is "system".
+
+  * The new built-in variable EDITOR can be used to specify the editor
+    for the edit_history command.  It is set to the value of the
+    environment variable EDITOR, or `vi' if EDITOR is not set, or is
+    empty.
+
+  * There is a new built-in variable, INFO_FILE, which is used as the
+    location of the info file.  Its initial value is
+    $OCTAVE_HOME/info/octave.info, so `help -i' should now work
+    provided that OCTAVE_HOME is set correctly, even if Octave is
+    installed in a directory different from that specified at compile
+    time.
+
+  * There is a new command line option, --info-file FILE, that may be
+    used to set Octave's idea of the location of the info file.  It
+    will override any value of OCTAVE_INFO_FILE found in the
+    environment, but not any INFO_FILE="filename" commands found in
+    the system or user startup files. 
+
+  * Octave's Info reader will now recognize gzipped files that have
+    names ending in `.gz'.
+
+  * The save command now accepts regular expressions as arguments.
+    Note that these patterns are regular expressions, and do not work
+    like filename globbing.  For example, given the variables `a',
+    `aa', and `a1', the command `save a*' saves `a' and `aa' but not
+    `a1'.  To match all variables beginning with `a', you must use an
+    expression like `a.*' (match all sequences beginning with `a'
+    followed by zero or more characters).
+
+  * Line and column information is included in more error messages.
+
+Summary of changes for version 0.77:
+-----------------------------------
+
+  * Improved help.  The command `help -i topic' now uses the GNU Info
+    browser to display help for the given topic directly from the
+    Texinfo documenation.
+
+  * New function: chol -- Cholesky factorization.
+
+Summary of changes for version 0.76:
+-----------------------------------
+
+  * Better run-time error messages.  Many now include line and column
+    information indicating where the error occurred.  Octave will also
+    print a traceback for errors occurring inside functions. If you
+    find error messages that could use improvement, or errors that
+    Octave fails to catch, please send a bug report to
+    bug-octave@che.utexas.edu.
+
+  * If gplot (or gsplot) is given a string to plot, and the string
+    does not name a file, Octave will pass the string along to gnuplot
+    directly.  This allows commands like
+
+      gplot "sin (x)" w l, data w p
+
+    to work (assuming that data is a variable containing a matrix of
+    values).
+
+  * Long options (--help, --version, etc.) are supported.
+
+Summary of changes for version 0.75:
+-----------------------------------
+
+  * The documentation is much more complete, but still could use a lot
+    of work.
+
+  * The history function now prints line numbers by default.  The
+    command `history -q' will  omit them.
+
+  * The clear function now accepts regular expressions.
+
+  * If gplot (or gsplot) is given a string to plot, and the string
+    names a file, Octave attempts to plot the contents of the file.
+
+  * New functions:
+
+    history:
+
+      run_history  -- run commands from the history list.
+      edit_history -- edit commands from the history list with your
+                      favorite editor.
+
+    linear algebra:
+
+      balance         -- Balancing for algebraic and generalized
+			 eigenvalue problems.
+      givens          -- Givens rotation.
+      is_square       -- Check to see if a matrix is square.
+      qzhess          -- QZ decomposition of the matrix pencil (a - lambda b).
+      qzval           -- Generalized eigenvalues for real matrices.
+      syl             -- Sylvester equation solver.
+
+    control systems:
+
+      is_symmetric    -- Check to see if a matrix is symmetric.
+      abcddim         -- Check dimensions of linear dynamic system [A,B,C,D].
+      is_controllable -- Check to see if [A,B,C,D] is controllable.
+      is_observable   -- Check to see if [A,B,C,D] is observable.
+      are             -- Solve algebraic Ricatti equation.
+      dare            -- Solve discrete-time algebraic Ricatti equation.
+      lqe             -- Kalman filter design for continuous linear system.
+      lqr             -- Linear Quadratic Regulator design.
+      lyap            -- Solve Lyapunov equation.
+      dlyap           -- Solve discrete Lyapunov equation.
+      tzero           -- Compute the transmission zeros of [A,B,C,D].
+
 Summary of changes for version 0.74:
 -----------------------------------
 
@@ -68,7 +282,8 @@ Summary of changes for version 0.73:
 
   * Support for Gill and Murray's QPSOL has been added.  Like NPSOL,
     QPSOL is not freely redistributable either, so you must obtain
-    your own copy to be able to use this feature.
+    your own copy to be able to use this feature.  More information
+    about where to find QPSOL and NPSOL are in the file README.NLP.
 
 Summary of changes for version 0.72:
 -----------------------------------

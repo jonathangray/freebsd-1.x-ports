@@ -30,6 +30,10 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <stdarg.h>
 
 #include "error.h"
+#include "pager.h"
+
+// Current error state.
+int error_state;
 
 static void
 verror (const char *name, const char *fmt, va_list args)
@@ -72,6 +76,11 @@ warning (const char *fmt, ...)
 void
 error (const char *fmt, ...)
 {
+  if (! error_state)
+    error_state = 1;
+
+  flush_output_to_pager ();
+
   va_list args;
   va_start (args, fmt);
   verror ("error", fmt, args);
@@ -81,6 +90,8 @@ error (const char *fmt, ...)
 void
 panic (const char *fmt, ...)
 {
+  flush_output_to_pager ();
+
   va_list args;
   va_start (args, fmt);
   verror ("panic", fmt, args);

@@ -46,7 +46,7 @@ class symbol_table;
 #define TREE_FCN_TYPEDEFS 1
 
 typedef tree_constant (*Text_fcn)(int, char **);
-typedef tree_constant* (*General_fcn)(tree_constant *, int, int);
+typedef tree_constant* (*General_fcn)(const tree_constant *, int, int);
 
 #endif
 
@@ -84,6 +84,7 @@ class tree_return_list;
 class tree_word_list;
 class tree_command;
 class tree_command_list;
+class tree_global_command;
 class tree_while_command;
 class tree_for_command;
 class tree_if_command;
@@ -133,14 +134,20 @@ class
 tree_builtin : public tree
 {
 public:
-  tree_builtin (void);
-  tree_builtin (int i_max, int o_max, Mapper_fcn& m_fcn, symbol_record *s);
-  tree_builtin (int i_max, int o_max, Text_fcn t_fcn, symbol_record *s);
-  tree_builtin (int i_max, int o_max, General_fcn t_fcn, symbol_record *s);
+  tree_builtin (const char *nm = (char *) NULL);
+
+  tree_builtin (int i_max, int o_max, Mapper_fcn& m_fcn,
+		const char *nm = (char *) NULL);
+
+  tree_builtin (int i_max, int o_max, Text_fcn t_fcn,
+		const char *nm = (char *) NULL);
+
+  tree_builtin (int i_max, int o_max, General_fcn t_fcn,
+		const char *nm = (char *) NULL);
 
   ~tree_builtin (void);
 
-  int is_builtin (void);
+  int is_builtin (void) const;
 
   tree_constant eval (int print);
 
@@ -148,10 +155,10 @@ public:
 
   tree_constant eval (int argc, char **argv, int print);
 
-  tree_constant *eval (tree_constant *args, int n_in, int n_out, int print);
+  tree_constant *eval (const tree_constant *args, int n_in, int n_out,
+		       int print);
 
-  tree *def (void);
-  char *name (void);
+  char *name (void) const;
 
   int max_expected_args (void);
 
@@ -161,9 +168,7 @@ private:
   Mapper_fcn mapper_fcn;
   Text_fcn text_fcn;
   General_fcn general_fcn;
-  symbol_record *sym;       // Is this really needed?  It points back
-			    // to the symbol record that contains this
-			    // builtin function...
+  char *my_name;
 };
 
 /*
@@ -175,16 +180,15 @@ tree_identifier : public tree
   friend class tree_index_expression;
 
 public:
-  tree_identifier (void);
-  tree_identifier (symbol_record *s);
+  tree_identifier (int l = -1, int c = -1);
+  tree_identifier (symbol_record *s, int l = -1, int c = -1);
 
   ~tree_identifier (void);
 
-  int is_identifier (void);
+  int is_identifier (void) const;
 
-  tree *def (void);
-  char *name (void);
-  symbol_record *symrec (void);
+  char *name (void) const;
+  void rename (const char *n);
 
   tree_identifier *define (tree_constant *t);
   tree_identifier *define (tree_function *t);
@@ -204,18 +208,22 @@ public:
 
   void mark_as_formal_parameter (void);
 
+  void mark_for_possible_ans_assign (void);
+
   tree_constant eval (int print);
 
   tree_constant *eval (int print, int nargout);
 
   tree_constant eval (int argc, char **argv, int print);
   
-  tree_constant *eval (tree_constant *args, int n_in, int n_out, int print);
+  tree_constant *eval (const tree_constant *args, int n_in, int n_out,
+		       int print);
 
   void eval_undefined_error (void);
 
 private:
   symbol_record *sym;
+  int maybe_do_ans_assign;
 };
 
 /*
@@ -240,15 +248,24 @@ public:
   char *m_file_name (void);
   time_t time_parsed (void);
 
+  void mark_as_system_m_file (void);
+  int is_system_m_file (void) const;
+
+  void stash_function_name (char *s);
+  char *function_name (void);
+
   tree_constant eval (int print);
 
   tree_constant *eval (int print, int nargout);
 
   tree_constant eval (int argc, char **argv, int print);
 
-  tree_constant *eval (tree_constant *args, int n_in, int n_out, int print);
+  tree_constant *eval (const tree_constant *args, int n_in, int n_out,
+		       int print);
 
   int max_expected_args (void);
+
+  void traceback_error (void);
 
 private:
   int call_depth;
@@ -256,8 +273,10 @@ private:
   tree_parameter_list *ret_list;
   symbol_table *sym_tab;
   tree *cmd_list;
-  time_t t_parsed;
   char *file_name;
+  char *fcn_name;
+  time_t t_parsed;
+  int system_m_file;
 };
 
 /*
@@ -284,12 +303,17 @@ class
 tree_prefix_expression : public tree_expression
 {
  public:
-  tree_prefix_expression (void);
-  tree_prefix_expression (tree_identifier *t, tree::expression_type et);
+  tree_prefix_expression (int l = -1, int c = -1);
+  tree_prefix_expression (tree_identifier *t, tree::expression_type et,
+			  int l = -1, int c = -1);
 
   ~tree_prefix_expression (void);
 
   tree_constant eval (int print);
+
+  void eval_error (void);
+
+  int is_prefix_expression (void) const;
 
  private:
   tree_identifier *id;
@@ -302,12 +326,15 @@ class
 tree_postfix_expression : public tree_expression
 {
  public:
-  tree_postfix_expression (void);
-  tree_postfix_expression (tree_identifier *t, tree::expression_type et);
+  tree_postfix_expression (int l = -1, int c = -1);
+  tree_postfix_expression (tree_identifier *t, tree::expression_type et,
+			   int l = -1, int c = -1);
 
   ~tree_postfix_expression (void);
 
   tree_constant eval (int print);
+
+  void eval_error (void);
 
  private:
   tree_identifier *id;
@@ -320,12 +347,15 @@ class
 tree_unary_expression : public tree_expression
 {
  public:
-  tree_unary_expression (void);
-  tree_unary_expression (tree *a, tree::expression_type t);
+  tree_unary_expression (int l = -1, int c = -1);
+  tree_unary_expression (tree *a, tree::expression_type t, int l = -1,
+			 int c = -1);
 
   ~tree_unary_expression (void);
 
   tree_constant eval (int print);
+
+  void eval_error (void);
 
  private:
   tree *op;
@@ -338,12 +368,15 @@ class
 tree_binary_expression : public tree_expression
 {
  public:
-  tree_binary_expression (void);
-  tree_binary_expression (tree *a, tree *b, tree::expression_type t);
+  tree_binary_expression (int l = -1, int c = -1);
+  tree_binary_expression (tree *a, tree *b, tree::expression_type t,
+			  int l = -1, int c = -1);
 
   ~tree_binary_expression (void);
 
   tree_constant eval (int print);
+
+  void eval_error (void);
 
  private:
   tree *op1;
@@ -365,7 +398,7 @@ public:
 
   tree_constant eval (int print);
 
-  int is_assignment_expression (void);
+  int is_assignment_expression (void) const;
 };
 
 /*
@@ -375,13 +408,17 @@ class
 tree_simple_assignment_expression : public tree_assignment_expression
 {
  public:
-  tree_simple_assignment_expression (void);
-  tree_simple_assignment_expression (tree_identifier *i, tree *r);
-  tree_simple_assignment_expression (tree_index_expression *idx_expr, tree *r);
+  tree_simple_assignment_expression (int l = -1, int c = -1);
+  tree_simple_assignment_expression (tree_identifier *i, tree *r,
+				     int l = -1, int c = -1);
+  tree_simple_assignment_expression (tree_index_expression *idx_expr,
+				     tree *r, int l = -1, int c = -1);
 
   ~tree_simple_assignment_expression (void);
 
   tree_constant eval (int print);
+
+  void eval_error (void);
 
  private:
   tree_identifier *lhs;
@@ -396,14 +433,17 @@ class
 tree_multi_assignment_expression : public tree_assignment_expression
 {
  public:
-  tree_multi_assignment_expression (void);
-  tree_multi_assignment_expression (tree_return_list *l, tree *r);
+  tree_multi_assignment_expression (int l = -1, int c = -1);
+  tree_multi_assignment_expression (tree_return_list *lst, tree *r,
+				    int l = -1, int c = -1);
 
   ~tree_multi_assignment_expression (void);
 
   tree_constant eval (int print);
 
   tree_constant *eval (int print, int nargout);
+
+  void eval_error (void);
 
  private:
   tree_return_list *lhs;
@@ -417,14 +457,16 @@ class
 tree_colon_expression : public tree_expression
 {
  public:
-  tree_colon_expression (void);
-  tree_colon_expression (tree *a, tree *b);
+  tree_colon_expression (int l = -1, int c = -1);
+  tree_colon_expression (tree *a, tree *b, int l = -1, int c = -1);
 
   ~tree_colon_expression (void);
 
   tree_colon_expression *chain (tree *t);
 
   tree_constant eval (int print);
+
+  void eval_error (const char *s);
 
  private:
   tree *op1;
@@ -439,21 +481,26 @@ class
 tree_index_expression : public tree_expression
 {
  public:
-  tree_index_expression (void);
-  tree_index_expression (tree_identifier *i);
-  tree_index_expression (tree_identifier *i, tree_argument_list *l);
+  tree_index_expression (int l = -1, int c = -1);
+  tree_index_expression (tree_identifier *i, int l = -1, int c = -1);
+  tree_index_expression (tree_identifier *i, tree_argument_list *lst,
+			 int l = -1, int c = -1);
 
   ~tree_index_expression (void);
 
-  int is_index_expression (void);
+  int is_index_expression (void) const;
 
   tree_identifier *ident (void);
 
   tree_argument_list *arg_list (void);
 
+  void mark_for_possible_ans_assign (void);
+
   tree_constant eval (int print);
 
   tree_constant *eval (int print, int nargout);
+
+  void eval_error (void);
 
  private:
   tree_identifier *id;
@@ -505,7 +552,7 @@ tree_parameter_list : public tree
   tree_parameter_list *reverse (void);
   int length (void);
 
-  char *name (void);
+  char *name (void) const;
 
   void mark_as_formal_parameters (void);
 
@@ -566,7 +613,7 @@ tree_word_list : public tree
   tree_word_list *reverse (void);
   int length (void);
 
-  char *name (void);
+  char *name (void) const;
 
   tree_word_list *next_elem (void);
 
@@ -611,19 +658,48 @@ tree_command_list : public tree_command
 };
 
 /*
+ * Global.
+ */
+class
+tree_global_command : public tree_command
+{
+ public:
+  tree_global_command (int l = -1, int c = -1);
+  tree_global_command (symbol_record *s, int l = -1, int c = -1);
+  tree_global_command (symbol_record *s, tree *e, int l = -1, int c = -1);
+
+  ~tree_global_command (void);
+
+  tree_global_command *chain (symbol_record *s, int l = -1, int c = -1);
+  tree_global_command *chain (symbol_record *s, tree *e, int l = -1, int c = -1);
+  tree_global_command *reverse (void);
+
+  tree_constant eval (int print);
+
+  void eval_error (void);
+
+ private:
+  symbol_record *sr;		// Symbol record from local symbol table.
+  tree *rhs;			// RHS of assignment.
+  tree_global_command *next;	// Next global command.
+};
+
+/*
  * While.
  */
 class
 tree_while_command : public tree_command
 {
  public:
-  tree_while_command (void);
-  tree_while_command (tree *e);
-  tree_while_command (tree *e, tree *l);
+  tree_while_command (int l = -1, int c = -1);
+  tree_while_command (tree *e, int l = -1, int c = -1);
+  tree_while_command (tree *e, tree *lst, int l = -1, int c = -1);
 
   ~tree_while_command (void);
 
   tree_constant eval (int print);
+
+  void eval_error (void);
 
  private:
   tree *expr;			// Expression to test.
@@ -637,15 +713,18 @@ class
 tree_for_command : public tree_command
 {
  public:
-  tree_for_command (void);
-  tree_for_command (tree_identifier *id, tree *e, tree *l);
+  tree_for_command (int l = -1, int c = -1);
+  tree_for_command (tree_index_expression *id, tree *e, tree *lst,
+		    int l = -1, int c = -1);
 
   ~tree_for_command (void);
 
   tree_constant eval (int print);
 
+  void eval_error (void);
+
  private:
-  tree_identifier *id;		// Identifier to modify.
+  tree_index_expression *id;	// Identifier to modify.
   tree *expr;			// Expression to evaluate.
   tree *list;			// List of commands to execute.
 };
@@ -657,17 +736,19 @@ class
 tree_if_command : public tree_command
 {
  public:
-  tree_if_command (void);
-  tree_if_command (tree *t);
-  tree_if_command (tree *e, tree *t);
+  tree_if_command (int l = -1, int c = -1);
+  tree_if_command (tree *t, int l = -1, int c = -1);
+  tree_if_command (tree *e, tree *t, int l = -1, int c = -1);
 
   ~tree_if_command (void);
 
-  tree_if_command *chain (tree *t);
-  tree_if_command *chain (tree *t1, tree *t2);
+  tree_if_command *chain (tree *t, int l = -1, int c = -1);
+  tree_if_command *chain (tree *t1, tree *t2, int l = -1, int c = -1);
   tree_if_command *reverse (void);
 
   tree_constant eval (int print);
+
+  void eval_error (void);
 
  private:
   tree *expr;			// Expression to test.
@@ -682,7 +763,7 @@ class
 tree_break_command : public tree_command
 {
  public:
-  tree_break_command (void);
+  tree_break_command (int l = -1, int c = -1);
 
   ~tree_break_command (void);
 
@@ -696,7 +777,7 @@ class
 tree_continue_command : public tree_command
 {
  public:
-  tree_continue_command (void);
+  tree_continue_command (int l = -1, int c = -1);
 
   ~tree_continue_command (void);
 
@@ -710,7 +791,7 @@ class
 tree_return_command : public tree_command
 {
  public:
-  tree_return_command (void);
+  tree_return_command (int l = -1, int c = -1);
 
   ~tree_return_command (void);
 

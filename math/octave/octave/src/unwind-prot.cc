@@ -35,7 +35,7 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 #include "error.h"
 #include "utils.h"
 
-static class unwind_elem
+class unwind_elem
 {
  public:
   unwind_elem (void);
@@ -209,7 +209,7 @@ complex_matrix_cleanup (void *cm)
   delete [] (ComplexMatrix *) cm;
 }
 
-static class saved_variable
+class saved_variable
 {
  public:
   enum var_type { integer, generic_ptr, generic };

@@ -1,5 +1,9 @@
 typedef union
 {
+// The type of the basic tokens returned by the lexer.
+  token *tok_val;
+
+// Types for the nonterminals we generate.
   tree *tree_type;
   tree_constant *tree_constant_type;
   tree_matrix *tree_matrix_type;
@@ -12,6 +16,7 @@ typedef union
   tree_word_list *tree_word_list_type;
   tree_command *tree_command_type;
   tree_if_command *tree_if_command_type;
+  tree_global_command *tree_global_command_type;
   tree_command_list *tree_command_list_type;
   tree_word_list_command *tree_word_list_command_type;
   tree_plot_command *tree_plot_command_type;
@@ -20,59 +25,53 @@ typedef union
   tree_plot_range *tree_plot_range_type;
   tree_subplot_using *tree_subplot_using_type;
   tree_subplot_style *tree_subplot_style_type;
-  symbol_record *sym_rec;
-  double number;
-  char *string;
-  end_tok_type ettype;
-  plot_tok_type pttype;
 } YYSTYPE;
-#define	FOR	258
-#define	WHILE	259
-#define	IF	260
-#define	ELSEIF	261
-#define	ELSE	262
-#define	FCN	263
-#define	BREAK	264
-#define	CONTINUE	265
-#define	FUNC_RET	266
-#define	SCREW_TWO	267
-#define	END_OF_INPUT	268
-#define	GLOBAL	269
-#define	CLEAR	270
-#define	USING	271
-#define	TITLE	272
-#define	WITH	273
-#define	COLON	274
-#define	OPEN_BRACE	275
-#define	CLOSE_BRACE	276
+#define	EXPR_AND	258
+#define	EXPR_OR	259
+#define	EXPR_NOT	260
+#define	EXPR_LT	261
+#define	EXPR_LE	262
+#define	EXPR_EQ	263
+#define	EXPR_NE	264
+#define	EXPR_GE	265
+#define	EXPR_GT	266
+#define	LEFTDIV	267
+#define	EMUL	268
+#define	EDIV	269
+#define	ELEFTDIV	270
+#define	QUOTE	271
+#define	TRANSPOSE	272
+#define	PLUS_PLUS	273
+#define	MINUS_MINUS	274
+#define	POW	275
+#define	EPOW	276
 #define	NUM	277
 #define	IMAG_NUM	278
 #define	NAME	279
 #define	SCREW	280
-#define	TEXT	281
-#define	STYLE	282
-#define	END	283
-#define	PLOT	284
-#define	EXPR_AND	285
-#define	EXPR_OR	286
-#define	EXPR_LT	287
-#define	EXPR_LE	288
-#define	EXPR_EQ	289
-#define	EXPR_NE	290
-#define	EXPR_GE	291
-#define	EXPR_GT	292
-#define	LEFTDIV	293
-#define	EMUL	294
-#define	EDIV	295
-#define	ELEFTDIV	296
-#define	QUOTE	297
-#define	TRANSPOSE	298
-#define	UNARY	299
-#define	PLUS_PLUS	300
-#define	MINUS_MINUS	301
-#define	EXPR_NOT	302
-#define	POW	303
-#define	EPOW	304
+#define	END	281
+#define	PLOT	282
+#define	TEXT	283
+#define	STYLE	284
+#define	FOR	285
+#define	WHILE	286
+#define	IF	287
+#define	ELSEIF	288
+#define	ELSE	289
+#define	BREAK	290
+#define	CONTINUE	291
+#define	FUNC_RET	292
+#define	FCN	293
+#define	SCREW_TWO	294
+#define	END_OF_INPUT	295
+#define	GLOBAL	296
+#define	USING	297
+#define	TITLE	298
+#define	WITH	299
+#define	COLON	300
+#define	OPEN_BRACE	301
+#define	CLOSE_BRACE	302
+#define	UNARY	303
 
 
 extern YYSTYPE yylval;

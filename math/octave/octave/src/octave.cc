@@ -28,6 +28,10 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 #endif
 
 #include <sys/types.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#include <sys/stat.h>
 #include <time.h>
 #include <pwd.h>
 #include <setjmp.h>
@@ -37,13 +41,13 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <assert.h>
 #include <iostream.h>
 #include <fstream.h>
-#include <GetOpt.h>
+
+#include "getopt.h"
 
 #include "sighandlers.h"
 #include "variables.h"
 #include "error.h"
 #include "tree-const.h"
-#include "symtab.h"
 #include "utils.h"
 #include "builtins.h"
 #include "input.h"
@@ -93,6 +97,12 @@ char *the_current_working_directory = (char *) NULL;
 // Load path specified on command line.
 char *load_path = (char *) NULL;
 
+// Name of the info file specified on command line.
+char *info_file = (char *) NULL;
+
+// Name of the editor to be invoked by the edit_history command.
+char *editor = (char *) NULL;
+
 // If nonzero, don't do fancy line editing.
 int no_line_editing = 0;
 
@@ -108,6 +118,17 @@ tree *global_command = (tree *) NULL;
 // Top level context (?)
 jmp_buf toplevel;
 
+// This is not really the right place to do this...
+typedef void (*one_arg_error_handler_t) (const char*);
+extern one_arg_error_handler_t set_Complex_error_handler
+  (one_arg_error_handler_t f);
+
+static void
+octave_Complex_error_handler (const char* msg)
+{
+  warning (msg);
+}
+
 // Nonzero means we read ~/.octaverc and ./.octaverc.
 static int read_init_files = 1;
 
@@ -115,11 +136,30 @@ static int read_init_files = 1;
 static int inhibit_startup_message = 0;
 
 // Usage message
-static const char *usage_string = "octave [-?dfhiqvx] [-p path] [file]";
+static const char *usage_string = 
+  "octave [-?dfhiqvx] [-p path] [--debug] [--help] [--interactive]\n\
+         [--info-file file] [--norc] [--path path] [--quiet] [--version]\n\
+         [--echo-commands] [file]";
 
 // This is here so that it\'s more likely that the usage message and
 // the real set of options will agree.
-static const char *getopt_option_string = "?dfhip:qvx";
+static const char *short_opts = "?dfhip:qvx";
+
+// Long options.
+#define INFO_FILE_OPTION 1
+static struct option long_opts[] =
+  {
+    { "debug", 0, 0, 'd' },
+    { "help", 0, 0, 'h' },
+    { "interactive", 0, 0, 'i' },
+    { "info-file", 1, 0, INFO_FILE_OPTION },
+    { "norc", 0, 0, 'f' },
+    { "path", 1, 0, 'p' },
+    { "quiet", 0, 0, 'q' },
+    { "version", 0, 0, 'v' },
+    { "echo-commands", 0, 0, 'x' },
+    { 0, 0, 0, 0 }
+  };
 
 /*
  * Initialize some global variables for later use.
@@ -150,6 +190,10 @@ initialize_globals (char *name)
   prog_name = strsave ("octave");
 
   load_path = default_path ();
+
+  info_file = default_info_file ();
+
+  editor = default_editor ();
 }
 
 void
@@ -178,6 +222,7 @@ parse_and_execute (FILE *f, int print)
   int retval;
   do
     {
+      reset_parser ();
       retval = yyparse ();
       if (retval == 0 && global_command != NULL_TREE)
 	{
@@ -190,7 +235,7 @@ parse_and_execute (FILE *f, int print)
   run_unwind_frame ("parse_and_execute");
 }
 
-static void
+void
 parse_and_execute (char *s, int print)
 {
   begin_unwind_frame ("parse_and_execute_2");
@@ -207,7 +252,7 @@ parse_and_execute (char *s, int print)
       unwind_protect_int (echo_input);
 
       input_line_number = 0;
-      current_input_column = 0;
+      current_input_column = 1;
       echo_input = 0;
 
       parse_and_execute (f, print);
@@ -230,16 +275,24 @@ execute_startup_files (void)
 
 // Try to execute commands from $HOME/.octaverc and ./.octaverc.
 
+  char *home_rc = (char *) NULL;
   if (home_directory != NULL)
     {
-      char *rc = strconcat (home_directory, "/.octaverc");
-
-      parse_and_execute (rc, 0);
-
-      delete [] rc;
+      home_rc = strconcat (home_directory, "/.octaverc");
+      parse_and_execute (home_rc, 0);
     }
 
-  parse_and_execute ("./.octaverc", 0);
+// Names alone are not enough.
+
+  struct stat home_rc_statbuf;
+  stat (home_rc, &home_rc_statbuf);
+  delete [] home_rc;
+
+  struct stat dot_rc_statbuf;
+  stat ("./.octaverc", &dot_rc_statbuf);
+
+  if (home_rc_statbuf.st_ino != dot_rc_statbuf.st_ino)
+    parse_and_execute ("./.octaverc", 0);
 }
 
 /*
@@ -253,13 +306,14 @@ verbose_usage (void)
        << ".  Copyright (C) 1992, 1993, John W. Eaton.\n"
        << "  This is free software with ABSOLUTELY NO WARRANTY.\n"
        << "\n"
-       << "  " << usage_string
-       << "\n"
+       << "  usage: " << usage_string
+       << "\n\n"
        << "     d : enter parser debugging mode\n"
        << "     f : don't read ~/.octaverc or .octaverc at startup\n"
        << "   h|? : print short help message and exit\n"
        << "     i : force interactive behavior\n"
        << "     q : don't print message at startup\n"
+       << "     v : print version number and exit\n"
        << "     x : echo commands as they are executed\n"
        << "\n"
        << "  file : execute commands from named file\n"
@@ -274,19 +328,22 @@ verbose_usage (void)
 static void
 usage (void)
 {
-  usage (usage_string);
+  cerr << "usage: " << usage_string << "\n";
   exit (1);
 }
 
 /*
  * Fix up things before exiting.
  */
-volatile void
+void
 clean_up_and_exit (int retval)
 {
   raw_mode (0);
+
   clean_up_history ();
+
   close_plot_stream ();
+
   close_files ();
 
   if (!quitting_gracefully && (interactive || forced_interactive))
@@ -296,6 +353,11 @@ clean_up_and_exit (int retval)
     retval = 0;
 
   exit (retval);
+
+// This is bogus but should prevent g++ from giving a warning saying
+// that this volatile function does return.
+
+  panic_impossible ();
 }
 
 static void
@@ -315,17 +377,17 @@ main (int argc, char **argv)
 // details.
   sysdep_init ();
 
+// This is not really the right place to do this...
+  set_Complex_error_handler (octave_Complex_error_handler);
+
 // Do this first, since some command line arguments may override the
 // defaults.
   initialize_globals (argv[0]);
 
-// If the 
-  GetOpt getopt (argc, argv, getopt_option_string);
-  int option_char;
-
-  while ((option_char = getopt ()) != EOF)
+  int optc;
+  while ((optc = getopt_long (argc, argv, short_opts, long_opts, 0)) != EOF)
     {
-      switch (option_char)
+      switch (optc)
 	{
 	case 'd':
 	  yydebug++;
@@ -341,8 +403,8 @@ main (int argc, char **argv)
 	  forced_interactive = 1;
 	  break;
 	case 'p':
-	  if (getopt.optarg != (char *) NULL)
-	    load_path = strsave (getopt.optarg);
+	  if (optarg != (char *) NULL)
+	    load_path = strsave (optarg);
 	  break;
 	case 'q':
 	  inhibit_startup_message = 1;
@@ -353,19 +415,14 @@ main (int argc, char **argv)
 	case 'v':
 	  print_version_and_exit ();
 	  break;
+	case INFO_FILE_OPTION:
+	  if (optarg != (char *) NULL)
+	    info_file = strsave (optarg);
+	  break;
 	default:
 	  usage ();
 	  break;
 	}
-    }
-
-  if (! inhibit_startup_message)
-    {
-      cout << "Octave, version " << version_string
-	   << ".  Copyright (C) 1992, 1993, John W. Eaton.\n"
-	   << "This is free software with ABSOLUTELY NO WARRANTY.\n"
-	   << "For details, type `warranty'.\n"
-	   << "\n";
     }
 
 // Make sure we clean up when we exit.
@@ -375,13 +432,9 @@ main (int argc, char **argv)
 
   initialize_file_io ();
 
-  global_sym_tab = new symbol_table ();
-  curr_sym_tab = global_sym_tab;
+  initialize_symbol_tables ();
 
   install_builtins ();
-
-  top_level_sym_tab = new symbol_table ();
-  curr_sym_tab = top_level_sym_tab;
 
   if (read_init_files)
     {
@@ -399,9 +452,14 @@ main (int argc, char **argv)
 
 // If there is an extra argument, see if it names a file to read.
 
-  if (getopt.optind != argc)
+  int remaining_args = argc - optind;
+  if (remaining_args > 1)
     {
-      FILE *infile = get_input_from_file (argv[getopt.optind]);
+      usage ();
+    }
+  else if (remaining_args == 1)
+    {
+      FILE *infile = get_input_from_file (argv[optind]);
       if (infile == (FILE *) NULL)
 	clean_up_and_exit (1);
       else
@@ -409,10 +467,10 @@ main (int argc, char **argv)
     }
   else
     {
+      switch_to_buffer (create_buffer (get_input_from_stdin ()));
+
 // Is input coming from a terminal?  If so, we are probably
 // interactive.
-
-      switch_to_buffer (create_buffer (get_input_from_stdin ()));
 
       interactive = (isatty (fileno (stdin)) && isatty (fileno (stdout)));
     }
@@ -428,6 +486,15 @@ main (int argc, char **argv)
 
   install_signal_handlers ();
 
+  if (! inhibit_startup_message)
+    {
+      cout << "Octave, version " << version_string
+	   << ".  Copyright (C) 1992, 1993, John W. Eaton.\n"
+	   << "This is free software with ABSOLUTELY NO WARRANTY.\n"
+	   << "For details, type `warranty'.\n"
+	   << "\n";
+    }
+
 // Allow the user to interrupt us without exiting.
 
   volatile sig_handler *saved_sigint_handler = signal (SIGINT, SIG_IGN);
@@ -435,6 +502,7 @@ main (int argc, char **argv)
   if (setjmp (toplevel) != 0)
     {
       raw_mode (0);
+
       cout << "\n";
     }
 

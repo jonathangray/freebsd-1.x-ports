@@ -1,4 +1,3 @@
-
 // Tree class.                                          -*- C++ -*-
 /*
 
@@ -56,9 +55,6 @@ extern "C"
 #include <readline/readline.h>
 }
 
-// Abort to top level on undefined symbol errors?
-static int abort_on_undefined = 0;
-
 // Nonzero means we're breaking out of a loop.
 static int breaking = 0;
 
@@ -81,6 +77,9 @@ tree::assign (tree_constant& t, tree_constant *args, int nargs)
 tree_constant *
 tree::eval (int print, int nargout)
 {
+  if (error_state)
+    return NULL_TREE_CONST;
+
   tree_constant *retval = new tree_constant [nargout+1];
   retval[0] = eval (print);
   return retval;
@@ -120,6 +119,19 @@ list_to_vector (tree *list, int& len)
 }
 #endif
 
+static int
+print_as_scalar (const tree_constant& val)
+{
+  int nr = val.rows ();
+  int nc = val.columns ();
+  return (val.is_scalar_type ()
+	  || val.is_string_type ()
+	  || (val.is_matrix_type ()
+	      && ((nr == 1 && nc == 1)
+		  || nr == 0
+		  || nc == 0)));
+}
+
 /*
  * Make sure that all arguments have values.
  */
@@ -138,7 +150,7 @@ all_args_defined (tree_constant *args, int nargs)
  * Are any of the arguments `:'?
  */
 static int
-any_arg_is_magic_colon (tree_constant *args, int nargs)
+any_arg_is_magic_colon (const tree_constant *args, int nargs)
 {
   while (--nargs > 0)
     {
@@ -256,7 +268,7 @@ tree_matrix::to_return_list (void)
 
 // Just about as ugly as it gets.
 
-static struct const_matrix_list
+struct const_matrix_list
 {
   tree::matrix_dir dir;
   tree_constant elem;
@@ -270,6 +282,9 @@ tree_constant
 tree_matrix::eval (int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
 
 // Just count the elements without looking at them.
 
@@ -310,7 +325,7 @@ tree_matrix::eval (int print)
 	return tree_constant (Matrix ());
 
       tree_constant tmp = elem->eval (0);
-      if (tmp.is_undefined ())
+      if (error_state || tmp.is_undefined ())
 	return tree_constant ();
 
       int nr = tmp.rows ();
@@ -325,7 +340,7 @@ tree_matrix::eval (int print)
 	  else if (empties_ok == 0)
 	    {
 	      error ("empty matrix found in matrix list");
-	      jump_to_top_level ();
+	      return tree_constant ();
 	    }
 
 	  if (direct == md_down)
@@ -575,44 +590,48 @@ tree_matrix::eval (int print)
 /*
  * Builtin functions.
  */
-tree_builtin::tree_builtin (void)
+tree_builtin::tree_builtin (const char *nm = (char *) NULL)
 {
   nargin_max = -1;
   nargout_max = -1;
   text_fcn = (Text_fcn) NULL;
   general_fcn = (General_fcn) NULL;
-  sym = (symbol_record *) NULL;
+  if (my_name != (char *) NULL)
+    my_name = strsave (nm);
 }
 
 tree_builtin::tree_builtin (int i_max, int o_max, Mapper_fcn& m_fcn,
-			    symbol_record *s)
+			    const char *nm = (char *) NULL)
 {
   nargin_max = i_max;
   nargout_max = o_max;
   mapper_fcn = m_fcn;
   text_fcn = (Text_fcn) NULL;
   general_fcn = (General_fcn) NULL;
-  sym = s;
+  if (my_name != (char *) NULL)
+    my_name = strsave (nm);
 }
 
 tree_builtin::tree_builtin (int i_max, int o_max, Text_fcn t_fcn,
-			    symbol_record *s)
+			    const char *nm = (char *) NULL)
 {
   nargin_max = i_max;
   nargout_max = o_max;
   text_fcn = t_fcn;
   general_fcn = (General_fcn) NULL;
-  sym = s;
+  if (my_name != (char *) NULL)
+    my_name = strsave (nm);
 }
 
 tree_builtin::tree_builtin (int i_max, int o_max, General_fcn g_fcn,
-			    symbol_record *s)
+			    const char *nm = (char *) NULL)
 {
   nargin_max = i_max;
   nargout_max = o_max;
   text_fcn = (Text_fcn) NULL;
   general_fcn = g_fcn;
-  sym = s;
+  if (my_name != (char *) NULL)
+    my_name = strsave (nm);
 }
 
 tree_builtin::~tree_builtin (void)
@@ -620,7 +639,7 @@ tree_builtin::~tree_builtin (void)
 }
 
 int
-tree_builtin::is_builtin (void)
+tree_builtin::is_builtin (void) const
 {
   return 1;
 }
@@ -629,17 +648,21 @@ tree_constant
 tree_builtin::eval (int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   if (text_fcn != (Text_fcn) NULL)
     {
       char **argv = new char * [1];
-      argv[0] = strsave (sym->name ());
+      argv[0] = strsave (my_name);
       retval = (*text_fcn) (1, argv);
       delete [] argv;
     }
   else if (general_fcn != (General_fcn) NULL)
     {
       tree_constant *argv = new tree_constant [1];
-      argv[0] = tree_constant (sym->name ());
+      argv[0] = tree_constant (my_name);
       tree_constant *tmp = (*general_fcn) (argv, 1, 1);
       delete [] argv;
       if (tmp != NULL_TREE_CONST)
@@ -647,7 +670,7 @@ tree_builtin::eval (int print)
       delete [] tmp;
     }
   else // Assume mapper function
-    message (name (), "argument expected");
+    message (my_name, "argument expected");
 
   if (retval.is_defined ())
     return retval.eval (print);
@@ -659,6 +682,10 @@ tree_constant *
 tree_builtin::eval (int print, int nargout)
 {
   tree_constant *retval = NULL_TREE_CONST;
+
+  if (error_state)
+    return retval;
+
   if (general_fcn != (General_fcn) NULL)
     {
       int n_in = 1;
@@ -667,7 +694,7 @@ tree_builtin::eval (int print, int nargout)
       retval = (*general_fcn) (args, n_in, n_out);
     }
   else
-    panic ("%s should be a general builtin function but it's not", name ());
+    panic ("%s should be a general builtin function but it's not", my_name);
 
   if (retval != NULL_TREE_CONST && retval[0].is_defined ())
     retval[0] = retval[0].eval (print);
@@ -678,6 +705,10 @@ tree_constant
 tree_builtin::eval (int argc, char **argv, int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   if (text_fcn != (Text_fcn) NULL)
     retval = (*text_fcn) (argc, argv);
   else
@@ -690,9 +721,13 @@ tree_builtin::eval (int argc, char **argv, int print)
 }
 
 tree_constant *
-tree_builtin::eval (tree_constant *args, int n_in, int n_out, int print)
+tree_builtin::eval (const tree_constant *args, int n_in, int n_out, int print)
 {
   tree_constant *retval = NULL_TREE_CONST;
+
+  if (error_state)
+    return retval;
+
   if (general_fcn != (General_fcn) NULL)
     if (any_arg_is_magic_colon (args, n_in))
       error ("invalid use of colon in function argument list");
@@ -701,7 +736,7 @@ tree_builtin::eval (tree_constant *args, int n_in, int n_out, int print)
   else
     {
       if (n_in > nargin_max)
-	message (name (), "too many arguments");
+	message (my_name, "too many arguments");
       else if (args[1].is_defined ())
 	{
 	  tree_constant tmp = args[1].mapper (mapper_fcn, 0);
@@ -716,16 +751,10 @@ tree_builtin::eval (tree_constant *args, int n_in, int n_out, int print)
   return retval;
 }
 
-tree *
-tree_builtin::def (void)
-{
-  return sym->def ();
-}
-
 char *
-tree_builtin::name (void)
+tree_builtin::name (void) const
 {
-  return sym->name ();
+  return my_name;
 }
 
 int
@@ -742,14 +771,20 @@ tree_builtin::max_expected_args (void)
 /*
  * Symbols from the symbol table.
  */
-tree_identifier::tree_identifier (void)
+tree_identifier::tree_identifier (int l = -1, int c = -1)
 {
   sym = (symbol_record *) NULL;
+  line_num = l;
+  column_num = c;
+  maybe_do_ans_assign = 0;
 }
 
-tree_identifier::tree_identifier (symbol_record *s)
+tree_identifier::tree_identifier (symbol_record *s, int l = -1, int c = -1)
 {
   sym = s;
+  line_num = l;
+  column_num = c;
+  maybe_do_ans_assign = 0;
 }
 
 tree_identifier::~tree_identifier (void)
@@ -757,27 +792,21 @@ tree_identifier::~tree_identifier (void)
 }
 
 int
-tree_identifier::is_identifier (void)
+tree_identifier::is_identifier (void) const
 {
   return 1;
 }
 
-tree *
-tree_identifier::def (void)
-{
-  return sym->def ();
-}
-
-symbol_record *
-tree_identifier::symrec (void)
-{
-  return sym;
-}
-
 char *
-tree_identifier::name (void)
+tree_identifier::name (void) const
 {
   return sym->name ();
+}
+
+void
+tree_identifier::rename (const char *n)
+{
+  sym->rename (n);
 }
 
 tree_identifier *
@@ -811,14 +840,31 @@ tree_identifier::document (char *s)
 }
 
 tree_constant
-tree_identifier::assign (tree_constant& t)
+tree_identifier::assign (tree_constant& rhs)
 {
   int status = 0;
-  tree_constant *tmp = new tree_constant (t);
-  if (t.is_defined ())
-    status = sym->define (tmp);
+
+  if (rhs.is_defined ())
+    {
+      if (! sym->is_defined ())
+	{
+	  if (! (sym->is_formal_parameter ()
+		 || sym->is_linked_to_global ()))
+	    {
+	      link_to_builtin_variable (sym);
+	    }
+	}
+      else if (sym->is_function ())
+	{
+	  sym->clear ();
+	}
+
+      tree_constant *tmp = new tree_constant (rhs);
+      status = sym->define (tmp);
+    }
+
   if (status)
-    return t;
+    return rhs;
   else
     return tree_constant ();
 }
@@ -830,26 +876,39 @@ tree_identifier::assign (tree_constant& rhs, tree_constant *args, int nargs)
 
   if (rhs.is_defined ())
     {
-      tree *tmp = sym->def ();
-      if (tmp == NULL_TREE)
+      if (! sym->is_defined ())
 	{
-	  if (user_pref.resize_on_range_error)
+	  if (! (sym->is_formal_parameter ()
+		 || sym->is_linked_to_global ()))
 	    {
-	      tree_constant *tc_tmp = new tree_constant ();
-	      retval = tc_tmp->assign (rhs, args, nargs);
-	      if (retval.is_defined ())
-		sym->define (tc_tmp);
+	      link_to_builtin_variable (sym);
 	    }
-	  else
-	    {
-	      error ("indexed assignment to previously undefined variables\n\
- is only possible when resize_on_range_error is true");
-	      return retval;
-	    }
+	}
+      else if (sym->is_function ())
+	{
+	  sym->clear ();
+	}
+
+      if (sym->is_variable ())
+	{
+	  tree *tmp = sym->def ();
+	  retval = tmp->assign (rhs, args, nargs);
 	}
       else
 	{
+	  assert (! sym->is_defined ());
+
+	  if (! user_pref.resize_on_range_error)
+	    {
+	      error ("indexed assignment to previously undefined variables");
+	      error ("is only possible when resize_on_range_error is true");
+	      return retval;
+	    }
+
+	  tree_constant *tmp = new tree_constant ();
 	  retval = tmp->assign (rhs, args, nargs);
+	  if (retval.is_defined ())
+	    sym->define (tmp);
 	}
     }
 
@@ -870,9 +929,15 @@ tree_identifier::bump_value (tree::expression_type etype)
 int
 tree_identifier::parse_m_file (int exec_script = 1)
 {
-  curr_m_file_name = sym->name ();
+  curr_m_file_name = name ();
   char *mf = m_file_in_path (curr_m_file_name);
-  return parse_m_file (mf, exec_script);
+  int script_file_executed = parse_m_file (mf, exec_script);
+  delete [] mf;
+
+  if (! (error_state || script_file_executed))
+    force_link_to_function (name ());
+
+  return script_file_executed;
 }
 
 static void
@@ -947,7 +1012,7 @@ tree_identifier::parse_m_file (char *mf, int exec_script = 1)
       using_readline = 0;
       reading_m_file = 1;
       input_line_number = 0;
-      current_input_column = 0;
+      current_input_column = 1;
 
       FILE *mfile = get_input_from_file (mf, 0);
 
@@ -977,22 +1042,6 @@ tree_identifier::parse_m_file (char *mf, int exec_script = 1)
 	}
 
       run_unwind_frame ("parse_m_file");
-
-      if (! script_file_executed)
-	{
-	  tree *ans = sym->def ();
-	  if (ans != NULL_TREE)
-	    {
-	      symbol_record *sr;
-	      sr = global_sym_tab->lookup (curr_m_file_name, 1, 0);
-	      if (! sr->is_defined ())
-		sr->alias (sym);
-	      ans->stash_m_file_name (mf);
-	      ans->stash_m_file_time (time ((time_t *) NULL));
-	    }
-	}
-
-      delete [] mf;
     }
 
   return script_file_executed;
@@ -1002,8 +1051,6 @@ void
 tree_identifier::parse_m_file (FILE *mfile, char *mf)
 {
   begin_unwind_frame ("parse_m_file_2");
-
-  id_to_define = this;
 
   unwind_protect_int (echo_input);
   unwind_protect_int (saving_history);
@@ -1038,49 +1085,60 @@ void
 tree_identifier::eval_undefined_error (void)
 {
   char *nm = sym->name ();
-  error ("`%s' undefined", nm);
-
-// If the symbol isn't defined, clear it from the symbol table so that
-// the builtin who command won't show it.  Don\'t clear undefined
-// symbols from the global or local (function) symbol tables -- that
-// can cause real problems...
-
-  if (curr_sym_tab == top_level_sym_tab)
-    curr_sym_tab->clear (nm);
-
-// Abort to top level?
-
-  if (abort_on_undefined)
-    jump_to_top_level ();
+  int l = line ();
+  int c = column ();
+  if (l == -1 && c == -1)
+    error ("`%s' undefined");
+  else
+    error ("`%s' undefined near line %d column %d", nm, l, c);
 }
 
+/*
+ * Try to find a definition for an identifier.  Here's how:
+ *
+ *   * If the identifier is already defined and is a function defined
+ *     in an m-file that has been modified since the last time we
+ *     parsed it, parse it again.
+ *
+ *   * If the identifier is not defined, try to find a builtin
+ *     variable or an already compiled function with the same name.
+ *
+ *   * If the identifier is still undefined, try looking for an m-file
+ *     to parse.
+ */
 tree *
 tree_identifier::do_lookup (int& script_file_executed)
 {
   script_file_executed = 0;
 
-  tree *ans = sym->def ();
-
-  if (ans == NULL_TREE || sym->is_function ())
+  if (! sym->is_linked_to_global ())
     {
-      symbol_record *tmp_sym = global_sym_tab->lookup (sym->name (), 0, 0);
-
-      if (tmp_sym == (symbol_record *) NULL || symbol_out_of_date (tmp_sym))
-	script_file_executed = parse_m_file ();
-      else
+      if (sym->is_defined ())
 	{
-	  if (tmp_sym != (symbol_record *) NULL)
+	  if (sym->is_function () && symbol_out_of_date (sym))
 	    {
-	      if (curr_sym_tab == top_level_sym_tab)
-		sym = tmp_sym;
-	      else if (! sym->is_formal_parameter ())
-		sym->alias (tmp_sym);
+	      script_file_executed = parse_m_file ();
 	    }
-	  else
-	    script_file_executed = parse_m_file ();
 	}
-      ans = sym->def ();
+      else if (! sym->is_formal_parameter ())
+	{
+	  link_to_builtin_or_function (sym);
+	  
+	  if (! sym->is_defined ())
+	    {
+	      script_file_executed = parse_m_file ();
+	    }
+	  else if (sym->is_function () && symbol_out_of_date (sym))
+	    {
+	      script_file_executed = parse_m_file ();
+	    }
+	}
     }
+
+  tree *ans = NULL_TREE;
+
+  if (! script_file_executed)
+    ans = sym->def ();
 
   return ans;
 }
@@ -1092,10 +1150,20 @@ tree_identifier::mark_as_formal_parameter (void)
     sym->mark_as_formal_parameter ();
 }
 
+void
+tree_identifier::mark_for_possible_ans_assign (void)
+{
+  maybe_do_ans_assign = 1;
+}
+
 tree_constant
 tree_identifier::eval (int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   int script_file_executed = 0;
 
   tree *ans = do_lookup (script_file_executed);
@@ -1108,45 +1176,55 @@ tree_identifier::eval (int print)
 	retval = ans->eval (0);
     }
 
-// XXX FIXME XXX -- this isn't a very clean way to keep from printing
-// the names of functions invoked without any arguments...
-
-  if (retval.is_defined ())
+  if (! error_state && retval.is_defined ())
     {
-      int pad_after = 0;
-      if (print && user_pref.print_answer_id_name)
+      if (maybe_do_ans_assign && ! ans->is_constant ())
 	{
-	  char *result_tag;
-	  if (ans != NULL_TREE && ans->is_constant ())
-	    result_tag = name ();
-	  else
-	    result_tag = "ans";
-    
-	  tree_constant_rep::constant_type t = retval.const_type ();
-	  if (t == tree_constant_rep::scalar_constant
-	      || t == tree_constant_rep::complex_scalar_constant
-	      || t == tree_constant_rep::string_constant)
-	    {
-	      ostrstream output_buf;
-	      output_buf << result_tag << " = " << ends;
-	      maybe_page_output (output_buf);
-	    }
-	  else
-	    {
-	      pad_after = 1;
-	      ostrstream output_buf;
-	      output_buf << result_tag << " =\n\n" << ends;
-	      maybe_page_output (output_buf);
-	    }
+	  symbol_record *sr = global_sym_tab->lookup ("ans", 1, 0);
+
+	  assert (sr != (symbol_record *) NULL);
+      
+	  tree_identifier *ans_id = new tree_identifier (sr);
+
+	  tree_constant *tmp = new tree_constant (retval);
+
+	  tree_simple_assignment_expression tmp_ass (ans_id, tmp);
+
+	  tmp_ass.eval (print);
 	}
-
-      retval.eval (print);
-
-      if (print && pad_after)
+      else
 	{
-	  ostrstream output_buf;
-	  output_buf << "\n" << ends;
-	  maybe_page_output (output_buf);
+	  if (print)
+	    {
+	      int pad_after = 0;
+	      if (user_pref.print_answer_id_name)
+		{
+		  char *result_tag = name ();
+    
+		  if (print_as_scalar (retval))
+		    {
+		      ostrstream output_buf;
+		      output_buf << result_tag << " = " << ends;
+		      maybe_page_output (output_buf);
+		    }
+		  else
+		    {
+		      pad_after = 1;
+		      ostrstream output_buf;
+		      output_buf << result_tag << " =\n\n" << ends;
+		      maybe_page_output (output_buf);
+		    }
+		}
+
+	      retval.eval (print);
+
+	      if (pad_after)
+		{
+		  ostrstream output_buf;
+		  output_buf << "\n" << ends;
+		  maybe_page_output (output_buf);
+		}
+	    }
 	}
     }
   return retval;
@@ -1156,6 +1234,10 @@ tree_constant *
 tree_identifier::eval (int print, int nargout)
 {
   tree_constant *retval = NULL_TREE_CONST;
+
+  if (error_state)
+    return retval;
+
   int script_file_executed = 0;
 
   tree *ans = do_lookup (script_file_executed);
@@ -1175,6 +1257,10 @@ tree_constant
 tree_identifier::eval (int argc, char **argv, int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   int script_file_executed = 0;
 
   tree *ans = do_lookup (script_file_executed);
@@ -1191,10 +1277,14 @@ tree_identifier::eval (int argc, char **argv, int print)
 }
 
 tree_constant *
-tree_identifier::eval (tree_constant *args, int nargin, int nargout,
+tree_identifier::eval (const tree_constant *args, int nargin, int nargout,
 		       int print)
 {
   tree_constant *retval = NULL_TREE_CONST;
+
+  if (error_state)
+    return retval;
+
   int script_file_executed = 0;
 
   tree *ans = do_lookup (script_file_executed);
@@ -1204,7 +1294,29 @@ tree_identifier::eval (tree_constant *args, int nargin, int nargout,
       if (ans == NULL_TREE)
 	eval_undefined_error ();
       else
-	retval = ans->eval (args, nargin, nargout, print);
+	{
+	  if (maybe_do_ans_assign && nargout == 1)
+	    {
+	      retval = ans->eval (args, nargin, nargout, 0);
+
+	      if (retval != NULL_TREE_CONST && retval[0].is_defined ())
+		{
+		  symbol_record *sr = global_sym_tab->lookup ("ans", 1, 0);
+
+		  assert (sr != (symbol_record *) NULL);
+      
+		  tree_identifier *ans_id = new tree_identifier (sr);
+
+		  tree_constant *tmp = new tree_constant (retval[0]);
+
+		  tree_simple_assignment_expression tmp_ass (ans_id, tmp);
+
+		  tmp_ass.eval (print);
+		}
+	    }
+	  else
+	    retval = ans->eval (args, nargin, nargout, print);
+	}
     }
 
   return retval;
@@ -1221,7 +1333,9 @@ tree_function::tree_function (void)
   sym_tab = (symbol_table *) NULL;
   cmd_list = NULL_TREE;
   file_name = (char *) NULL;
+  fcn_name = (char *) NULL;
   t_parsed = 0;
+  system_m_file = 0;
 }
 
 tree_function::tree_function (tree *cl, symbol_table *st)
@@ -1232,7 +1346,9 @@ tree_function::tree_function (tree *cl, symbol_table *st)
   sym_tab = st;
   cmd_list = cl;
   file_name = (char *) NULL;
+  fcn_name = (char *) NULL;
   t_parsed = 0;
+  system_m_file = 0;
 }
 
 tree_function::~tree_function (void)
@@ -1284,142 +1400,103 @@ tree_function::time_parsed (void)
   return t_parsed;
 }
 
+void
+tree_function::mark_as_system_m_file (void)
+{
+  if (file_name != (char *) NULL)
+    {
+// We really should stash the whole path to the file we found, when we
+// looked it up, to avoid possible race conditions...  XXX FIXME XXX
+//
+// We probably also don't need to get the library directory every
+// time, but since this function is only called when the M-file is
+// parsed, it probably doesn't matter that much.
+
+      char *oct_lib = octave_lib_dir ();
+      int len = strlen (oct_lib);
+
+      char *mf_name = m_file_in_path (file_name);
+
+      if (strncmp (oct_lib, mf_name, len) == 0)
+	system_m_file = 1;
+
+      delete [] mf_name;
+    }
+  else
+    system_m_file = 0;
+}
+
+int
+tree_function::is_system_m_file (void) const
+{
+  return system_m_file;
+}
+
+void
+tree_function::stash_function_name (char *s)
+{
+  fcn_name = strsave (s);
+}
+
+char *
+tree_function::function_name (void)
+{
+  return fcn_name;
+}
+
 tree_constant
 tree_function::eval (int print)
 {
   tree_constant retval;
 
-  if (cmd_list == NULL_TREE)
+  if (error_state || cmd_list == NULL_TREE)
     return retval;
-
-// Save old and set current symbol table context, for eval_undefined_error().
-  unwind_protect_ptr (curr_sym_tab);
-
-  curr_sym_tab = sym_tab;
 
   tree_constant *tmp = eval (print, 1);
 
-  if (tmp != NULL_TREE_CONST)
+  if (! error_state && tmp != NULL_TREE_CONST)
     retval = tmp[0];
   delete [] tmp;
 
-  run_unwind_protect ();
-
   return retval;
+}
+
+// For unwind protect.
+
+static void
+clear_symbol_table (void *table)
+{
+  symbol_table *tmp = (symbol_table *) table;
+  tmp->clear ();
 }
 
 tree_constant *
 tree_function::eval (int print, int nargout)
 {
-  tree_constant *retval = NULL_TREE_CONST;
-
-  if (cmd_list == NULL_TREE)
-    return retval;
-
-  begin_unwind_frame ("func_eval_1");
-
-  unwind_protect_int (call_depth);
-  call_depth++;
-
-  if (call_depth > 1)
-    {
-      error ("recursive function calls not supported yet");
-      jump_to_top_level ();
-    }
-
-  int nargin = 1;
-
-// Force symbols to be undefined, in case they were left over from
-// another call.
-  if (sym_tab != (symbol_table *) NULL)  // When is this ever false?
-    sym_tab->undefine ();
-
-// Associate names in the local symbol table with global names.
-  sym_tab->bind_globals ();
-
-// Save old and set current symbol table context, for eval_undefined_error().
-
-  unwind_protect_ptr (curr_sym_tab);
-  curr_sym_tab = sym_tab;
-
-  tree_constant *tmp;
-  symbol_record *sr;
-
-  sr = sym_tab->lookup ("nargin", 1, 0);
-  sr->unprotect ();
-  tmp = new tree_constant (nargin-1);
-  sr->define (tmp);
-  sr->protect ();
-
-  sr = sym_tab->lookup ("nargout", 1, 0);
-  sr->unprotect ();
-  tmp = new tree_constant (nargout);
-  sr->define (tmp);
-  sr->protect ();
-      
-// Evaluate the commands that make up the function, aborting to the
-// top level on undefined symbol errors.
-
-  unwind_protect_int (abort_on_undefined);
-
-  int abort_on_undefined_status = abort_on_undefined;
-  abort_on_undefined = 1;
-
-// Always turn on printing for commands inside functions.   Maybe this
-// should be toggled by a user-leval variable?
-
-  int pf = ! user_pref.silent_functions;
-  tree_constant last_computed_value = cmd_list->eval (pf);
-
-  if (returning)
-    returning = 0;
-
-  abort_on_undefined = abort_on_undefined_status;
-
-// Copy return values out.
-
-  if (ret_list != (tree_parameter_list *) NULL)
-    {
-      int nout = ret_list->length ();
-      retval = new tree_constant [nout+1];
-      int i = 0;
-      tree_parameter_list *elem = ret_list;
-      for ( ; elem != (tree_parameter_list *) NULL; elem = elem->next_elem ())
-	retval[i++] = elem->eval (0);
-      retval [nout] = tree_constant ();
-
-      if (retval != NULL_TREE_CONST
-	  && retval[0].is_defined ())
-	retval[0].eval (print);
-    }
-  else if (user_pref.return_last_computed_value)
-    {
-      retval = new tree_constant [2];
-      retval[0] = last_computed_value;
-      retval[1] = tree_constant ();
-    }
-
-  run_unwind_frame ("func_eval_1");
-
-  return retval;
+  return eval (NULL_TREE_CONST, 1, nargout, print);
 }
 
 tree_constant
 tree_function::eval (int argc, char **argv, int print)
 {
-  error ("%s: requires argument list in parentheses", argv[0]);
+  if (! error_state)
+    error ("%s: requires argument list in parentheses", argv[0]);
   return tree_constant ();
 }
 
 tree_constant *
-tree_function::eval (tree_constant *args, int nargin, int nargout, int print)
+tree_function::eval (const tree_constant *args, int nargin,
+		     int nargout, int print)
 {
   tree_constant *retval = NULL_TREE_CONST;
+
+  if (error_state)
+    return retval;
 
   if (cmd_list == NULL_TREE)
     return retval;
 
-  begin_unwind_frame ("func_eval_2");
+  begin_unwind_frame ("func_eval");
 
   unwind_protect_int (call_depth);
   call_depth++;
@@ -1427,16 +1504,12 @@ tree_function::eval (tree_constant *args, int nargin, int nargout, int print)
   if (call_depth > 1)
     {
       error ("recursive function calls not supported yet");
-      jump_to_top_level ();
+      goto abort;
     }
 
-// Force symbols to be undefined, in case they were left over from
-// another call.
-  if (sym_tab != (symbol_table *) NULL) // When is this ever false?
-    sym_tab->undefine ();
+// Force symbols to be undefined again when this function exits.
 
-// Associate names in the local symbol table with global names.
-  sym_tab->bind_globals ();
+  add_unwind_protect (clear_symbol_table, (void *) sym_tab);
 
 // Save old and set current symbol table context, for eval_undefined_error().
 
@@ -1473,39 +1546,24 @@ tree_function::eval (tree_constant *args, int nargin, int nargout, int print)
 // variables.
 
   {
-    tree_constant *tmp;
-    symbol_record *sr;
-
-    sr = sym_tab->lookup ("nargin", 1, 0);
-    sr->unprotect ();
-    tmp = new tree_constant (nargin-1);
-    sr->define (tmp);
-    sr->protect ();
-
-    sr = sym_tab->lookup ("nargout", 1, 0);
-    sr->unprotect ();
-    tmp = new tree_constant (nargout);
-    sr->define (tmp);
-    sr->protect ();
+    bind_nargin_and_nargout (sym_tab, nargin, nargout);
       
-// Evaluate the commands that make up the function, aborting to the
-// top level on undefined symbol errors.
-
-    unwind_protect_int (abort_on_undefined);
-    int abort_on_undefined_status = abort_on_undefined;
-    abort_on_undefined = 1;
-
-// Always turn on printing for commands inside functions.   Maybe this
-// should be toggled by a user-leval variable?
+// Evaluate the commands that make up the function.  Always turn on
+// printing for commands inside functions.   Maybe this should be
+// toggled by a user-leval variable?
 
     int pf = ! user_pref.silent_functions;
     tree_constant last_computed_value = cmd_list->eval (pf);
-    
+
     if (returning)
       returning = 0;
 
-    abort_on_undefined = abort_on_undefined_status;
-
+    if (error_state)
+      {
+	traceback_error ();
+	goto abort;
+      }
+    
 // Copy return values out.
 
     if (ret_list != (tree_parameter_list *) NULL)
@@ -1531,7 +1589,7 @@ tree_function::eval (tree_constant *args, int nargin, int nargout, int print)
   }
 
  abort:
-  run_unwind_frame ("func_eval_2");
+  run_unwind_frame ("func_eval");
 
   return retval;
 }
@@ -1543,6 +1601,26 @@ tree_function::max_expected_args (void)
     return param_list->length () + 1;
   else
     return 1;
+}
+
+void
+tree_function::traceback_error (void)
+{
+  error_state = -1;
+  if (fcn_name != (char *) NULL)
+    {
+      if (file_name != (char *) NULL)
+	error ("called from `%s' in file `%s'", fcn_name, file_name);
+      else 
+	error ("called from `%s'", fcn_name);
+    }
+  else
+    {
+      if (file_name != (char *) NULL)
+	error ("called from file `%s'", file_name);
+      else
+	error ("called from `?unknown?'");
+    }
 }
 
 /*
@@ -1567,17 +1645,22 @@ tree_expression::eval (int print)
 /*
  * Prefix expressions.
  */
-tree_prefix_expression::tree_prefix_expression (void)
+tree_prefix_expression::tree_prefix_expression (int l = -1, int c = -1)
 {
   id = (tree_identifier *) NULL;
   etype = unknown;
+  line_num = l;
+  column_num = c;
 }
 
 tree_prefix_expression::tree_prefix_expression (tree_identifier *t,
-						tree::expression_type et)
+						tree::expression_type et,
+						int l = -1, int c = -1)
 {
   id = t;
   etype = et;
+  line_num = l;
+  column_num = c;
 }
 
 tree_prefix_expression::~tree_prefix_expression (void)
@@ -1589,28 +1672,67 @@ tree_constant
 tree_prefix_expression::eval (int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   if (id != (tree_identifier *) NULL)
     {
       id->bump_value (etype);
       retval = id->eval (print);
+      if (error_state)
+	{
+	  retval = tree_constant ();
+	  if (error_state)
+	    eval_error ();
+	}
     }
   return retval;
+}
+
+void
+tree_prefix_expression::eval_error (void)
+{
+  if (error_state > 0)
+    {
+      char *op;
+      switch (etype)
+	{
+	case tree::increment: op = "++";      break;
+	case tree::decrement: op = "--";      break;
+	default:              op = "unknown"; break;
+	}
+
+      error ("evaluating prefix operator `%s' near line %d, column %d",
+	     op, line (), column ());
+    }
+}
+
+int
+tree_prefix_expression::is_prefix_expression (void) const
+{
+  return 1;
 }
 
 /*
  * Postfix expressions.
  */
-tree_postfix_expression::tree_postfix_expression (void)
+tree_postfix_expression::tree_postfix_expression (int l = -1, int c = -1)
 {
   id = (tree_identifier *) NULL;
   etype = unknown;
+  line_num = l;
+  column_num = c;
 }
 
 tree_postfix_expression::tree_postfix_expression (tree_identifier *t,
-						  tree::expression_type et)
+						  tree::expression_type et,
+						  int l = -1, int c = -1)
 {
   id = t;
   etype = et;
+  line_num = l;
+  column_num = c;
 }
 
 tree_postfix_expression::~tree_postfix_expression (void)
@@ -1622,28 +1744,61 @@ tree_constant
 tree_postfix_expression::eval (int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   if (id != (tree_identifier *) NULL)
     {
       retval = id->eval (print);
       id->bump_value (etype);
+      if (error_state)
+	{
+	  retval = tree_constant ();
+	  if (error_state)
+	    eval_error ();
+	}
     }
   return retval;
+}
+
+void
+tree_postfix_expression::eval_error (void)
+{
+  if (error_state > 0)
+    {
+      char *op;
+      switch (etype)
+	{
+	case tree::increment: op = "++";      break;
+	case tree::decrement: op = "--";      break;
+	default:              op = "unknown"; break;
+	}
+
+      error ("evaluating postfix operator `%s' near line %d, column %d",
+	     op, line (), column ());
+    }
 }
 
 /*
  * Unary expressions.
  */
-tree_unary_expression::tree_unary_expression (void)
+tree_unary_expression::tree_unary_expression (int l = -1, int c = -1)
 {
   etype = tree::unknown;
   op = NULL_TREE;
+  line_num = l;
+  column_num = c;
 }
 
 tree_unary_expression::tree_unary_expression (tree *a,
-					      tree::expression_type t)
+					      tree::expression_type t,
+					      int l = -1, int c = -1)
 {
   etype = t;
   op = a;
+  line_num = l;
+  column_num = c;
 }
 
 tree_unary_expression::~tree_unary_expression (void)
@@ -1654,6 +1809,9 @@ tree_unary_expression::~tree_unary_expression (void)
 tree_constant
 tree_unary_expression::eval (int print)
 {
+  if (error_state)
+    return tree_constant ();
+
   tree_constant ans;
 
   switch (etype)
@@ -1665,10 +1823,18 @@ tree_unary_expression::eval (int print)
       if (op != NULL_TREE)
 	{
 	  tree_constant u = op->eval (0);
-	  if (u.is_undefined ())
-	    ans = u;
-	  else
-	    ans = do_unary_op (u, etype);
+	  if (error_state)
+	    eval_error ();
+	  else if (u.is_defined ())
+	    {
+	      ans = do_unary_op (u, etype);
+	      if (error_state)
+		{
+		  ans = tree_constant ();
+		  if (error_state)
+		    eval_error ();
+		}
+	    }
 	}
       break;
     default:
@@ -1682,22 +1848,47 @@ tree_unary_expression::eval (int print)
     return ans;
 }
 
+void
+tree_unary_expression::eval_error (void)
+{
+  if (error_state > 0)
+    {
+      char *op;
+      switch (etype)
+	{
+	case tree::not:        op = "!";       break;
+	case tree::uminus:     op = "-";       break;
+	case tree::hermitian:  op = "'";       break;
+	case tree::transpose:  op = ".'";      break;
+	default:               op = "unknown"; break;
+	}
+
+      error ("evaluating unary operator `%s' near line %d, column %d",
+	     op, line (), column ());
+    }
+}
+
 /*
  * Binary expressions.
  */
-tree_binary_expression::tree_binary_expression (void)
+tree_binary_expression::tree_binary_expression (int l = -1, int c = -1)
 {
   etype = tree::unknown;
   op1 = NULL_TREE;
   op2 = NULL_TREE;
+  line_num = l;
+  column_num = c;
 }
 
 tree_binary_expression::tree_binary_expression (tree *a, tree *b,
-						tree::expression_type t)
+						tree::expression_type t,
+						int l = -1, int c = -1)
 {
   etype = t;
   op1 = a;
   op2 = b;
+  line_num = l;
+  column_num = c;
 }
 
 tree_binary_expression::~tree_binary_expression (void)
@@ -1709,6 +1900,9 @@ tree_binary_expression::~tree_binary_expression (void)
 tree_constant
 tree_binary_expression::eval (int print)
 {
+  if (error_state)
+    return tree_constant ();
+
   tree_constant ans;
   switch (etype)
     {
@@ -1733,13 +1927,22 @@ tree_binary_expression::eval (int print)
       if (op1 != NULL_TREE)
 	{
 	  tree_constant a = op1->eval (0);
-	  if (a.is_defined ())
+	  if (error_state)
+	    eval_error ();
+	  else if (a.is_defined () && op2 != NULL_TREE)
 	    {
-	      if (op2 != NULL_TREE)
+	      tree_constant b = op2->eval (0);
+	      if (error_state)
+		eval_error ();
+	      else if (b.is_defined ())
 		{
-		  tree_constant b = op2->eval (0);
-		  if (b.is_defined ())
-		    ans = do_binary_op (a, b, etype);
+		  ans = do_binary_op (a, b, etype);
+		  if (error_state)
+		    {
+		      ans = tree_constant ();
+		      if (error_state)
+			eval_error ();
+		    }
 		}
 	    }
 	}
@@ -1753,6 +1956,40 @@ tree_binary_expression::eval (int print)
     return ans.eval (print);
   else
     return ans;
+}
+
+void
+tree_binary_expression::eval_error (void)
+{
+  if (error_state > 0)
+    {
+      char *op;
+      switch (etype)
+	{
+	case tree::add:        op = "+";       break;
+	case tree::subtract:   op = "-";       break;
+	case tree::multiply:   op = "*";       break;
+	case tree::el_mul:     op = ".*";      break;
+	case tree::divide:     op = "/";       break;
+	case tree::el_div:     op = "./";      break;
+	case tree::leftdiv:    op = "\\";      break;
+	case tree::el_leftdiv: op = ".\\";     break;
+	case tree::power:      op = "^";       break;
+	case tree::elem_pow:   op = ".^";      break;
+	case tree::cmp_lt:     op = "<";       break;
+	case tree::cmp_le:     op = "<=";      break;
+	case tree::cmp_eq:     op = "==";      break;
+	case tree::cmp_ge:     op = ">=";      break;
+	case tree::cmp_gt:     op = ">";       break;
+	case tree::cmp_ne:     op = "!=";      break;
+	case tree::and:        op = "&&";      break;
+	case tree::or:         op = "||";      break;
+	default:               op = "unknown"; break;
+	}
+
+      error ("evaluating binary operator `%s' near line %d, column %d",
+	     op, line (), column ());
+    }
 }
 
 /*
@@ -1776,7 +2013,7 @@ tree_assignment_expression::eval (int print)
 }
 
 int
-tree_assignment_expression::is_assignment_expression (void)
+tree_assignment_expression::is_assignment_expression (void) const
 {
   return 1;
 }
@@ -1784,30 +2021,37 @@ tree_assignment_expression::is_assignment_expression (void)
 /*
  * Simple assignment expressions.
  */
-tree_simple_assignment_expression::tree_simple_assignment_expression (void)
+tree_simple_assignment_expression::tree_simple_assignment_expression
+  (int l = -1, int c = -1)
 {
   etype = tree::assignment;
   lhs = (tree_identifier *) NULL;
   index = (tree_argument_list *) NULL;
   rhs = NULL_TREE;
+  line_num = l;
+  column_num = c;
 }
 
 tree_simple_assignment_expression::tree_simple_assignment_expression
-  (tree_identifier *i, tree *r)
+  (tree_identifier *i, tree *r, int l = -1, int c = -1)
 {
   etype = tree::assignment;
   lhs = i;
   index = (tree_argument_list *) NULL;
   rhs = r;
+  line_num = l;
+  column_num = c;
 }
 
 tree_simple_assignment_expression::tree_simple_assignment_expression
-  (tree_index_expression *idx_expr, tree *r)
+  (tree_index_expression *idx_expr, tree *r, int l = -1, int c = -1)
 {
   etype = tree::assignment;
   lhs = idx_expr->ident ();
   index = idx_expr->arg_list ();
   rhs = r;
+  line_num = l;
+  column_num = c;
 }
 
 tree_simple_assignment_expression::~tree_simple_assignment_expression (void)
@@ -1825,31 +2069,47 @@ tree_simple_assignment_expression::eval (int print)
   tree_constant ans;
   tree_constant retval;
 
+  if (error_state)
+    return retval;
+
   if (rhs != NULL_TREE)
     {
       tree_constant rhs_val = rhs->eval (0);
-      if (index == NULL_TREE)
-	ans = lhs->assign (rhs_val);
+      if (error_state)
+	{
+	  if (error_state)
+	    eval_error ();
+	}
+      else if (index == NULL_TREE)
+	{
+	  ans = lhs->assign (rhs_val);
+	  if (error_state)
+	    eval_error ();
+	}
       else
 	{
 // Extract the arguments into a simple vector.
 	  int nargs = 0;
 	  tree_constant *args = index->convert_to_const_vector (nargs);
-	  if (nargs > 1)
-	    ans = lhs->assign (rhs_val, args, nargs);
+	  if (nargs > 1 && ! error_state)
+	    {
+	      ans = lhs->assign (rhs_val, args, nargs);
+	      if (error_state)
+		eval_error ();
+	    }
+	  else if (error_state)
+	    eval_error ();
+
 	  delete [] args;
 	}
     }
 
-  if (ans.is_defined ())
+  if (! error_state && ans.is_defined ())
     {
       int pad_after = 0;
       if (print && user_pref.print_answer_id_name)
 	{
-	  tree_constant_rep::constant_type t = ans.const_type ();
-	  if (t == tree_constant_rep::scalar_constant
-	      || t == tree_constant_rep::complex_scalar_constant
-	      || t == tree_constant_rep::string_constant)
+	  if (print_as_scalar (ans))
 	    {
 	      ostrstream output_buf;
 	      output_buf << lhs->name () << " = " << ends;
@@ -1877,22 +2137,42 @@ tree_simple_assignment_expression::eval (int print)
   return retval;
 }
 
+void
+tree_simple_assignment_expression::eval_error (void)
+{
+  if (error_state > 0)
+    {
+      int l = line ();
+      int c = column ();
+      if (l != -1 && c != -1)
+	error ("evaluating assignment expression near line %d, column %d",
+	       l, c);
+//      else
+//	error ("evaluating assignment expression");
+    }
+}
+
 /*
  * Multi-valued assignmnt expressions.
  */
-tree_multi_assignment_expression::tree_multi_assignment_expression (void)
+tree_multi_assignment_expression::tree_multi_assignment_expression
+  (int l = -1, int c = -1)
 {
   etype = tree::multi_assignment;
   lhs = (tree_return_list *) NULL;
   rhs = NULL_TREE;
+  line_num = l;
+  column_num = c;
 }
 
 tree_multi_assignment_expression::tree_multi_assignment_expression
-  (tree_return_list *l, tree *r)
+  (tree_return_list *lst, tree *r, int l = -1, int c = -1)
 {
   etype = tree::multi_assignment;
-  lhs = l;
+  lhs = lst;
   rhs = r;
+  line_num = l;
+  column_num = c;
 }
 
 tree_multi_assignment_expression::~tree_multi_assignment_expression (void)
@@ -1905,12 +2185,18 @@ tree_constant
 tree_multi_assignment_expression::eval (int print)
 {
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   tree_constant *result = eval (print, 1);
+
   if (result != NULL_TREE_CONST)
     {
       retval = result[0];
       delete [] result;
     }
+
   return retval;
 }
 
@@ -1919,11 +2205,17 @@ tree_multi_assignment_expression::eval (int print, int nargout)
 {
   assert (etype == tree::multi_assignment);
 
-  if (rhs == NULL_TREE)
+  if (error_state || rhs == NULL_TREE)
     return NULL_TREE_CONST;
 
   nargout = lhs->length ();
   tree_constant *results = rhs->eval (0, nargout);
+
+  if (error_state)
+    eval_error ();
+
+  int ma_line = line ();
+  int ma_column = column ();
 
   if (results != NULL_TREE_CONST)
     {
@@ -1939,46 +2231,54 @@ tree_multi_assignment_expression::eval (int print, int nargout)
 	    {
 	      if (results[i].is_undefined ())
 		{
-		  tree_simple_assignment_expression tmp_expr (lhs_expr,
-							      NULL_TREE_CONST);
+		  tree_simple_assignment_expression tmp_expr
+		    (lhs_expr, NULL_TREE_CONST, ma_line, ma_column);
+
 		  results[i] = tmp_expr.eval (0); // Should stay undefined!
+
+		  if (error_state)
+		    break;
+
 		  if (last_was_scalar_type && i == 1)
 		    pad_after = 0;
+
 		  break;
 		}
 	      else
 		{
 		  tree_constant *tmp = new tree_constant (results[i]);
-		  tree_simple_assignment_expression tmp_expr (lhs_expr, tmp);
+
+		  tree_simple_assignment_expression tmp_expr
+		    (lhs_expr, tmp, ma_line, ma_column);
+
 		  results[i] = tmp_expr.eval (0); // May change
+
+		  if (error_state)
+		    break;
+
 		  if (print && pad_after)
 		    {
 		      ostrstream output_buf;
-		      output_buf << "\n" << ends;
+		      output_buf << "\n" << '\0';
 		      maybe_page_output (output_buf);
 		    }
 
 		  if (print && user_pref.print_answer_id_name)
 		    {
-		      tree_constant_rep::constant_type t
-			= results[i].const_type ();
-
 		      tree_identifier *tmp_id = lhs_expr->ident ();
 		      char *tmp_nm = tmp_id->name ();
 
-		      if (t == tree_constant_rep::complex_scalar_constant
-			  || t == tree_constant_rep::scalar_constant
-			  || t == tree_constant_rep::string_constant)
+		      if (print_as_scalar (results[i]))
 			{
 			  ostrstream output_buf;
-			  output_buf << tmp_nm << " = " << ends;
+			  output_buf << tmp_nm << " = " << '\0';
 			  maybe_page_output (output_buf);
 			  last_was_scalar_type = 1;
 			}
 		      else
 			{
 			  ostrstream output_buf;
-			  output_buf << tmp_nm << " =\n\n" << ends;
+			  output_buf << tmp_nm << " =\n\n" << '\0';
 			  maybe_page_output (output_buf);
 			  last_was_scalar_type = 0;
 			}
@@ -1990,11 +2290,17 @@ tree_multi_assignment_expression::eval (int print, int nargout)
 	    }
 	  else
 	    {
-	      tree_simple_assignment_expression tmp_expr (lhs_expr,
-							  NULL_TREE_CONST);
+	      tree_simple_assignment_expression tmp_expr
+		(lhs_expr, NULL_TREE_CONST, ma_line, ma_column);
+
 	      tmp_expr.eval (0);
+
+	      if (error_state)
+		break;
+
 	      if (last_was_scalar_type && i == 1)
 		pad_after = 0;
+
 	      break;
 	    }
 	}
@@ -2002,7 +2308,7 @@ tree_multi_assignment_expression::eval (int print, int nargout)
       if (print && pad_after)
 	{
 	  ostrstream output_buf;
-	  output_buf << "\n" << ends;
+	  output_buf << "\n" << '\0';
 	  maybe_page_output (output_buf);
 	}
     }
@@ -2010,23 +2316,36 @@ tree_multi_assignment_expression::eval (int print, int nargout)
   return results;
 }
 
+void
+tree_multi_assignment_expression::eval_error (void)
+{
+  if (error_state > 0)
+    error ("evaluating assignment expression near line %d, column %d",
+	   line (), column ());
+}
+
 /*
  * Colon expressions.
  */
-tree_colon_expression::tree_colon_expression (void)
+tree_colon_expression::tree_colon_expression (int l = -1, int c = -1)
 {
   etype = tree::colon;
   op1 = NULL_TREE;
   op2 = NULL_TREE;
   op3 = NULL_TREE;
+  line_num = l;
+  column_num = c;
 }
 
-tree_colon_expression::tree_colon_expression (tree *a, tree *b)
+tree_colon_expression::tree_colon_expression (tree *a, tree *b,
+					      int l = -1, int c = -1)
 {
   etype = tree::colon;
   op1 = a;		// base
   op2 = b;		// limit
   op3 = NULL_TREE;	// increment if not empty.
+  line_num = l;
+  column_num = c;
 }
 
 tree_colon_expression::~tree_colon_expression (void)
@@ -2057,7 +2376,7 @@ tree_colon_expression::eval (int print)
 {
   tree_constant retval;
 
-  if (op1 == NULL_TREE || op2 == NULL_TREE) 
+  if (error_state || op1 == NULL_TREE || op2 == NULL_TREE) 
     return retval;
 
   tree_constant tmp;
@@ -2066,7 +2385,7 @@ tree_colon_expression::eval (int print)
 
   if (tmp.is_undefined ())
     {
-      error ("invalid null value colon expression");
+      eval_error ("invalid null value in colon expression");
       return retval;
     }
 
@@ -2074,7 +2393,7 @@ tree_colon_expression::eval (int print)
   if (tmp.const_type () != tree_constant_rep::scalar_constant
       && tmp.const_type () != tree_constant_rep::complex_scalar_constant)
     {
-      error ("base for colon expression must be a scalar");
+      eval_error ("base for colon expression must be a scalar");
       return retval;
     }
   double base = tmp.double_value ();
@@ -2083,7 +2402,7 @@ tree_colon_expression::eval (int print)
 
   if (tmp.is_undefined ())
     {
-      error ("invalid null value colon expression");
+      eval_error ("invalid null value in colon expression");
       return retval;
     }
 
@@ -2091,7 +2410,7 @@ tree_colon_expression::eval (int print)
   if (tmp.const_type () != tree_constant_rep::scalar_constant
       && tmp.const_type () != tree_constant_rep::complex_scalar_constant)
     {
-      error ("limit for colon expression must be a scalar");
+      eval_error ("limit for colon expression must be a scalar");
       return retval;
     }
   double limit = tmp.double_value ();
@@ -2103,7 +2422,7 @@ tree_colon_expression::eval (int print)
 
       if (tmp.is_undefined ())
 	{
-	  error ("invalid null value colon expression");
+	  eval_error ("invalid null value in colon expression");
 	  return retval;
 	}
 
@@ -2111,17 +2430,21 @@ tree_colon_expression::eval (int print)
       if (tmp.const_type () != tree_constant_rep::scalar_constant
 	  && tmp.const_type () != tree_constant_rep::complex_scalar_constant)
 	{
-	  error ("increment for colon expression must be a scalar");
+	  eval_error ("increment for colon expression must be a scalar");
 	  return retval;
 	}
       else
 	inc = tmp.double_value ();
     }
 
-  int nelem = (int) ((limit - base) / inc + 1);
+  retval = tree_constant (base, limit, inc);
 
-  if (nelem > 0)
-    retval = tree_constant (base, limit, inc);
+  if (error_state)
+    {
+      if (error_state)
+	eval_error ("evaluating colon expression");
+      return tree_constant ();
+    }
 
   if (retval.is_defined ())
     return retval.eval (print);
@@ -2129,26 +2452,41 @@ tree_colon_expression::eval (int print)
     return retval;
 }
 
+void
+tree_colon_expression::eval_error (const char *s)
+{
+  if (error_state > 0)
+    error ("%s near line %d column %d", s, line (), column ());
+}
+
 /*
  * Index expressions.
  */
-tree_index_expression::tree_index_expression (void)
+tree_index_expression::tree_index_expression (int l = -1, int c = -1)
 {
   id = (tree_identifier *) NULL;
   list = (tree_argument_list *) NULL;
+  line_num = l;
+  column_num = c;
 }
 
 tree_index_expression::tree_index_expression (tree_identifier *i,
-					      tree_argument_list *l)
+					      tree_argument_list *lst,
+					      int l = -1, int c = -1)
 {
   id = i;
-  list = l;
+  list = lst;
+  line_num = l;
+  column_num = c;
 }
 
-tree_index_expression::tree_index_expression (tree_identifier *i)
+tree_index_expression::tree_index_expression (tree_identifier *i,
+					      int l = -1, int c = -1)
 {
   id = i;
   list = (tree_argument_list *) NULL;
+  line_num = l;
+  column_num = c;
 }
 
 tree_index_expression::~tree_index_expression (void)
@@ -2158,7 +2496,7 @@ tree_index_expression::~tree_index_expression (void)
 }
 
 int
-tree_index_expression::is_index_expression (void)
+tree_index_expression::is_index_expression (void) const
 {
   return 1;
 }
@@ -2175,13 +2513,27 @@ tree_index_expression::arg_list (void)
   return list;
 }
 
+void
+tree_index_expression::mark_for_possible_ans_assign (void)
+{
+  id->mark_for_possible_ans_assign ();
+}
+
+
 tree_constant
 tree_index_expression::eval (int print)
 {
   tree_constant retval;
 
+  if (error_state)
+    return retval;
+
   if (list == (tree_argument_list *) NULL)
-    retval = id->eval (print);
+    {
+      retval = id->eval (print);
+      if (error_state)
+	eval_error ();
+    }
   else
     {
 // Extract the arguments into a simple vector.
@@ -2191,8 +2543,13 @@ tree_index_expression::eval (int print)
       if (nargin > 1 && all_args_defined (args, nargin))
 	{
 	  tree_constant *tmp = id->eval (args, nargin, 1, print);
+
+	  if (error_state)
+	    eval_error ();
+
 	  if (tmp != NULL_TREE_CONST)
 	    retval = tmp[0];
+
 	  delete [] tmp;
 	}
       delete [] args;
@@ -2205,8 +2562,15 @@ tree_index_expression::eval (int print, int nargout)
 {
   tree_constant *retval = NULL_TREE_CONST;
 
+  if (error_state)
+    return retval;
+
   if (list == (tree_argument_list *) NULL)
-    retval = id->eval (print, nargout);
+    {
+      retval = id->eval (print, nargout);
+      if (error_state)
+	eval_error ();
+    }
   else
     {
 // Extract the arguments into a simple vector.
@@ -2215,9 +2579,40 @@ tree_index_expression::eval (int print, int nargout)
 // Don't pass null arguments.
       if (nargin > 1 && all_args_defined (args, nargin))
 	retval = id->eval (args, nargin, nargout, print);
+
+      if (error_state)
+	eval_error ();
+
       delete [] args;
     }
   return retval;
+}
+
+void
+tree_index_expression::eval_error (void)
+{
+  if (error_state > 0)
+    {
+      int l = line ();
+      int c = column ();
+      char *fmt;
+      if (l != -1 && c != -1)
+	{
+	  if (list != (tree_argument_list *) NULL)
+	    fmt = "evaluating index expression near line %d, column %d";
+	  else
+	    fmt = "evaluating expression near line %d, column %d";
+
+	  error (fmt, l, c);
+	}
+      else
+	{
+	  if (list != (tree_argument_list *) NULL)
+	    error ("evaluating index expression");
+	  else
+	    error ("evaluating expression");
+	}
+    }
 }
 
 /*
@@ -2313,7 +2708,7 @@ tree_argument_list::convert_to_const_vector (int& len)
 tree_constant
 tree_argument_list::eval (int print)
 {
-  if (arg == NULL_TREE)
+  if (error_state || arg == NULL_TREE)
     return tree_constant ();
   else
     return arg->eval (print);
@@ -2379,7 +2774,7 @@ tree_parameter_list::length (void)
 }
 
 char *
-tree_parameter_list::name (void)
+tree_parameter_list::name (void) const
 {
   return param->name ();
 }
@@ -2407,7 +2802,7 @@ tree_parameter_list::next_elem (void)
 tree_constant
 tree_parameter_list::eval (int print)
 {
-  if (param == NULL_TREE)
+  if (error_state || param == NULL_TREE)
     return tree_constant ();
   else
     return param->eval (print);
@@ -2565,7 +2960,7 @@ tree_word_list::length (void)
 }
 
 char *
-tree_word_list::name (void)
+tree_word_list::name (void) const
 {
   return word;
 }
@@ -2579,7 +2974,8 @@ tree_word_list::next_elem (void)
 tree_constant
 tree_word_list::eval (int print)
 {
-  error ("executing word_list_command");
+  if (! error_state)
+    error ("executing word_list_command");
   return tree_constant ();
 }
 
@@ -2642,6 +3038,10 @@ tree_command_list::eval (int print)
 {
   int pf;
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
   tree_command_list *list;
   for (list = this; list != (tree_command_list *) NULL; list = list->next)
     {
@@ -2657,6 +3057,9 @@ tree_command_list::eval (int print)
 	{
 	  retval = cmd->eval (pf);
 
+	  if (error_state)
+	    return tree_constant ();
+
 	  if (breaking || continuing)
 	    break;
 
@@ -2668,24 +3071,145 @@ tree_command_list::eval (int print)
 }
 
 /*
+ * Global.
+ */
+tree_global_command::tree_global_command (int l = -1, int c = -1)
+{
+  line_num = l;
+  column_num = c;
+  sr = (symbol_record *) NULL;
+  rhs = NULL_TREE;
+  next = (tree_global_command *) NULL;
+}
+
+tree_global_command::tree_global_command (symbol_record *s,
+					  int l = -1, int c = -1)
+{
+  line_num = l;
+  column_num = c;
+  sr = s;
+  rhs = NULL_TREE;
+  next = (tree_global_command *) NULL;
+}
+
+tree_global_command::tree_global_command (symbol_record *s, tree *e,
+					  int l = -1, int c = -1) 
+{
+  line_num = l;
+  column_num = c;
+  sr = s;
+  rhs = e;
+  next = (tree_global_command *) NULL;
+}
+
+tree_global_command::~tree_global_command (void)
+{
+  delete next;
+}
+
+tree_global_command *
+tree_global_command::chain (symbol_record *s, int l = -1, int c = -1)
+{
+  tree_global_command *tmp = new tree_global_command (s, l, c);
+  tmp->next = this;
+  return tmp;
+}
+
+tree_global_command *
+tree_global_command::chain (symbol_record *s, tree *e,
+			    int l = -1, int c = -1)
+{
+  tree_global_command *tmp = new tree_global_command (s, e, l, c);
+  tmp->next = this;
+  return tmp;
+}
+
+tree_global_command *
+tree_global_command::reverse (void)
+{
+  tree_global_command *list = this;
+  tree_global_command *next;
+  tree_global_command *prev = (tree_global_command *) NULL;
+
+  while (list != (tree_global_command *) NULL)
+    {
+      next = list->next;
+      list->next = prev;
+      prev = list;
+      list = next;
+    }
+  return prev;
+}
+
+tree_constant
+tree_global_command::eval (int print)
+{
+  tree_constant retval;
+
+  link_to_global_variable (sr);
+
+  if (rhs != NULL_TREE)
+    {
+      tree_identifier *id = new tree_identifier (sr);
+      tree_constant tmp_rhs = rhs->eval (0);
+      if (error_state)
+	{
+	  eval_error ();
+	  return retval;
+	}
+      else
+	{
+	  tree_constant *tmp_val = new tree_constant (tmp_rhs);
+	  tree_simple_assignment_expression tmp_ass (id, tmp_val);
+	  tmp_ass.eval (0);
+	  if (error_state)
+	    {
+	      eval_error ();
+	      return retval;
+	    }
+	}
+    }
+
+  if (next != (tree_global_command *) NULL)
+    next->eval (print);
+
+  return retval;
+}
+
+void
+tree_global_command::eval_error (void)
+{
+  if (error_state > 0)
+    error ("evaluating global command near line %d, column %d",
+	   line (), column ());
+}
+
+/*
  * While.
  */
-tree_while_command::tree_while_command (void)
+tree_while_command::tree_while_command (int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
   expr = NULL_TREE;
   list = NULL_TREE;
 }
 
-tree_while_command::tree_while_command (tree *e)
+tree_while_command::tree_while_command (tree *e, int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
   expr = e;
   list = NULL_TREE;
 }
 
-tree_while_command::tree_while_command (tree *e, tree *l)
+tree_while_command::tree_while_command (tree *e, tree *lst,
+					int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
   expr = e;
-  list = l;
+  list = lst;
 }
 
 tree_while_command::~tree_while_command (void)
@@ -2699,12 +3223,21 @@ tree_while_command::eval (int print)
 {
   tree_constant retval;
 
+  if (error_state)
+    return retval;
+
   for (;;)
     {
       int expr_value = 0;
       if (expr == NULL_TREE)
 	return tree_constant ();
       tree_constant t1 = expr->eval (0);
+
+      if (error_state)
+	{
+	  eval_error ();
+	  return tree_constant ();
+	}
 
       if (t1.rows () == 0 || t1.columns () == 0)
 	{
@@ -2714,7 +3247,7 @@ tree_while_command::eval (int print)
 	  else if (flag == 0)
 	    {
 	      error ("while: empty matrix used in conditional");
-	      jump_to_top_level ();
+	      return tree_constant ();
 	    }
 	  t1 = tree_constant (0.0);
 	}
@@ -2736,13 +3269,12 @@ tree_while_command::eval (int print)
 	{
 	  if (list != NULL_TREE)
 	    {
-// Evaluate the commands that make up the loop, aborting to the
-// top level on undefined symbol errors.
-
-	      int abort_on_undefined_status = abort_on_undefined;
-	      abort_on_undefined = 1;
 	      retval = list->eval (1);
-	      abort_on_undefined = abort_on_undefined_status;
+	      if (error_state)
+		{
+		  eval_error ();
+		  return tree_constant ();
+		}
 	    }
 
 	  if (returning)
@@ -2767,21 +3299,35 @@ tree_while_command::eval (int print)
   return retval;
 }
 
+void
+tree_while_command::eval_error (void)
+{
+  if (error_state > 0)
+    error ("evaluating while command near line %d, column %d",
+	   line (), column ());
+}
+
 /*
  * For.
  */
-tree_for_command::tree_for_command (void)
+tree_for_command::tree_for_command (int l = -1, int c = -1)
 {
-  id = (tree_identifier *) NULL;
+  line_num = l;
+  column_num = c;
+  id = (tree_index_expression *) NULL;
   expr = NULL_TREE;
   list = NULL_TREE;
 }
 
-tree_for_command::tree_for_command (tree_identifier *ident, tree *e, tree *l)
+tree_for_command::tree_for_command (tree_index_expression *ident,
+				    tree *e, tree *lst,
+				    int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
   id = ident;
   expr = e;
-  list = l;
+  list = lst;
 }
 
 tree_for_command::~tree_for_command (void)
@@ -2794,14 +3340,18 @@ tree_for_command::~tree_for_command (void)
 tree_constant
 tree_for_command::eval (int print)
 {
-  if (expr == NULL_TREE)
-    return tree_constant ();
+  tree_constant retval;
+
+  if (error_state || expr == NULL_TREE)
+    return retval;
 
   tree_constant tmp_expr = expr->eval (0);
-  if (tmp_expr.is_undefined ())
-    return tree_constant ();
 
-  tree_constant retval;
+  if (error_state || tmp_expr.is_undefined ())
+    {
+      eval_error ();
+      return retval;
+    }
 
   tree_constant_rep::constant_type expr_type = tmp_expr.const_type ();
   switch (expr_type)
@@ -2809,17 +3359,23 @@ tree_for_command::eval (int print)
     case tree_constant_rep::complex_scalar_constant:
     case tree_constant_rep::scalar_constant:
       {
-	id->assign (tmp_expr);
+	tree_constant *rhs = new tree_constant (tmp_expr);
+	tree_simple_assignment_expression tmp_ass (id, rhs);
+	tmp_ass.eval (0);
+	if (error_state)
+	  {
+	    eval_error ();
+	    return tree_constant ();
+	  }
 
 	if (list != NULL_TREE)
 	  {
-// Evaluate the commands that make up the loop, aborting to the
-// top level on undefined symbol errors.
-
-	    int abort_on_undefined_status = abort_on_undefined;
-	    abort_on_undefined = 1;
 	    retval = list->eval (1);
-	    abort_on_undefined = abort_on_undefined_status;
+	    if (error_state)
+	      {
+		eval_error ();
+		return tree_constant ();
+	      }
 	  }
       }
       break;
@@ -2845,34 +3401,39 @@ tree_for_command::eval (int print)
 
 	for (int i = 0; i < steps; i++)
 	  {
-	    tree_constant tmp;
+	    tree_constant *rhs;
 
 	    if (nr == 1)
 	      {
 		if (expr_type == tree_constant_rep::matrix_constant)
-		  tmp = tree_constant (m_tmp (0, i));
+		  rhs = new tree_constant (m_tmp (0, i));
 		else
-		  tmp = tree_constant (cm_tmp (0, i));
+		  rhs = new tree_constant (cm_tmp (0, i));
 	      }
 	    else
 	      {
 		if (expr_type == tree_constant_rep::matrix_constant)
-		  tmp = tree_constant (m_tmp.extract (0, i, nr-1, i));
+		  rhs = new tree_constant (m_tmp.extract (0, i, nr-1, i));
 		else
-		  tmp = tree_constant (cm_tmp.extract (0, i, nr-1, i));
+		  rhs = new tree_constant (cm_tmp.extract (0, i, nr-1, i));
 	      }
 
-	    id->assign (tmp);
+	    tree_simple_assignment_expression tmp_ass (id, rhs);
+	    tmp_ass.eval (0);
+	    if (error_state)
+	      {
+		eval_error ();
+		return tree_constant ();
+	      }
 
 	    if (list != NULL_TREE)
 	      {
-// Evaluate the commands that make up the loop, aborting to the
-// top level on undefined symbol errors.
-
-		int abort_on_undefined_status = abort_on_undefined;
-		abort_on_undefined = 1;
 		retval = list->eval (1);
-		abort_on_undefined = abort_on_undefined_status;
+		if (error_state)
+		  {
+		    eval_error ();
+		    return tree_constant ();
+		  }
 	      }
 
 	    if (returning)
@@ -2907,19 +3468,23 @@ tree_for_command::eval (int print)
 	for (int i = 0; i < steps; i++)
 	  {
 	    double tmp_val = b + i * increment;
-	    tree_constant tmp (tmp_val);
-
-	    id->assign (tmp);
+	    tree_constant *rhs = new tree_constant (tmp_val);
+	    tree_simple_assignment_expression tmp_ass (id, rhs);
+	    tmp_ass.eval (0);
+	    if (error_state)
+	      {
+		eval_error ();
+		return tree_constant ();
+	      }
 
 	    if (list != NULL_TREE)
 	      {
-// Evaluate the commands that make up the loop, aborting to the
-// top level on undefined symbol errors.
-
-		int abort_on_undefined_status = abort_on_undefined;
-		abort_on_undefined = 1;
 		retval = list->eval (1);
-		abort_on_undefined = abort_on_undefined_status;
+		if (error_state)
+		  {
+		    eval_error ();
+		    return tree_constant ();
+		  }
 	      }
 
 	    if (returning)
@@ -2948,25 +3513,39 @@ tree_for_command::eval (int print)
   return retval;
 }
 
+void
+tree_for_command::eval_error (void)
+{
+  if (error_state > 0)
+    error ("evaluating for command near line %d, column %d",
+	   line (), column ());
+}
+
 /*
  * If.
  */
-tree_if_command::tree_if_command (void)
+tree_if_command::tree_if_command (int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
   expr = NULL_TREE;
   list = NULL_TREE;
   next = (tree_if_command *) NULL;
 }
 
-tree_if_command::tree_if_command (tree *t)
+tree_if_command::tree_if_command (tree *t, int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
   expr = NULL_TREE;
   list = t;
   next = (tree_if_command *) NULL;
 }
 
-tree_if_command::tree_if_command (tree *e, tree *t)
+tree_if_command::tree_if_command (tree *e, tree *t, int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
   expr = e;
   list = t;
   next = (tree_if_command *) NULL;
@@ -2980,17 +3559,17 @@ tree_if_command::~tree_if_command (void)
 }
 
 tree_if_command *
-tree_if_command::chain (tree *t)
+tree_if_command::chain (tree *t, int l = -1, int c = -1)
 {
-  tree_if_command *tmp = new tree_if_command (t);
+  tree_if_command *tmp = new tree_if_command (t, l, c);
   tmp->next = this;
   return tmp;
 }
 
 tree_if_command *
-tree_if_command::chain (tree *t1, tree *t2)
+tree_if_command::chain (tree *t1, tree *t2, int l = -1, int c = -1)
 {
-  tree_if_command *tmp = new tree_if_command (t1, t2);
+  tree_if_command *tmp = new tree_if_command (t1, t2, l, c);
   tmp->next = this;
   return tmp;
 }
@@ -3016,8 +3595,12 @@ tree_constant
 tree_if_command::eval (int print)
 {
   int expr_value = 0;
-  tree_if_command *lst;
   tree_constant retval;
+
+  if (error_state)
+    return retval;
+
+  tree_if_command *lst;
   for (lst = this; lst != (tree_if_command *) NULL; lst = lst->next)
     {
       if (lst->expr != NULL_TREE)
@@ -3026,8 +3609,11 @@ tree_if_command::eval (int print)
 	  if (tmp == NULL_TREE)
 	    return tree_constant ();
 	  tree_constant t1 = tmp->eval (0);
-	  if (t1.is_undefined ())
-	    break;
+	  if (error_state || t1.is_undefined ())
+	    {
+	      lst->eval_error ();
+	      break;
+	    }
 
 	  if (t1.rows () == 0 || t1.columns () == 0)
 	    {
@@ -3037,7 +3623,8 @@ tree_if_command::eval (int print)
 	      else if (flag == 0)
 		{
 		  error ("if: empty matrix used in conditional");
-		  jump_to_top_level ();
+		  lst->eval_error ();
+		  return tree_constant ();
 		}
 	      t1 = tree_constant (0.0);
 	    }
@@ -3061,6 +3648,10 @@ tree_if_command::eval (int print)
 		retval = lst->list->eval (1);
 	      else
 		error ("if: empty command list");
+
+	      if (error_state)
+		lst->eval_error ();
+
 	      break;
 	    }
 	}
@@ -3070,17 +3661,32 @@ tree_if_command::eval (int print)
 	    retval = lst->list->eval (1);
 	  else
 	    error ("if: empty command list");
+
+	  if (error_state)
+	    lst->eval_error ();
+
 	  break;
 	}
     }
+
   return retval;
+}
+
+void
+tree_if_command::eval_error (void)
+{
+  if (error_state > 0)
+    error ("evaluating if command near line %d, column %d",
+	   line (), column ());
 }
 
 /*
  * Break.  Is this overkill, or what?
  */
-tree_break_command::tree_break_command (void)
+tree_break_command::tree_break_command (int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
 }
 
 tree_break_command::~tree_break_command (void)
@@ -3090,15 +3696,18 @@ tree_break_command::~tree_break_command (void)
 tree_constant
 tree_break_command::eval (int print)
 {
-  breaking = 1;
+  if (! error_state)
+    breaking = 1;
   return tree_constant ();
 }
 
 /*
  * Continue.
  */
-tree_continue_command::tree_continue_command (void)
+tree_continue_command::tree_continue_command (int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
 }
 
 tree_continue_command::~tree_continue_command (void)
@@ -3108,15 +3717,18 @@ tree_continue_command::~tree_continue_command (void)
 tree_constant
 tree_continue_command::eval (int print)
 {
-  continuing = 1;
+  if (! error_state)
+    continuing = 1;
   return tree_constant ();
 }
 
 /*
  * Return.
  */
-tree_return_command::tree_return_command (void)
+tree_return_command::tree_return_command (int l = -1, int c = -1)
 {
+  line_num = l;
+  column_num = c;
 }
 
 tree_return_command::~tree_return_command (void)
@@ -3126,7 +3738,8 @@ tree_return_command::~tree_return_command (void)
 tree_constant
 tree_return_command::eval (int print)
 {
-  returning = 1;
+  if (! error_state)
+    returning = 1;
   return tree_constant ();
 }
 
@@ -3152,16 +3765,25 @@ tree_word_list_command::~tree_word_list_command (void)
   delete word_list;
 }
 
+/*
+ * Turn word list into char **argv with length = argc.
+ */
 tree_constant
 tree_word_list_command::eval (int print)
 {
-// Turn word list into char **argv with length = argc.
+  tree_constant retval;
+
+  if (error_state)
+    return retval;
 
   int argc = 1;
   if (word_list != (tree_word_list *) NULL)
     argc += word_list->length ();
+
   char **argv = new char * [argc];
+
   argv[0] = strsave (ident->name ());
+
   tree_word_list *wl = word_list;
   for (int i = 1; i < argc; i++)
     {
@@ -3169,8 +3791,11 @@ tree_word_list_command::eval (int print)
       argv[i] = strsave (s);
       wl = wl->next_elem ();
     }
-  tree_constant retval = ident->eval (argc, argv, print);
+
+  retval = ident->eval (argc, argv, print);
+
   delete [] argv;
+
   return retval;
 }
 

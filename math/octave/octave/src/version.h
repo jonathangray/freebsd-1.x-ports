@@ -21,7 +21,7 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
 
-static char version_string[] = "0.74";
+static char version_string[] = "0.79";
 
 /*
 ;;; Local Variables: ***

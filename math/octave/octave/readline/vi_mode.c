@@ -70,6 +70,7 @@ extern int rl_arg_sign;
 
 extern char *xmalloc (), *xrealloc ();
 extern void rl_extend_line_buffer ();
+extern int maybe_save_line (), maybe_unsave_line ();
 
 /* Last string searched for from `/' or `?'. */
 static char *vi_last_search = (char *)NULL;
@@ -618,17 +619,6 @@ rl_vi_insertion_mode ()
 }
 
 int
-vi_done_inserting ()
-{
-  if (vi_doing_insert)
-    {
-      rl_end_undo_group ();
-      vi_doing_insert = 0;
-    }
-  return 0;
-}
-
-int
 rl_vi_movement_mode ()
 {
   if (rl_point > 0)
@@ -641,6 +631,17 @@ rl_vi_movement_mode ()
 }
 
 int
+vi_done_inserting ()
+{
+  if (vi_doing_insert)
+    {
+      rl_end_undo_group ();
+      vi_doing_insert = 0;
+    }
+  return 0;
+}
+
+int
 rl_vi_arg_digit (count, c)
      int count, c;
 {
@@ -648,15 +649,6 @@ rl_vi_arg_digit (count, c)
     rl_beg_of_line ();
   else
     rl_digit_argument (count, c);
-
-  return 0;
-}
-
-int
-rl_vi_check ()
-{
-  if (rl_point && rl_point == rl_end)
-    rl_point--;
 
   return 0;
 }
@@ -708,6 +700,15 @@ rl_vi_put (count, key)
 }
 
 int
+rl_vi_check ()
+{
+  if (rl_point && rl_point == rl_end)
+    rl_point--;
+
+  return 0;
+}
+
+int
 rl_vi_column (count)
      int count;
 {
@@ -715,45 +716,6 @@ rl_vi_column (count)
     rl_end_of_line ();
   else
     rl_point = count - 1;
-
-  return 0;
-}
-
-/* A simplified loop for vi. Don't dispatch key at end.
-   Don't recognize minus sign? */
-int
-rl_digit_loop1 ()
-{
-  int key, c;
-
-  while (1)
-    {
-      rl_message ("(arg: %d) ", rl_arg_sign * rl_numeric_arg, 0);
-      key = c = rl_read_key ();
-
-      if (keymap[c].type == ISFUNC &&
-	  keymap[c].function == rl_universal_argument)
-	{
-	  rl_numeric_arg *= 4;
-	  continue;
-	}
-
-      c = UNMETA (c);
-      if (numeric (c))
-	{
-	  if (rl_explicit_arg)
-	    rl_numeric_arg = (rl_numeric_arg * 10) + digit_value (c);
-	  else
-	    rl_numeric_arg = digit_value (c);
-	  rl_explicit_arg = 1;
-	}
-      else
-	{
-	  rl_clear_message ();
-	  rl_stuff_char (key);
-	  break;
-	}
-    }
 
   return 0;
 }
@@ -831,6 +793,45 @@ rl_vi_domove (key, nextkey)
 
   if (rl_mark < rl_point)
     exchange (rl_point, rl_mark);
+
+  return 0;
+}
+
+/* A simplified loop for vi. Don't dispatch key at end.
+   Don't recognize minus sign? */
+int
+rl_digit_loop1 ()
+{
+  int key, c;
+
+  while (1)
+    {
+      rl_message ("(arg: %d) ", rl_arg_sign * rl_numeric_arg, 0);
+      key = c = rl_read_key ();
+
+      if (keymap[c].type == ISFUNC &&
+	  keymap[c].function == rl_universal_argument)
+	{
+	  rl_numeric_arg *= 4;
+	  continue;
+	}
+
+      c = UNMETA (c);
+      if (numeric (c))
+	{
+	  if (rl_explicit_arg)
+	    rl_numeric_arg = (rl_numeric_arg * 10) + digit_value (c);
+	  else
+	    rl_numeric_arg = digit_value (c);
+	  rl_explicit_arg = 1;
+	}
+      else
+	{
+	  rl_clear_message ();
+	  rl_stuff_char (key);
+	  break;
+	}
+    }
 
   return 0;
 }
@@ -955,6 +956,13 @@ rl_vi_comment ()
 }
 
 int
+rl_vi_first_print ()
+{
+  rl_back_to_indent (0, 0);
+  return 0;
+}
+
+int
 rl_back_to_indent (ignore1, ignore2)
      int ignore1, ignore2;
 {
@@ -962,13 +970,6 @@ rl_back_to_indent (ignore1, ignore2)
   while (rl_point < rl_end && whitespace (rl_line_buffer[rl_point]))
     rl_point++;
 
-  return 0;
-}
-
-int
-rl_vi_first_print ()
-{
-  rl_back_to_indent (0, 0);
   return 0;
 }
 
@@ -1308,7 +1309,6 @@ rl_vi_replace (count, key)
  * Try to complete the word we are standing on or the word that ends with
  * the previous character. A space matches everything.
  * Word delimiters are space and ;.
-int
  */
 int
 rl_vi_possible_completions ()

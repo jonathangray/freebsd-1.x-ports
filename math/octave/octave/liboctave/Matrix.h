@@ -139,6 +139,24 @@ extern "C"
 			const double*, int*, double*, const int*,
 			int*);
 
+  int F77_FCN (dpotrf) (const char*, const int*, double*, const int*,
+			int*, long);
+
+//
+// fortran functions for generalized eigenvalue problems
+//
+  int F77_FCN (reduce) (const int*, const int*, double*,
+	   	        const int*, double*,
+			int*, int*, double*, double*);
+
+  int F77_FCN (scaleg) (const int*, const int*, double*,
+	   	        const int*, double*,
+			const int*, const int*, double*, double*, double*);
+
+  int F77_FCN (gradeq) (const int*, const int*, double*,
+	   	        const int*, double*,
+			int*, int*, double*, double*);
+
 /*
  * f2c translates complex*16 as
  *
@@ -224,6 +242,10 @@ extern "C"
 			const double*, int*, Complex*, const int*,
 			double*, int*);
 
+  int F77_FCN (zpotrf) (const char*, const int*, Complex*, const int*,
+			int*, long);
+
+
 // Note that the original complex fft routines were not written for
 // double complex arguments.  They have been modified by adding an
 // implicit double precision (a-h,o-z) statement at the beginning of
@@ -247,6 +269,11 @@ class ComplexMatrix;
 class ComplexColumnVector;
 class ComplexRowVector;
 class ComplexDiagMatrix;
+class AEPBALANCE;
+class ComplexAEPBALANCE;
+class GEPBALANCE;
+class CHOL;
+class ComplexCHOL;
 class DET;
 class ComplexDET;
 class EIG;
@@ -271,7 +298,10 @@ friend class RowVector;
 friend class DiagMatrix;
 friend class ComplexMatrix;
 friend class ComplexDiagMatrix;
+friend class AEPBALANCE;
+friend class CHOL;
 friend class EIG;
+friend class GEPBALANCE;
 friend class HESS;
 friend class SCHUR;
 friend class SVD;
@@ -409,10 +439,10 @@ public:
   Matrix operator * (double s) const;
   Matrix operator / (double s) const;
 
-  ComplexMatrix operator + (Complex s) const;
-  ComplexMatrix operator - (Complex s) const;
-  ComplexMatrix operator * (Complex s) const;
-  ComplexMatrix operator / (Complex s) const;
+  ComplexMatrix operator + (const Complex& s) const;
+  ComplexMatrix operator - (const Complex& s) const;
+  ComplexMatrix operator * (const Complex& s) const;
+  ComplexMatrix operator / (const Complex& s) const;
 
 // scalar by matrix -> matrix operations
 
@@ -482,10 +512,16 @@ public:
   ColumnVector diag (int k) const;
 
   ColumnVector row_min (void) const;
+  ColumnVector row_min_loc (void) const;
+
   ColumnVector row_max (void) const;
+  ColumnVector row_max_loc (void) const;
 
   RowVector column_min (void) const;
+  RowVector column_min_loc (void) const;
+
   RowVector column_max (void) const;
+  RowVector column_max_loc (void) const;
 
 // i/o
 
@@ -494,7 +530,7 @@ public:
 
 // conversions
 
-  double *fortran_vec (void);
+  double *fortran_vec (void) const;
 
 private:
   int nr;
@@ -546,7 +582,7 @@ inline double Matrix::checkelem (int r, int c) const
 inline double Matrix::operator () (int r, int c) const
   { return checkelem (r, c); }
 
-inline double *Matrix::fortran_vec (void) { return data; }
+inline double *Matrix::fortran_vec (void) const { return data; }
 
 /*
  * Column Vector class
@@ -610,10 +646,10 @@ public:
   ColumnVector operator * (double s) const;
   ColumnVector operator / (double s) const;
 
-  ComplexColumnVector operator + (Complex s) const;
-  ComplexColumnVector operator - (Complex s) const;
-  ComplexColumnVector operator * (Complex s) const;
-  ComplexColumnVector operator / (Complex s) const;
+  ComplexColumnVector operator + (const Complex& s) const;
+  ComplexColumnVector operator - (const Complex& s) const;
+  ComplexColumnVector operator * (const Complex& s) const;
+  ComplexColumnVector operator / (const Complex& s) const;
 
 // scalar by column vector -> column vector operations
 
@@ -661,7 +697,7 @@ public:
 
 // conversions
 
-  double *fortran_vec (void);
+  double *fortran_vec (void) const;
 
 private:
   int len;
@@ -707,7 +743,7 @@ ColumnVector::checkelem (int n) const
 
 inline double ColumnVector::operator () (int n) const { return checkelem (n); }
 
-inline double *ColumnVector::fortran_vec (void) { return data; }
+inline double *ColumnVector::fortran_vec (void) const { return data; }
 
 /*
  * Row Vector class
@@ -771,10 +807,10 @@ public:
   RowVector operator * (double s) const;
   RowVector operator / (double s) const;
 
-  ComplexRowVector operator + (Complex s) const;
-  ComplexRowVector operator - (Complex s) const;
-  ComplexRowVector operator * (Complex s) const;
-  ComplexRowVector operator / (Complex s) const;
+  ComplexRowVector operator + (const Complex& s) const;
+  ComplexRowVector operator - (const Complex& s) const;
+  ComplexRowVector operator * (const Complex& s) const;
+  ComplexRowVector operator / (const Complex& s) const;
 
 // scalar by row vector -> row vector operations
 
@@ -828,7 +864,7 @@ public:
 
 // conversions
 
-  double *fortran_vec (void);
+  double *fortran_vec (void) const;
 
 private:
   int len;
@@ -874,7 +910,7 @@ RowVector::checkelem (int n) const
 
 inline double RowVector::operator () (int n) const { return checkelem (n); }
 
-inline double *RowVector::fortran_vec (void) { return data; }
+inline double *RowVector::fortran_vec (void) const { return data; }
 
 /*
  * Diagonal Matrix class
@@ -947,16 +983,16 @@ public:
   Matrix operator + (double s) const;
   Matrix operator - (double s) const;
 
-  ComplexMatrix operator + (Complex s) const;
-  ComplexMatrix operator - (Complex s) const;
+  ComplexMatrix operator + (const Complex& s) const;
+  ComplexMatrix operator - (const Complex& s) const;
 
 // diagonal matrix by scalar -> diagonal matrix operations
 
   DiagMatrix operator * (double s) const;
   DiagMatrix operator / (double s) const;
 
-  ComplexDiagMatrix operator * (Complex s) const;
-  ComplexDiagMatrix operator / (Complex s) const;
+  ComplexDiagMatrix operator * (const Complex& s) const;
+  ComplexDiagMatrix operator / (const Complex& s) const;
 
 // scalar by diagonal matrix -> matrix operations
 
@@ -1031,9 +1067,9 @@ inline DiagMatrix::DiagMatrix (double *d, int r, int c)
 
 inline DiagMatrix::~DiagMatrix (void) { delete [] data; data = 0; }
 
-inline int DiagMatrix::rows (void) const { return len; }
-inline int DiagMatrix::cols (void) const { return len; }
-inline int DiagMatrix::columns (void) const { return len; } 
+inline int DiagMatrix::rows (void) const { return nr; }
+inline int DiagMatrix::cols (void) const { return nc; }
+inline int DiagMatrix::columns (void) const { return nc; } 
 
 // Would be nice to be able to avoid compiler warning and make this
 // fail on assignment.
@@ -1079,6 +1115,8 @@ friend class Matrix;
 friend class DiagMatrix;
 friend class ComplexRowVector;
 friend class ComplexDiagMatrix;
+friend class ComplexAEPBALANCE;
+friend class ComplexCHOL;
 friend class EIG;
 friend class ComplexHESS;
 friend class ComplexSVD;
@@ -1090,13 +1128,13 @@ public:
   ComplexMatrix (void);
   ComplexMatrix (int r, int c);
   ComplexMatrix (int r, int c, double val);
-  ComplexMatrix (int r, int c, Complex val);
+  ComplexMatrix (int r, int c, const Complex& val);
   ComplexMatrix (const Matrix& a);
   ComplexMatrix (const ComplexMatrix& a);
   ComplexMatrix (const DiagMatrix& a);
   ComplexMatrix (const ComplexDiagMatrix& a);
   ComplexMatrix (double a);
-  ComplexMatrix (Complex a);
+  ComplexMatrix (const Complex& a);
  ~ComplexMatrix (void);
 
   ComplexMatrix& operator = (const Matrix& a);
@@ -1116,7 +1154,7 @@ public:
 
   ComplexMatrix& resize (int r, int c);
   ComplexMatrix& resize (int r, int c, double val);
-  ComplexMatrix& resize (int r, int c, Complex val);
+  ComplexMatrix& resize (int r, int c, const Complex& val);
 
   int operator == (const ComplexMatrix& a) const;
   int operator != (const ComplexMatrix& a) const;
@@ -1134,9 +1172,9 @@ public:
   ComplexMatrix& insert (const ComplexDiagMatrix& a, int r, int c);
 
   ComplexMatrix& fill (double val);
-  ComplexMatrix& fill (Complex val);
+  ComplexMatrix& fill (const Complex& val);
   ComplexMatrix& fill (double val, int r1, int c1, int r2, int c2);
-  ComplexMatrix& fill (Complex val, int r1, int c1, int r2, int c2);
+  ComplexMatrix& fill (const Complex& val, int r1, int c1, int r2, int c2);
 
   ComplexMatrix append (const Matrix& a) const;
   ComplexMatrix append (const RowVector& a) const;
@@ -1232,10 +1270,10 @@ public:
   ComplexMatrix operator * (double s) const;
   ComplexMatrix operator / (double s) const;
 
-  ComplexMatrix operator + (Complex s) const;
-  ComplexMatrix operator - (Complex s) const;
-  ComplexMatrix operator * (Complex s) const;
-  ComplexMatrix operator / (Complex s) const;
+  ComplexMatrix operator + (const Complex& s) const;
+  ComplexMatrix operator - (const Complex& s) const;
+  ComplexMatrix operator * (const Complex& s) const;
+  ComplexMatrix operator / (const Complex& s) const;
 
 // scalar by matrix -> matrix operations
 
@@ -1244,10 +1282,10 @@ public:
   friend ComplexMatrix operator * (double s, const ComplexMatrix& a);
   friend ComplexMatrix operator / (double s, const ComplexMatrix& a);
 
-  friend ComplexMatrix operator + (Complex s, const ComplexMatrix& a);
-  friend ComplexMatrix operator - (Complex s, const ComplexMatrix& a);
-  friend ComplexMatrix operator * (Complex s, const ComplexMatrix& a);
-  friend ComplexMatrix operator / (Complex s, const ComplexMatrix& a);
+  friend ComplexMatrix operator + (const Complex& s, const ComplexMatrix& a);
+  friend ComplexMatrix operator - (const Complex& s, const ComplexMatrix& a);
+  friend ComplexMatrix operator * (const Complex& s, const ComplexMatrix& a);
+  friend ComplexMatrix operator / (const Complex& s, const ComplexMatrix& a);
 
 // matrix by column vector -> column vector operations
 
@@ -1317,10 +1355,16 @@ public:
   ComplexColumnVector diag (int k) const;
 
   ComplexColumnVector row_min (void) const;
+  ComplexColumnVector row_min_loc (void) const;
+
   ComplexColumnVector row_max (void) const;
+  ComplexColumnVector row_max_loc (void) const;
 
   ComplexRowVector column_min (void) const;
+  ComplexRowVector column_min_loc (void) const;
+
   ComplexRowVector column_max (void) const;
+  ComplexRowVector column_max_loc (void) const;
 
 // i/o
 
@@ -1329,7 +1373,7 @@ public:
 
 // conversions
 
-  Complex *fortran_vec (void);
+  Complex *fortran_vec (void) const;
 
 private:
   int nr;
@@ -1383,7 +1427,7 @@ inline Complex ComplexMatrix::checkelem (int r, int c) const
 inline Complex ComplexMatrix::operator () (int r, int c) const
   { return checkelem (r, c); }
 
-inline Complex *ComplexMatrix::fortran_vec (void) { return data; }
+inline Complex *ComplexMatrix::fortran_vec (void) const { return data; }
 
 /*
  * Complex Column Vector class
@@ -1400,11 +1444,11 @@ public:
   ComplexColumnVector (void);
   ComplexColumnVector (int n);
   ComplexColumnVector (int n, double val);
-  ComplexColumnVector (int n, Complex val);
+  ComplexColumnVector (int n, const Complex& val);
   ComplexColumnVector (const ColumnVector& a);
   ComplexColumnVector (const ComplexColumnVector& a);
   ComplexColumnVector (double a);
-  ComplexColumnVector (Complex a);
+  ComplexColumnVector (const Complex& a);
  ~ComplexColumnVector (void);
 
   ComplexColumnVector& operator = (const ColumnVector& a);
@@ -1423,7 +1467,7 @@ public:
 
   ComplexColumnVector& resize (int n);
   ComplexColumnVector& resize (int n, double val);
-  ComplexColumnVector& resize (int n, Complex val);
+  ComplexColumnVector& resize (int n, const Complex& val);
 
   int operator == (const ComplexColumnVector& a) const;
   int operator != (const ComplexColumnVector& a) const;
@@ -1434,9 +1478,9 @@ public:
   ComplexColumnVector& insert (const ComplexColumnVector& a, int r);
 
   ComplexColumnVector& fill (double val);
-  ComplexColumnVector& fill (Complex val);
+  ComplexColumnVector& fill (const Complex& val);
   ComplexColumnVector& fill (double val, int r1, int r2);
-  ComplexColumnVector& fill (Complex val, int r1, int r2);
+  ComplexColumnVector& fill (const Complex& val, int r1, int r2);
 
   ComplexColumnVector stack (const ColumnVector& a) const;
   ComplexColumnVector stack (const ComplexColumnVector& a) const;
@@ -1459,10 +1503,10 @@ public:
   ComplexColumnVector operator * (double s) const;
   ComplexColumnVector operator / (double s) const;
 
-  ComplexColumnVector operator + (Complex s) const;
-  ComplexColumnVector operator - (Complex s) const;
-  ComplexColumnVector operator * (Complex s) const;
-  ComplexColumnVector operator / (Complex s) const;
+  ComplexColumnVector operator + (const Complex& s) const;
+  ComplexColumnVector operator - (const Complex& s) const;
+  ComplexColumnVector operator * (const Complex& s) const;
+  ComplexColumnVector operator / (const Complex& s) const;
 
 // scalar by column vector -> column vector operations
 
@@ -1475,13 +1519,13 @@ public:
   friend ComplexColumnVector operator / (double s,
 					 const ComplexColumnVector& a);
 
-  friend ComplexColumnVector operator + (Complex s,
+  friend ComplexColumnVector operator + (const Complex& s,
 					 const ComplexColumnVector& a);
-  friend ComplexColumnVector operator - (Complex s,
+  friend ComplexColumnVector operator - (const Complex& s,
 					 const ComplexColumnVector& a);
-  friend ComplexColumnVector operator * (Complex s,
+  friend ComplexColumnVector operator * (const Complex& s,
 					 const ComplexColumnVector& a);
-  friend ComplexColumnVector operator / (Complex s,
+  friend ComplexColumnVector operator / (const Complex& s,
 					 const ComplexColumnVector& a);
 
 // column vector by row vector -> matrix operations
@@ -1527,7 +1571,7 @@ public:
 
 // conversions
 
-  Complex *fortran_vec (void);
+  Complex *fortran_vec (void) const;
 
 private:
   int len;
@@ -1577,7 +1621,7 @@ ComplexColumnVector::checkelem (int n) const
 inline Complex ComplexColumnVector::operator () (int n) const
   { return checkelem (n); }
 
-inline Complex *ComplexColumnVector::fortran_vec (void) { return data; }
+inline Complex *ComplexColumnVector::fortran_vec (void) const { return data; }
 
 /*
  * Complex Row Vector class
@@ -1594,11 +1638,11 @@ public:
   ComplexRowVector (void);
   ComplexRowVector (int n);
   ComplexRowVector (int n, double val);
-  ComplexRowVector (int n, Complex val);
+  ComplexRowVector (int n, const Complex& val);
   ComplexRowVector (const RowVector& a);
   ComplexRowVector (const ComplexRowVector& a);
   ComplexRowVector (double a);
-  ComplexRowVector (Complex a);
+  ComplexRowVector (const Complex& a);
  ~ComplexRowVector (void);
 
   ComplexRowVector& operator = (const RowVector& a);
@@ -1617,7 +1661,7 @@ public:
 
   ComplexRowVector& resize (int n);
   ComplexRowVector& resize (int n, double val);
-  ComplexRowVector& resize (int n, Complex val);
+  ComplexRowVector& resize (int n, const Complex& val);
 
   int operator == (const ComplexRowVector& a) const;
   int operator != (const ComplexRowVector& a) const;
@@ -1628,9 +1672,9 @@ public:
   ComplexRowVector& insert (const ComplexRowVector& a, int c);
 
   ComplexRowVector& fill (double val);
-  ComplexRowVector& fill (Complex val);
+  ComplexRowVector& fill (const Complex& val);
   ComplexRowVector& fill (double val, int c1, int c2);
-  ComplexRowVector& fill (Complex val, int c1, int c2);
+  ComplexRowVector& fill (const Complex& val, int c1, int c2);
 
   ComplexRowVector append (const RowVector& a) const;
   ComplexRowVector append (const ComplexRowVector& a) const;
@@ -1653,10 +1697,10 @@ public:
   ComplexRowVector operator * (double s) const;
   ComplexRowVector operator / (double s) const;
 
-  ComplexRowVector operator + (Complex s) const;
-  ComplexRowVector operator - (Complex s) const;
-  ComplexRowVector operator * (Complex s) const;
-  ComplexRowVector operator / (Complex s) const;
+  ComplexRowVector operator + (const Complex& s) const;
+  ComplexRowVector operator - (const Complex& s) const;
+  ComplexRowVector operator * (const Complex& s) const;
+  ComplexRowVector operator / (const Complex& s) const;
 
 // scalar by row vector -> row vector operations
 
@@ -1665,10 +1709,14 @@ public:
   friend ComplexRowVector operator * (double s, const ComplexRowVector& a);
   friend ComplexRowVector operator / (double s, const ComplexRowVector& a);
 
-  friend ComplexRowVector operator + (Complex s, const ComplexRowVector& a);
-  friend ComplexRowVector operator - (Complex s, const ComplexRowVector& a);
-  friend ComplexRowVector operator * (Complex s, const ComplexRowVector& a);
-  friend ComplexRowVector operator / (Complex s, const ComplexRowVector& a);
+  friend ComplexRowVector operator + (const Complex& s, const
+				      ComplexRowVector& a);
+  friend ComplexRowVector operator - (const Complex& s, const
+				      ComplexRowVector& a);
+  friend ComplexRowVector operator * (const Complex& s, const
+				      ComplexRowVector& a);
+  friend ComplexRowVector operator / (const Complex& s, const
+				      ComplexRowVector& a);
 
 // row vector by column vector -> scalar
 
@@ -1719,7 +1767,7 @@ public:
 
 // conversions
 
-  Complex *fortran_vec (void);
+  Complex *fortran_vec (void) const;
 
 private:
   int len;
@@ -1767,7 +1815,7 @@ ComplexRowVector::checkelem (int n) const
 inline Complex ComplexRowVector::operator () (int n) const
   { return checkelem (n); }
 
-inline Complex *ComplexRowVector::fortran_vec (void) { return data; }
+inline Complex *ComplexRowVector::fortran_vec (void) const { return data; }
 
 /*
  * Complex Diagonal Matrix class
@@ -1783,10 +1831,10 @@ public:
   ComplexDiagMatrix (void);
   ComplexDiagMatrix (int n);
   ComplexDiagMatrix (int n, double val);
-  ComplexDiagMatrix (int n, Complex val);
+  ComplexDiagMatrix (int n, const Complex& val);
   ComplexDiagMatrix (int r, int c);
   ComplexDiagMatrix (int r, int c, double val);
-  ComplexDiagMatrix (int r, int c, Complex val);
+  ComplexDiagMatrix (int r, int c, const Complex& val);
   ComplexDiagMatrix (const RowVector& a);
   ComplexDiagMatrix (const ComplexRowVector& a);
   ComplexDiagMatrix (const ColumnVector& a);
@@ -1794,7 +1842,7 @@ public:
   ComplexDiagMatrix (const DiagMatrix& a);
   ComplexDiagMatrix (const ComplexDiagMatrix& a);
   ComplexDiagMatrix (double a);
-  ComplexDiagMatrix (Complex a);
+  ComplexDiagMatrix (const Complex& a);
  ~ComplexDiagMatrix (void);
 
   ComplexDiagMatrix& operator = (const DiagMatrix& a);
@@ -1814,15 +1862,15 @@ public:
 
   ComplexDiagMatrix& resize (int r, int c);
   ComplexDiagMatrix& resize (int r, int c, double val);
-  ComplexDiagMatrix& resize (int r, int c, Complex val);
+  ComplexDiagMatrix& resize (int r, int c, const Complex& val);
 
   int operator == (const ComplexDiagMatrix& a) const;
   int operator != (const ComplexDiagMatrix& a) const;
 
   ComplexDiagMatrix& fill (double val);
-  ComplexDiagMatrix& fill (Complex val);
+  ComplexDiagMatrix& fill (const Complex& val);
   ComplexDiagMatrix& fill (double val, int beg, int end);
-  ComplexDiagMatrix& fill (Complex val, int beg, int end);
+  ComplexDiagMatrix& fill (const Complex& val, int beg, int end);
   ComplexDiagMatrix& fill (const ColumnVector& a);
   ComplexDiagMatrix& fill (const ComplexColumnVector& a);
   ComplexDiagMatrix& fill (const RowVector& a);
@@ -1859,32 +1907,36 @@ public:
   ComplexMatrix operator + (double s) const;
   ComplexMatrix operator - (double s) const;
 
-  ComplexMatrix operator + (Complex s) const;
-  ComplexMatrix operator - (Complex s) const;
+  ComplexMatrix operator + (const Complex& s) const;
+  ComplexMatrix operator - (const Complex& s) const;
 
 // diagonal matrix by scalar -> diagonal matrix operations
 
   ComplexDiagMatrix operator * (double s) const;
   ComplexDiagMatrix operator / (double s) const;
 
-  ComplexDiagMatrix operator * (Complex s) const;
-  ComplexDiagMatrix operator / (Complex s) const;
+  ComplexDiagMatrix operator * (const Complex& s) const;
+  ComplexDiagMatrix operator / (const Complex& s) const;
 
 // scalar by diagonal matrix -> matrix operations
 
   friend ComplexMatrix operator + (double s, const ComplexDiagMatrix& a);
   friend ComplexMatrix operator - (double s, const ComplexDiagMatrix& a);
 
-  friend ComplexMatrix operator + (Complex s, const ComplexDiagMatrix& a);
-  friend ComplexMatrix operator - (Complex s, const ComplexDiagMatrix& a);
+  friend ComplexMatrix operator + (const Complex& s, const
+				   ComplexDiagMatrix& a);
+  friend ComplexMatrix operator - (const Complex& s, const
+				   ComplexDiagMatrix& a);
 
 // scalar by diagonal matrix -> diagonal matrix operations
 
   friend ComplexDiagMatrix operator * (double s, const ComplexDiagMatrix& a);
   friend ComplexDiagMatrix operator / (double s, const ComplexDiagMatrix& a);
 
-  friend ComplexDiagMatrix operator * (Complex s, const ComplexDiagMatrix& a);
-  friend ComplexDiagMatrix operator / (Complex s, const ComplexDiagMatrix& a);
+  friend ComplexDiagMatrix operator * (const Complex& s, const
+				       ComplexDiagMatrix& a);
+  friend ComplexDiagMatrix operator / (const Complex& s, const
+				       ComplexDiagMatrix& a);
 
 // diagonal matrix by column vector -> column vector operations
 
@@ -1953,9 +2005,9 @@ inline ComplexDiagMatrix::ComplexDiagMatrix (Complex *d, int r, int c)
 inline ComplexDiagMatrix::~ComplexDiagMatrix (void)
   { delete [] data; data = 0; }
 
-inline int ComplexDiagMatrix::rows (void) const { return len; }
-inline int ComplexDiagMatrix::cols (void) const { return len; }
-inline int ComplexDiagMatrix::columns (void) const { return len; } 
+inline int ComplexDiagMatrix::rows (void) const { return nr; }
+inline int ComplexDiagMatrix::cols (void) const { return nc; }
+inline int ComplexDiagMatrix::columns (void) const { return nc; } 
 
 // Would be nice to be able to avoid compiler warning and make this
 // fail on assignment.
@@ -1990,6 +2042,110 @@ inline Complex ComplexDiagMatrix::checkelem (int r, int c) const
 
 inline Complex ComplexDiagMatrix::operator () (int r, int c) const
   { return checkelem (r, c); }
+
+/*
+ * Result of a AEP Balance operation
+ */
+
+class AEPBALANCE
+{
+friend class Matrix;
+
+public:
+  AEPBALANCE (void) {}
+
+  AEPBALANCE (const Matrix& a, const char *balance_job);
+
+  AEPBALANCE (const AEPBALANCE& a);
+
+  AEPBALANCE& operator = (const AEPBALANCE& a);
+  Matrix balanced_matrix (void) const;
+  Matrix balancing_matrix (void) const;
+  friend ostream& operator << (ostream& os, const AEPBALANCE& a);
+
+private:
+  int init (const Matrix& a, const char * balance_job);
+
+  Matrix balanced_mat;
+  Matrix balancing_mat;
+};
+
+inline AEPBALANCE::AEPBALANCE (const Matrix& a,const char * balance_job) 
+{
+  init (a,balance_job); 
+}
+
+inline AEPBALANCE::AEPBALANCE (const AEPBALANCE& a)
+{
+  balanced_mat = a.balanced_mat;
+  balancing_mat = a.balancing_mat;
+}
+
+inline AEPBALANCE&
+AEPBALANCE::operator = (const AEPBALANCE& a)
+{
+  balanced_mat = a.balanced_mat;
+  balancing_mat = a.balancing_mat;
+
+  return *this;
+}
+inline Matrix AEPBALANCE::balanced_matrix (void) const
+  { return balanced_mat; }
+
+inline Matrix AEPBALANCE::balancing_matrix (void) const
+  { return balancing_mat; }
+
+/*
+ * Result of a Complex balancing operation
+ */
+
+class ComplexAEPBALANCE
+{
+friend class ComplexMatrix;
+
+public:
+  ComplexAEPBALANCE (void) {}
+  ComplexAEPBALANCE (const ComplexMatrix& a, const char *balance_job);
+  ComplexAEPBALANCE (const ComplexAEPBALANCE& a);
+  ComplexAEPBALANCE& operator = (const ComplexAEPBALANCE& a);
+  ComplexMatrix balanced_matrix (void) const;
+  ComplexMatrix balancing_matrix (void) const;
+
+  friend ostream& operator << (ostream& os, const ComplexAEPBALANCE& a);
+
+private:
+  int init (const ComplexMatrix& a, const char * balance_job);
+
+  ComplexMatrix balanced_mat;
+  ComplexMatrix balancing_mat;
+};
+
+inline ComplexAEPBALANCE::ComplexAEPBALANCE (const ComplexMatrix& a,
+					     const char * balance_job)
+{
+  init(a,balance_job); 
+}
+
+inline ComplexAEPBALANCE::ComplexAEPBALANCE (const ComplexAEPBALANCE& a)
+{
+  balanced_mat = a.balanced_mat;
+  balancing_mat = a.balancing_mat;
+}
+
+inline ComplexAEPBALANCE&
+ComplexAEPBALANCE::operator = (const ComplexAEPBALANCE& a)
+{
+  balanced_mat = a.balanced_mat;
+  balancing_mat = a.balancing_mat;
+
+  return *this;
+}
+
+inline ComplexMatrix ComplexAEPBALANCE::balanced_matrix (void) const
+  { return balanced_mat; }
+
+inline ComplexMatrix ComplexAEPBALANCE::balancing_matrix (void) const
+  { return balancing_mat; }
 
 /*
  * Result of a Determinant calculation.
@@ -2085,7 +2241,160 @@ inline ComplexDET::ComplexDET (const Complex *d)
   { det[0] = d[0]; det[1] = d[1]; }
 
 /*
- * Result of a Hessenbug Decomposition
+ * Result of a GEP Balance operation
+ * Note: currenlty only do balancing on real data.  Complex balancing
+ * done on magnitudes of complex data.
+ */
+
+class GEPBALANCE
+{
+friend class Matrix;
+
+public:
+  GEPBALANCE (void) {}
+
+  GEPBALANCE (const Matrix& a, const Matrix &, const char *balance_job);
+
+  GEPBALANCE (const GEPBALANCE& a);
+
+  GEPBALANCE& operator = (const GEPBALANCE& a);
+  Matrix balanced_a_matrix (void) const;
+  Matrix balanced_b_matrix (void) const;
+  Matrix left_balancing_matrix (void) const;
+  Matrix right_balancing_matrix (void) const;
+  friend ostream& operator << (ostream& os, const GEPBALANCE& a);
+
+private:
+  int init (const Matrix& a, const Matrix& b, const char * balance_job);
+
+  Matrix balanced_a_mat;
+  Matrix balanced_b_mat;
+  Matrix left_balancing_mat;
+  Matrix right_balancing_mat;
+};
+
+inline GEPBALANCE::GEPBALANCE (const Matrix& a, const Matrix& b, 
+  const char * balance_job) 
+{
+  init (a,b,balance_job); 
+}
+
+inline GEPBALANCE::GEPBALANCE (const GEPBALANCE& a)
+{
+  balanced_a_mat = a.balanced_a_mat;
+  balanced_b_mat = a.balanced_b_mat;
+  left_balancing_mat = a.left_balancing_mat;
+  right_balancing_mat = a.right_balancing_mat;
+}
+
+inline GEPBALANCE&
+GEPBALANCE::operator = (const GEPBALANCE& a)
+{
+  balanced_a_mat = a.balanced_a_mat;
+  balanced_b_mat = a.balanced_b_mat;
+  left_balancing_mat = a.left_balancing_mat;
+  right_balancing_mat = a.right_balancing_mat;
+
+  return *this;
+}
+
+inline Matrix GEPBALANCE::balanced_a_matrix (void) const 
+  { return balanced_a_mat; }
+
+inline Matrix GEPBALANCE::balanced_b_matrix (void) const 
+  { return balanced_b_mat; }
+
+inline Matrix GEPBALANCE::left_balancing_matrix (void) const 
+  { return left_balancing_mat; }
+
+inline Matrix GEPBALANCE::right_balancing_matrix (void) const 
+  { return right_balancing_mat; }
+
+/*
+ * Result of a Cholesky Factorization
+ */
+
+class CHOL
+{
+friend class Matrix;
+
+public:
+  CHOL (void) {}
+
+  CHOL (const Matrix& a);
+  CHOL (const Matrix& a, int& info);
+
+  CHOL (const CHOL& a);
+
+  CHOL& operator = (const CHOL& a);
+  Matrix chol_matrix (void) const;
+  friend ostream& operator << (ostream& os, const CHOL& a);
+
+private:
+  int init (const Matrix& a);
+
+  Matrix chol_mat;
+};
+
+inline CHOL::CHOL (const Matrix& a) {init (a); }
+inline CHOL::CHOL (const Matrix& a, int& info) { info = init (a); }
+inline CHOL::CHOL (const CHOL& a) { chol_mat = a.chol_mat; }
+
+inline CHOL&
+CHOL::operator = (const CHOL& a)
+{
+  chol_mat = a.chol_mat;
+
+  return *this;
+}
+
+inline Matrix CHOL::chol_matrix (void) const { return chol_mat; }
+
+/*
+ * Result of a Cholesky Factorization
+ */
+
+class ComplexCHOL
+{
+friend class ComplexMatrix;
+
+public:
+  ComplexCHOL (void) {}
+  ComplexCHOL (const ComplexMatrix& a);
+  ComplexCHOL (const ComplexMatrix& a, int& info);
+  ComplexCHOL (const ComplexCHOL& a);
+  ComplexCHOL& operator = (const ComplexCHOL& a);
+  ComplexMatrix chol_matrix (void) const;
+
+  friend ostream& operator << (ostream& os, const ComplexCHOL& a);
+
+private:
+  int init (const ComplexMatrix& a);
+
+  ComplexMatrix chol_mat;
+};
+
+inline ComplexCHOL::ComplexCHOL (const ComplexMatrix& a) { init (a); }
+inline ComplexCHOL::ComplexCHOL (const ComplexMatrix& a, int& info)
+  { info = init (a); }
+
+inline ComplexCHOL::ComplexCHOL (const ComplexCHOL& a)
+  { chol_mat = a.chol_mat; }
+
+inline ComplexCHOL&
+ComplexCHOL::operator = (const ComplexCHOL& a)
+{
+  chol_mat = a.chol_mat;
+
+  return *this;
+}
+
+inline ComplexMatrix ComplexCHOL::chol_matrix (void) const
+  { return chol_mat; }
+
+  
+/*
+ * Result of a Hessenberg Decomposition
  */
 
 class HESS
@@ -2114,11 +2423,13 @@ private:
 
 inline HESS::HESS (const Matrix& a) {init (a); }
 inline HESS::HESS (const Matrix& a, int& info) { info = init(a); }
+
 inline HESS::HESS (const HESS& a)
 {
   hess_mat = a.hess_mat;
   unitary_hess_mat = a.unitary_hess_mat;
 }
+
 inline HESS&
 HESS::operator = (const HESS& a)
 {
@@ -2127,11 +2438,12 @@ HESS::operator = (const HESS& a)
 
   return *this;
 }
+
 inline Matrix HESS::hess_matrix (void) const { return hess_mat; }
 inline Matrix HESS::unitary_hess_matrix (void) const {return unitary_hess_mat;}
 
 /*
- * Result of a Hessenburg Decomposition
+ * Result of a Hessenberg Decomposition
  */
 
 class ComplexHESS
@@ -2212,7 +2524,6 @@ private:
 };
 
 inline SCHUR::SCHUR (const Matrix& a, const char *ord) { init (a, ord); }
-
 inline SCHUR::SCHUR (const Matrix& a, const char *ord, int& info) 
   { info = init (a, ord); }
 
@@ -2285,6 +2596,7 @@ ComplexSCHUR::operator = (const ComplexSCHUR& a, const char *ord)
 
   return *this;
 }
+
 inline ComplexMatrix ComplexSCHUR::schur_matrix (void) const
   { return schur_mat; }
 
@@ -2325,7 +2637,6 @@ private:
 };
 
 inline SVD::SVD (const Matrix& a) { init (a); }
-
 inline SVD::SVD (const Matrix& a, int& info) { info = init (a); }
 
 inline SVD::SVD (const SVD& a)

@@ -384,10 +384,9 @@ Matrix::stack (const DiagMatrix& a) const
 Matrix
 Matrix::transpose (void) const
 {
-  Matrix result;
+  Matrix result (nc, nr);
   if (len > 0)
     {
-      result.resize (nc, nr);
       for (int j = 0; j < nc; j++)
 	for (int i = 0; i < nr; i++)
 	  result.data[nc*i+j] = data[nr*j+i];
@@ -979,25 +978,25 @@ Matrix::operator / (double s) const
 }
 
 ComplexMatrix
-Matrix::operator + (Complex s) const
+Matrix::operator + (const Complex& s) const
 {
   return ComplexMatrix (add (data, len, s), nr, nc);
 }
 
 ComplexMatrix
-Matrix::operator - (Complex s) const
+Matrix::operator - (const Complex& s) const
 {
   return ComplexMatrix (subtract (data, len, s), nr, nc);
 }
 
 ComplexMatrix
-Matrix::operator * (Complex s) const
+Matrix::operator * (const Complex& s) const
 {
   return ComplexMatrix (multiply (data, len, s), nr, nc);
 }
 
 ComplexMatrix
-Matrix::operator / (Complex s) const
+Matrix::operator / (const Complex& s) const
 {
   return ComplexMatrix (divide (data, len, s), nr, nc);
 }
@@ -1045,12 +1044,12 @@ Matrix::operator * (const ColumnVector& a) const
   double beta  = 0.0;
   int i_one = 1;
 
-  double *y = new double [a.len];
+  double *y = new double [nr];
 
   F77_FCN (dgemv) (&trans, &nr, &nc, &alpha, data, &ld, a.data,
 		   &i_one, &beta, y, &i_one, 1L); 
 
-  return ColumnVector (y, a.len);
+  return ColumnVector (y, nr);
 }
 
 ComplexColumnVector
@@ -1823,6 +1822,28 @@ Matrix::row_min (void) const
 }
 
 ColumnVector
+Matrix::row_min_loc (void) const
+{
+  ColumnVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nr);
+
+      for (int i = 0; i < nr; i++)
+        {
+          int res = 0;
+          for (int j = 0; j < nc; j++)
+            if (elem (i, j) < elem (i, res))
+              res = j;
+          result.elem (i) = (double) (res + 1);
+        }
+    }
+
+  return result;
+}
+
+ColumnVector
 Matrix::row_max (void) const
 {
   ColumnVector result;
@@ -1839,6 +1860,28 @@ Matrix::row_max (void) const
 	      res = elem (i, j);
 	  result.elem (i) = res;
 	}
+    }
+
+  return result;
+}
+
+ColumnVector
+Matrix::row_max_loc (void) const
+{
+  ColumnVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nr);
+
+      for (int i = 0; i < nr; i++)
+        {
+          int res = 0;
+          for (int j = 0; j < nc; j++)
+            if (elem (i, j) > elem (i, res))
+              res = j;
+          result.elem (i) = (double) (res + 1);
+        }
     }
 
   return result;
@@ -1865,6 +1908,28 @@ Matrix::column_min (void) const
 
   return result;
 }
+RowVector
+Matrix::column_min_loc (void) const
+{
+  RowVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nc);
+
+      for (int j = 0; j < nc; j++)
+        {
+          int res = 0.0;
+          for (int i = 0; i < nr; i++)
+            if (elem (i, j) < elem (res, j))
+              res = i;
+          result.elem (j) = (double) (res + 1);
+        }
+    }
+
+  return result;
+}
+
 
 RowVector
 Matrix::column_max (void) const
@@ -1883,6 +1948,28 @@ Matrix::column_max (void) const
 	      res = elem (i, j);
 	  result.elem (j) = res;
 	}
+    }
+
+  return result;
+}
+
+RowVector
+Matrix::column_max_loc (void) const
+{
+  RowVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nc);
+
+      for (int j = 0; j < nc; j++)
+        {
+          int res = 0;
+          for (int i = 0; i < nr; i++)
+            if (elem (i, j) > elem (res, j))
+              res = i;
+          result.elem (j) = (double) (res + 1);
+        }
     }
 
   return result;
@@ -1961,7 +2048,7 @@ ComplexMatrix::ComplexMatrix (int r, int c, double val)
     data = (Complex *) NULL;
 }
 
-ComplexMatrix::ComplexMatrix (int r, int c, Complex val)
+ComplexMatrix::ComplexMatrix (int r, int c, const Complex& val)
 {
   if (r < 0 || c < 0)
     FAIL;
@@ -2047,7 +2134,7 @@ ComplexMatrix::ComplexMatrix (double a)
   data[0] = a;
 }
 
-ComplexMatrix::ComplexMatrix (Complex a)
+ComplexMatrix::ComplexMatrix (const Complex& a)
 {
   nr = 1;
   nc = 1;
@@ -2157,7 +2244,7 @@ ComplexMatrix::resize (int r, int c, double val)
 }
 
 ComplexMatrix&
-ComplexMatrix::resize (int r, int c, Complex val)
+ComplexMatrix::resize (int r, int c, const Complex& val)
 {
   if (r < 0 || c < 0)
     FAIL;
@@ -2314,7 +2401,7 @@ ComplexMatrix::fill (double val)
 }
 
 ComplexMatrix&
-ComplexMatrix::fill (Complex val)
+ComplexMatrix::fill (const Complex& val)
 {
   if (nr > 0 && nc > 0)
     copy (data, len, val);
@@ -2339,7 +2426,7 @@ ComplexMatrix::fill (double val, int r1, int c1, int r2, int c2)
 }
 
 ComplexMatrix&
-ComplexMatrix::fill (Complex val, int r1, int c1, int r2, int c2)
+ComplexMatrix::fill (const Complex& val, int r1, int c1, int r2, int c2)
 {
   if (r1 < 0 || r2 < 0 || c1 < 0 || c2 < 0
       || r1 >= nr || r2 >= nr || c1 >= nc || c2 >= nc)
@@ -2580,10 +2667,9 @@ ComplexMatrix::hermitian (void) const
 ComplexMatrix
 ComplexMatrix::transpose (void) const
 {
-  ComplexMatrix result;
+  ComplexMatrix result (nc, nr);
   if (len > 0)
     {
-      result.resize (nc, nr);
       for (int j = 0; j < nc; j++)
 	for (int i = 0; i < nr; i++)
 	  result.data[nc*i+j] = data[nr*j+i];
@@ -3220,25 +3306,25 @@ ComplexMatrix::operator / (double s) const
 }
 
 ComplexMatrix
-ComplexMatrix::operator + (Complex s) const
+ComplexMatrix::operator + (const Complex& s) const
 {
   return ComplexMatrix (add (data, len, s), nr, nc);
 }
 
 ComplexMatrix
-ComplexMatrix::operator - (Complex s) const
+ComplexMatrix::operator - (const Complex& s) const
 {
   return ComplexMatrix (subtract (data, len, s), nr, nc);
 }
 
 ComplexMatrix
-ComplexMatrix::operator * (Complex s) const
+ComplexMatrix::operator * (const Complex& s) const
 {
   return ComplexMatrix (multiply (data, len, s), nr, nc);
 }
 
 ComplexMatrix
-ComplexMatrix::operator / (Complex s) const
+ComplexMatrix::operator / (const Complex& s) const
 {
   return ComplexMatrix (divide (data, len, s), nr, nc);
 }
@@ -3270,25 +3356,25 @@ operator / (double s, const ComplexMatrix& a)
 }
 
 ComplexMatrix
-operator + (Complex s, const ComplexMatrix& a)
+operator + (const Complex& s, const ComplexMatrix& a)
 {
   return ComplexMatrix (add (s, a.data, a.len), a.nr, a.nc);
 }
 
 ComplexMatrix
-operator - (Complex s, const ComplexMatrix& a)
+operator - (const Complex& s, const ComplexMatrix& a)
 {
   return ComplexMatrix (subtract (s, a.data, a.len), a.nr, a.nc);
 }
 
 ComplexMatrix
-operator * (Complex s, const ComplexMatrix& a)
+operator * (const Complex& s, const ComplexMatrix& a)
 {
   return ComplexMatrix (multiply (s, a.data, a.len), a.nr, a.nc);
 }
 
 ComplexMatrix
-operator / (Complex s, const ComplexMatrix& a)
+operator / (const Complex& s, const ComplexMatrix& a)
 {
   return ComplexMatrix (divide (s, a.data, a.len), a.nr, a.nc);
 }
@@ -3317,12 +3403,12 @@ ComplexMatrix::operator * (const ComplexColumnVector& a) const
   Complex beta (0.0);
   int i_one = 1;
 
-  Complex *y = new Complex [a.len];
+  Complex *y = new Complex [nr];
 
   F77_FCN (zgemv) (&trans, &nr, &nc, &alpha, data, &ld, a.data,
 		   &i_one, &beta, y, &i_one, 1L); 
 
-  return ComplexColumnVector (y, a.len);
+  return ComplexColumnVector (y, nr);
 }
 
 // matrix by diagonal matrix -> matrix operations
@@ -4128,6 +4214,32 @@ ComplexMatrix::row_min (void) const
 }
 
 ComplexColumnVector
+ComplexMatrix::row_min_loc (void) const
+{
+  ComplexColumnVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nr);
+
+      for (int i = 0; i < nr; i++)
+        {
+          Complex res = 0;
+          double absres = abs (elem (i, 0));
+          for (int j = 0; j < nc; j++)
+            if (abs (elem (i, j)) < absres)
+              {
+                res = j;
+                absres = abs (elem (i, j));
+              }
+          result.elem (i) = res + 1;
+        }
+    }
+
+  return result;
+}
+
+ComplexColumnVector
 ComplexMatrix::row_max (void) const
 {
   ComplexColumnVector result;
@@ -4148,6 +4260,32 @@ ComplexMatrix::row_max (void) const
 	      }
 	  result.elem (i) = res;
 	}
+    }
+
+  return result;
+}
+
+ComplexColumnVector
+ComplexMatrix::row_max_loc (void) const
+{
+  ComplexColumnVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nr);
+
+      for (int i = 0; i < nr; i++)
+        {
+          Complex res = 0;
+          double absres = abs (elem (i, 0));
+          for (int j = 0; j < nc; j++)
+            if (abs (elem (i, j)) > absres)
+              {
+                res = j;
+                absres = abs (elem (i, j));
+              }
+          result.elem (i) = res + 1;
+        }
     }
 
   return result;
@@ -4180,6 +4318,32 @@ ComplexMatrix::column_min (void) const
 }
 
 ComplexRowVector
+ComplexMatrix::column_min_loc (void) const
+{
+  ComplexRowVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nc);
+
+      for (int j = 0; j < nc; j++)
+        {
+          Complex res = 0;
+          double absres = abs (elem (0, j));
+          for (int i = 0; i < nr; i++)
+            if (abs (elem (i, j)) < absres)
+              {
+                res = i;
+                absres = abs (elem (i, j));
+              }
+          result.elem (j) = res + 1;
+        }
+    }
+
+  return result;
+}
+
+ComplexRowVector
 ComplexMatrix::column_max (void) const
 {
   ComplexRowVector result;
@@ -4200,6 +4364,32 @@ ComplexMatrix::column_max (void) const
 	      }
 	  result.elem (j) = res;
 	}
+    }
+
+  return result;
+}
+
+ComplexRowVector
+ComplexMatrix::column_max_loc (void) const
+{
+  ComplexRowVector result;
+
+  if (nr > 0 && nc > 0)
+    {
+      result.resize (nc);
+
+      for (int j = 0; j < nc; j++)
+        {
+          Complex res = 0;
+          double absres = abs (elem (0, j));
+          for (int i = 0; i < nr; i++)
+            if (abs (elem (i, j)) > absres)
+              {
+                res = i;
+                absres = abs (elem (i, j));
+              }
+          result.elem (j) = res + 1;
+        }
     }
 
   return result;

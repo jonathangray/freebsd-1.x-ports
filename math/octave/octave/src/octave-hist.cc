@@ -19,11 +19,12 @@ You should have received a copy of the GNU General Public License
 along with Octave; see the file COPYING.  If not, write to the Free
 Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
-The function listed below was adapted from a similar function from
+The functions listed below were adapted from similar functions from
 GNU Bash, the Bourne Again SHell, copyright (C) 1987, 1989, 1991 Free
 Software Foundation, Inc.
 
-  builtin_history
+  do_history         edit_history_readline
+  do_edit_history    edit_history_add_hist
 
 */
 
@@ -39,19 +40,27 @@ Software Foundation, Inc.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
 #include <fstream.h>
+#include <strstream.h>
 
 #include "statdefs.h"
 #include "utils.h"
 #include "error.h"
 #include "input.h"
 #include "octave.h"
+#include "user-prefs.h"
+#include "unwind-prot.h"
 #include "octave-hist.h"
+#include "sighandlers.h"
 
 extern "C"
 {
 #include <readline/history.h>
 }
+
+// Nonzero means input is coming from temporary history file.
+int input_from_tmp_history_file = 0;
 
 // Nonzero means we are saving history lines.
 int saving_history = 1;
@@ -146,12 +155,15 @@ maybe_save_history (char *s)
  * Display, save, or load history.  Stolen and modified from bash.
  *
  * Arg of -w FILENAME means write file, arg of -r FILENAME
- * means read file.  Arg of N means only display that many items.
+ * means read file, arg of -q means don't number lines.  Arg of N
+ * means only display that many items. 
  */
 void
 do_history (int argc, char **argv)
 {
   HIST_ENTRY **hlist;
+
+  int numbered_output = 1;
 
   while (--argc > 0)
     {
@@ -216,6 +228,8 @@ do_history (int argc, char **argv)
 	    }
 	  return;
 	}
+      else if (strcmp (*argv, "-q") == 0)
+	numbered_output = 0;
       else if (strcmp (*argv, "--") == 0)
 	{
 	  argc--;
@@ -262,13 +276,343 @@ do_history (int argc, char **argv)
 	{
 //	  QUIT;  // in bash: (interrupt_state) throw_to_top_level ();
 
-	  char tmp[7];
-	  sprintf (tmp, "%5d%c ", i + history_base,
-		   hlist[i]->data ? '*' : ' ');
+	  if (numbered_output)
+	    cerr.form ("%5d%c", i + history_base, hlist[i]->data ? '*' : ' ');
 	  cerr << hlist[i]->line << "\n";
 	  i++;
 	}
     }
+}
+
+/*
+ * Read the edited history lines from STREAM and return them
+ * one at a time.  This can read unlimited length lines.  The
+ *  caller should free the storage.
+ */
+static char *
+edit_history_readline (fstream& stream)
+{
+  char c;
+  int line_len = 128;
+  int lindex = 0;
+  char *line = new char [line_len];
+  line[0] = '\0';
+
+  while (stream.get (c))
+    {
+      if (lindex + 2 >= line_len)
+	{
+	  char *tmp_line = new char [line_len += 128];
+	  strcpy (tmp_line, line);
+	  delete [] line;
+	  line = tmp_line;
+	}
+
+      if (c == '\n')
+	{
+	  line[lindex++] = '\n';
+	  line[lindex++] = '\0';
+	  return line;
+	}
+      else
+	line[lindex++] = c;
+    }
+
+  if (! lindex)
+    {
+      delete [] line;
+      return (char *) NULL;
+    }
+
+  if (lindex + 2 >= line_len)
+    {
+      char *tmp_line = new char [lindex+3];
+      strcpy (tmp_line, line);
+      delete [] line;
+      line = tmp_line;
+    }
+
+// Finish with newline if none in file.
+
+  line[lindex++] = '\n';
+  line[lindex++] = '\0';
+  return line;
+}
+
+extern "C"
+{
+  HIST_ENTRY *history_get ();
+}
+
+/*
+ * Use `command' to replace the last entry in the history list, which,
+ * by this time, is `run_history blah...'.  The intent is that the
+ * new command become the history entry, and that `fc' should never
+ * appear in the history list.  This way you can do `run_history' to
+ * your heart's content.
+ */ 
+static void
+edit_history_repl_hist (char *command)
+{
+  if (command == (char *) NULL || *command == '\0')
+    return;
+
+  HIST_ENTRY **hlist = history_list ();
+
+  if (hlist == (HIST_ENTRY **) NULL)
+    return;
+
+  for (int i = 0; hlist[i]; i++)
+    ; // Count 'em.
+  i--;
+
+  /* History_get () takes a parameter that should be
+     offset by history_base. */
+
+// Don't free this.
+  HIST_ENTRY *histent = history_get (history_base + i);
+  if (histent == (HIST_ENTRY *) NULL)
+    return;
+
+  char *data = (char *) NULL;
+  if (histent->data != (char *) NULL)
+    {
+      int len = strlen (histent->data);
+      data = (char *) malloc (len);
+      strcpy (data, histent->data);
+    }
+
+  int n = strlen (command);
+
+  if (command[n - 1] == '\n')
+    command[n - 1] = '\0';
+
+  if (command != (char *) NULL && *command != '\0')
+    {
+      HIST_ENTRY *discard = replace_history_entry (i, command, data);
+      if (discard != (HIST_ENTRY *) NULL)
+	{
+	  if (discard->line != (char *) NULL)
+	    free (discard->line);
+
+	  free ((char *) discard);
+	}
+    }
+}
+
+static void
+edit_history_add_hist (char *line)
+{
+  if (line != (char *) NULL)
+    {
+      int len = strlen (line);
+      if (len > 0 && line[len-1] == '\n')
+	line[len-1] = '\0';
+
+      if (line[0] != '\0')
+	add_history (line);
+    }
+}
+
+#define histline(i) (hlist[(i)]->line)
+
+static char *
+mk_tmp_hist_file (int argc, char **argv, int insert_curr, char *warn_for)
+{
+  HIST_ENTRY **hlist;
+
+  hlist = history_list ();
+
+  int hist_count = 0;
+
+  while (hlist[hist_count++] != (HIST_ENTRY *) NULL)
+    ; // Find the number of items in the history list.
+
+// The current command line is already part of the history list by the
+// time we get to this point.  Delete it from the list.
+
+  hist_count -= 2;
+  if (! insert_curr)
+    remove_history (hist_count);
+  hist_count--;
+
+// If no numbers have been specified, the default is to edit the last
+// command in the history list.
+
+  int hist_end = hist_count;
+  int hist_beg = hist_count;
+  int reverse = 0;
+
+// Process options
+
+  int usage_error = 0;
+  if (argc == 3)
+    {
+      argv++;
+      if (sscanf (*argv++, "%d", &hist_beg) != 1
+	  || sscanf (*argv, "%d", &hist_end) != 1)
+	usage_error = 1;
+      else
+	{
+	  hist_beg--;
+	  hist_end--;
+	}
+    }
+  else if (argc == 2)
+    {
+      argv++;
+      if (sscanf (*argv++, "%d", &hist_beg) != 1)
+	usage_error = 1;
+      else
+	{
+	  hist_beg--;
+	  hist_end = hist_beg;
+	}
+    }
+
+  if (hist_beg < 0 || hist_end < 0 || hist_beg > hist_count
+      || hist_end > hist_count)
+    {
+      error ("%s: history specification out of range", warn_for);
+      return (char *) NULL;
+    }
+
+  if (usage_error)
+    {
+      usage ("%s [first] [last]", warn_for);
+      return (char *) NULL;
+    }
+
+  if (hist_end < hist_beg)
+    {
+      int t = hist_end;
+      hist_end = hist_beg;
+      hist_beg = t;
+      reverse = 1;
+    }
+
+  char *name = tmpnam ((char *) NULL);
+
+  fstream file (name, ios::out);
+
+  if (! file)
+    {
+      error ("%s: couldn't open temporary file `%s'", warn_for, name);
+      return (char *) NULL;
+    }
+
+  if (reverse)
+    {
+      for (int i = hist_end; i >= hist_beg; i--)
+	file << histline (i) << "\n";
+    }
+  else
+    {
+      for (int i = hist_beg; i <= hist_end; i++)
+	file << histline (i) << "\n";
+    }
+
+  file.close ();
+
+  return strsave (name);
+}
+
+void
+do_edit_history (int argc, char **argv)
+{
+  char *name = mk_tmp_hist_file (argc, argv, 0, "edit_history");
+
+  if (name == (char *) NULL)
+    return;
+
+// Call up our favorite editor on the file of commands.
+
+  ostrstream buf;
+  buf << user_pref.editor << " " << name << ends;
+  char *cmd = buf.str ();
+
+// Ignore interrupts while we are off editing commands.  Should we
+// maybe avoid using system()?
+
+  volatile sig_handler *saved_sigint_handler = signal (SIGINT, SIG_IGN);
+  system (cmd);
+  signal (SIGINT, saved_sigint_handler);
+
+// Write the commands to the history file since parse_and_execute
+// disables command line history while it executes.
+
+  fstream file (name, ios::in);
+
+  char *line;
+  int first = 1;
+  while ((line = edit_history_readline (file)) != NULL)
+    {
+
+// Skip blank lines
+
+      if (line[0] == '\n')
+	{
+	  delete [] line;
+	  continue;
+	}
+
+      if (first)
+	{
+	  first = 0;
+	  edit_history_repl_hist (line);
+	}
+      else
+	edit_history_add_hist (line);
+    }
+
+  file.close ();
+
+// Turn on command echo, so the output from this will make better sense.
+
+  begin_unwind_frame ("do_edit_history");
+  unwind_protect_int (echo_input);
+  unwind_protect_int (input_from_tmp_history_file);
+  echo_input = 1;
+  input_from_tmp_history_file = 1;
+
+  parse_and_execute (name, 1);
+
+  run_unwind_frame ("do_edit_history");
+
+// Delete the temporary file.  Should probably be done with an
+// unwind_protect.
+
+  unlink (name);
+
+  delete [] name;
+}
+
+void
+do_run_history (int argc, char **argv)
+{
+  char *name = mk_tmp_hist_file (argc, argv, 1, "run_history");
+
+  if (name == (char *) NULL)
+    return;
+
+// Turn on command echo, so the output from this will make better sense.
+
+  begin_unwind_frame ("do_run_history");
+  unwind_protect_int (echo_input);
+  unwind_protect_int (input_from_tmp_history_file);
+  echo_input = 1;
+  input_from_tmp_history_file = 1;
+
+  parse_and_execute (name, 1);
+
+  run_unwind_frame ("do_run_history");
+
+// Delete the temporary file.  Should probably be done with an
+// unwind_protect.
+
+  unlink (name);
+
+  delete [] name;
 }
 
 int

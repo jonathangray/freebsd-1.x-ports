@@ -1,86 +1,108 @@
-#   Copyright (C) 1993 John W. Eaton
-
-# John W. Eaton
-# jwe@che.utexas.edu
-# Department of Chemical Engineering
-# The University of Texas at Austin
-
-#
-# octave support library routines
-#
-
-#
-# default_octave_version -- extract and print the version number of octave
-#
-proc default_octave_version { } {
-    global OCTAVE
-
-    set tmp [exec $OCTAVE -v]
-    regexp "version *\[0-9\].\[0-9\]*" $tmp version
-    clone_output "[which $OCTAVE] $version\n"
-    unset tmp
-    unset version
+if ![info exists prompt] then {
+    set prompt "octave:\[0-9\]*> "
 }
 
-#
-# default_octave_start -- interpret a program using octave
-#
-proc default_octave_start { prog } {
-    global verbose
-    global comp_output
-    global OCTAVE
-    global OCTAVE_PATH
+if ![info exists nl] then {
+    set nl "(\[\r\n\])*"
+}
 
-    send_log "$OCTAVE -q $prog\n"
-    if $verbose>1 then {
-	send_user "Spawning \"$OCTAVE $prog\"\n"
-    }
-
-    catch "exec $OCTAVE -q -p $OCTAVE_PATH $prog" comp_output
-    if ![string match "" $comp_output] then {
-	send_log "$comp_output\n"
-	if $verbose>1 then {
-	    send_user "$comp_output\n"
-	}
-    }
+if ![info exists resync] then {
+    set resync ".*$prompt$"
 }
 
 #
 # octave_version -- extract and print the version number of octave
 #
-proc octave_version { } {
-    default_octave_version
+proc octave_version {} {
+	global OCTAVE
+	set tmp [exec $OCTAVE -v]
+	regexp "version *\[0-9\].\[0-9\]*" $tmp version
+	clone_output "[which $OCTAVE] $version\n"
+	unset tmp
+	unset version
 }
 
 #
-# octave_load -- loads the program. For octave, we just execute it
+# octave_load -- loads the program
 #
-proc octave_load { args } {
-    global verbose
-    global exec_output
-
-    if ![file exists $args] then {
-	error "$args does not exist."
-	return -1
-    }
-
-    set status [catch "exec $args" exec_output]
-    if $verbose>1 then {
-	send_user "Executed $args\n"
-    }
-    return $status
+proc octave_load { arg } {
+	#
 }
 
 #
-# octave_exit -- just a stub for octave
+# octave_exit -- quit and cleanup
 #
-proc octave_exit { } {
-    send_user "bye-bye.\n"
+proc octave_exit {} {
+	#
 }
 
 #
-# octave_start -- interpret source file
+# octave_start -- start octave running
 #
-proc octave_start { prog } {
-    default_octave_start $prog
+proc octave_start {} {
+	global OCTAVE
+	global OCTAVE_SCRIPT_PATH
+	global prompt
+	global spawn_id
+	global verbose
+	global timeout
+
+	if { $verbose > 1 } {
+		send_user "starting $OCTAVE\n"
+	}
+#
+# It might take a long time to start Octave, but we shouldn't leave
+# the timeout period at a minute for the real tests.
+#
+	set tmp $timeout
+	set timeout 60
+	if [ llength $OCTAVE_SCRIPT_PATH ] {
+		spawn $OCTAVE -q -p $OCTAVE_SCRIPT_PATH
+	} else {
+		spawn $OCTAVE -q
+	}
+	set timeout $tmp
+
+	expect {
+		-re "No such file.*" { error "Can't start $OCTAVE"; exit 1 }
+		-re "$prompt$" { }
+		timeout { error "Failed to spawn $OCTAVE (timeout)"; exit 1 }
+	}
+#
+# Always turn off paging!
+#
+	send "page_screen_output = \"false\";\n"
+	expect {
+		-re ".*$prompt$"		{ }
+	}
 }
+
+#
+# Octave should never take very long to respond to the tests we are
+# going to use.
+#
+set timeout 5
+
+#
+# expectations that clean up in case of error. Note that `$test' is
+# a purely local variable.
+#
+# The first of these is used to match any bad responses, and resynchronise
+# things by finding a prompt. The second is a timeout error, and shouldn't
+# ever be triggered.
+#
+#expect_after {
+#	-re "\[^\n\r\]*$prompt$" {
+#		fail "$test (bad match)"
+#		if { $verbose > 0 } {
+#			regexp ".*\r\n(\[^\r\n\]+)(\[\r\n\])+$prompt$" \
+#						$expect_out(buffer) "" output
+#			send_user "\tUnmatched output: \"$output\"\n"
+#		}
+#	}
+#	timeout {
+#		fail "$test (timeout)"
+#	}
+#}
+
+octave_start

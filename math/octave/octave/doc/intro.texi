@@ -6,10 +6,15 @@
 @chapter A Brief Introduction to Octave
 @cindex introduction
 
-This manual will eventually document how to run, install and port
-Octave, and how to report bugs.
+This manual documents how to run, install and port Octave, and how
+to report bugs.
 
-This document corresponds to Octave version 0.74.
+Octave is a high-level language for numerical computations.
+It provides a convenient command line interface for performing
+numerical experiments, and may also be used as a batch-oriented
+language.
+
+This document corresponds to Octave version @value{VERSION}.
 
 @c XXX FIXME XXX -- add explanation about how and why Octave was written.
 @c
@@ -17,26 +22,268 @@ This document corresponds to Octave version 0.74.
 @c                  always use more funding.
 
 @menu
-* Getting Started::             
 * Running Octave::              
 * Simple Examples::             
 @end menu
 
-@node Getting Started, Running Octave,  , Introduction
-@section Getting Started
-@cindex getting started
-
-@node Running Octave, Simple Examples, Getting Started, Introduction
+@node Running Octave, Simple Examples, Introduction, Introduction
 @section Running Octave
+
+On most systems, the way to invoke Octave is with the shell command
+@samp{octave}.  Octave displays an initial message and then a prompt
+indicating it is ready to accept input.  You can begin typing Octave
+commands immediately afterward.
+
+If you get into trouble, you can usually interrupt Octave by typing
+@kbd{C-c}.  This will normally return you to Octave's prompt.
+
+To exit Octave, type @samp{quit}, or @samp{exit} at the Octave prompt.
+
+@cindex exiting octave
+@cindex quitting octave
+@findex exit
+@findex quit
+
+On systems that support job control, you can suspend Octave by sending
+it a SIGTSTP signal, usually by typing @kbd{C-z}.
 
 @node Simple Examples,  , Running Octave, Introduction
 @section Simple Examples
 
-@c should have examples of the following, with M-files for the examples
-@c provided somewhere in the distribution
-@c
-@c matrix multiply
-@c solution of linear equations
-@c svd
-@c solution of differential equations
-@c graphics
+The following chapters describe all of Octave's features in detail, but
+before doing that, it might be helpful to give a sampling of some of its
+capabilities.
+
+If you are new to Octave, I recommend that you try these examples to
+begin learning Octave by using it.  Lines marked with @samp{octave:13>}
+are lines you type, ending each with a carriage return.  Octave will
+respond with an answer, or by displaying a graph.
+
+@unnumberedsubsec Creating a Matrix
+
+To create a new matrix and store it in a variable so that it you can
+refer to it later, type the command
+
+@example
+octave:1> a = [ 1, 1, 2; 3, 5, 8; 13, 21, 34 ]
+@end example
+
+@noindent
+Octave will respond by printing the matrix in neatly aligned columns.
+Ending a command with a semicolon tells Octave to not print the result
+of a command.  For example
+
+@example
+octave:2> b = rand (3, 2);
+@end example
+
+@noindent
+will create a 3 row, 2 column matrix with each element set to a random
+value between zero and one.
+
+To display the value of any variable, simply type the name of the
+variable.  For example, to display the value stored in the matrix
+@samp{b}, type the command
+
+@example
+octave:3> b
+@end example
+
+@unnumberedsubsec Matrix Arithmetic
+
+Octave has a convenient operator notation for performing matrix
+arithmetic.  For example, to multiply the matrix @code{a} by a scalar
+value, type the command
+
+@example
+octave:4> 2 * a
+@end example
+
+To multiply two matrices, type the command
+
+@example
+octave:4> a * b
+@end example
+
+To form the matrix product
+@iftex
+@tex
+ $a^Ta$,
+@end tex
+@end iftex
+@ifinfo
+ @code{transpose (a) * a},
+@end ifinfo
+type the command
+
+@example
+octave:5> a' * a
+@end example
+
+@unnumberedsubsec Solving Linear Equations
+
+To solve the set of linear equations
+@iftex
+@tex
+ ${\bf Ax} = {\bf b}$,
+@end tex
+@end iftex
+@ifinfo
+@code{Ax = b},
+@end ifinfo
+use the left division operator, @samp{\}:
+
+@example
+octave:6> a \ b
+@end example
+
+@noindent
+This is conceptually equivalent to
+@iftex
+@tex
+ ${\bf A}^{-1}{\bf b}$,
+@end tex
+@end iftex
+@ifinfo
+inv (A) * b,
+@end ifinfo
+but avoids computing the inverse of a matrix directly.
+
+If the coefficient matrix is singular, Octave will print a warning
+message and compute a minimum norm solution.
+
+@unnumberedsubsec Integrating Differential Equations
+
+Octave has built-in functions for solving nonlinear differential
+equations of the form
+@iftex
+@tex
+$$
+{dx \over dt} = f(x,t), \quad {\rm with} \quad x(t=t_0) = x_0
+$$
+@end tex
+@end iftex
+@ifinfo
+@example
+dx
+-- = f (x, t)
+dt
+@end example
+
+@noindent
+with the initial condition
+
+@example
+x(t = t0) = x0
+@end example
+@end ifinfo
+
+@noindent
+For Octave to integrate equations of this form, you must first provide a
+definition of the function
+@iftex
+@tex
+$f (x, t)$.
+@end tex
+@end iftex
+@ifinfo
+@code{f(x,t)}.
+@end ifinfo
+This is straightforward, and may be accomplished by entering the
+function body directly on the command line.  For example, the following
+commands define the right hand side function for an interesting pair of
+nonlinear differential equations.  Note that while you are entering a
+function, Octave responds with a different prompt, to indicate that it
+is waiting for you to complete your input.
+
+@example
+octave:7> function xdot = f (x, t) 
+>
+>  r = 0.25;
+>  k = 1.4;
+>  a = 1.5;
+>  b = 0.16;
+>  c = 0.9;
+>  d = 0.8;
+>
+>  xdot(1) = r*x(1)*(1 - x(1)/k) - a*x(1)*x(2)/(1 + b*x(1));
+>  xdot(2) = c*a*x(1)*x(2)/(1 + b*x(1)) - d*x(2);
+>
+> endfunction
+@end example
+
+@noindent
+Given the initial condition
+
+@example
+x0 = [1; 2];
+@end example
+
+@noindent
+and the set of output times as a column vector (note that the first
+output time corresponds to the initial condition given above)
+
+@example
+t = linspace (0, 50, 200)';
+@end example
+
+@noindent
+it is easy to integrate the set of differential equations:
+
+@example
+x = lsode ("f", x0, t);
+@end example
+
+@noindent
+The function @samp{lsode} uses the Livermore Solver for Ordinary
+Differential Equations, described in A. C. Hindmarsh, @cite{ODEPACK, a
+Systematized Collection of ODE Solvers}, in: Scientific Computing, R. S.
+Stepleman et al. (Eds.), North-Holland, Amsterdam, 1983, pages 55--64.
+
+@unnumberedsubsec Producing Graphical Output
+
+To display the solution of the previous example graphically, use the
+command
+
+@example
+plot (t, x)
+@end example
+
+If you are using the X Window System, Octave will automatically create
+a separate window to display the plot.  If you are using a terminal that
+supports some other graphics commands, you will need to tell Octave what
+kind of terminal you have.  Type the command
+
+@example
+set term
+@end example
+
+@noindent
+to see a list of the supported terminal types.  Octave uses
+@code{gnuplot} to display graphics, and can display graphics on any
+terminal that is supported by @code{gnuplot}.
+
+To capture the output of the plot command in a file rather than sending
+the output directly to your terminal, you can use a set of commands like
+this
+
+@example
+set term postscript
+set output "foo.ps"
+replot
+@end example
+
+@noindent
+This will work for other types of output devices as well.  Octave's
+@samp{set} command is really just piped to the @code{gnuplot}
+subprocess, so that once you have a plot on the screen that you like,
+you should be able to do something like this to create an output file
+suitable for your graphics printer.
+
+Or, you can eliminate the intermediate file by using commands like this
+
+@example
+set term postscript
+set output "|lpr -Pname_of_your_graphics_printer"
+replot
+@end example

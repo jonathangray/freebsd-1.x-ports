@@ -84,7 +84,7 @@ tree_constant_rep::tree_constant_rep (double d)
   type_tag = scalar_constant;
 }
 
-tree_constant_rep::tree_constant_rep (Matrix& m)
+tree_constant_rep::tree_constant_rep (const Matrix& m)
 {
   if (m.rows () == 1 && m.columns () == 1)
     {
@@ -98,7 +98,7 @@ tree_constant_rep::tree_constant_rep (Matrix& m)
     }
 }
 
-tree_constant_rep::tree_constant_rep (DiagMatrix& d)
+tree_constant_rep::tree_constant_rep (const DiagMatrix& d)
 {
   if (d.rows () == 1 && d.columns () == 1)
     {
@@ -112,7 +112,7 @@ tree_constant_rep::tree_constant_rep (DiagMatrix& d)
     }
 }
 
-tree_constant_rep::tree_constant_rep (RowVector& v)
+tree_constant_rep::tree_constant_rep (const RowVector& v)
 {
   int len = v.capacity ();
   if (len == 1)
@@ -141,7 +141,7 @@ tree_constant_rep::tree_constant_rep (RowVector& v)
     }
 }
 
-tree_constant_rep::tree_constant_rep (RowVector& v, int prefer_column_vector)
+tree_constant_rep::tree_constant_rep (const RowVector& v, int prefer_column_vector)
 {
   int len = v.capacity ();
   if (len == 1)
@@ -170,7 +170,7 @@ tree_constant_rep::tree_constant_rep (RowVector& v, int prefer_column_vector)
     }
 }
 
-tree_constant_rep::tree_constant_rep (ColumnVector& v)
+tree_constant_rep::tree_constant_rep (const ColumnVector& v)
 {
   int len = v.capacity ();
   if (len == 1)
@@ -199,7 +199,7 @@ tree_constant_rep::tree_constant_rep (ColumnVector& v)
     }
 }
 
-tree_constant_rep::tree_constant_rep (ColumnVector& v,
+tree_constant_rep::tree_constant_rep (const ColumnVector& v,
 				      int prefer_column_vector) 
 {
   int len = v.capacity ();
@@ -229,13 +229,13 @@ tree_constant_rep::tree_constant_rep (ColumnVector& v,
     }
 }
 
-tree_constant_rep::tree_constant_rep (Complex c)
+tree_constant_rep::tree_constant_rep (const Complex& c)
 {
   complex_scalar = new Complex (c);
   type_tag = complex_scalar_constant;
 }
 
-tree_constant_rep::tree_constant_rep (ComplexRowVector& v)
+tree_constant_rep::tree_constant_rep (const ComplexRowVector& v)
 {
   int len = v.capacity ();
   if (len == 1)
@@ -264,7 +264,7 @@ tree_constant_rep::tree_constant_rep (ComplexRowVector& v)
     }
 }
 
-tree_constant_rep::tree_constant_rep (ComplexMatrix& m)
+tree_constant_rep::tree_constant_rep (const ComplexMatrix& m)
 {
   if (m.rows () == 1 && m.columns () == 1)
     {
@@ -278,7 +278,7 @@ tree_constant_rep::tree_constant_rep (ComplexMatrix& m)
     }
 }
 
-tree_constant_rep::tree_constant_rep (ComplexDiagMatrix& d)
+tree_constant_rep::tree_constant_rep (const ComplexDiagMatrix& d)
 {
   if (d.rows () == 1 && d.columns () == 1)
     {
@@ -292,7 +292,7 @@ tree_constant_rep::tree_constant_rep (ComplexDiagMatrix& d)
     }
 }
 
-tree_constant_rep::tree_constant_rep (ComplexRowVector& v,
+tree_constant_rep::tree_constant_rep (const ComplexRowVector& v,
 				      int prefer_column_vector)
 {
   int len = v.capacity ();
@@ -322,7 +322,7 @@ tree_constant_rep::tree_constant_rep (ComplexRowVector& v,
     }
 }
 
-tree_constant_rep::tree_constant_rep (ComplexColumnVector& v)
+tree_constant_rep::tree_constant_rep (const ComplexColumnVector& v)
 {
   int len = v.capacity ();
   if (len == 1)
@@ -351,7 +351,7 @@ tree_constant_rep::tree_constant_rep (ComplexColumnVector& v)
     }
 }
 
-tree_constant_rep::tree_constant_rep (ComplexColumnVector& v,
+tree_constant_rep::tree_constant_rep (const ComplexColumnVector& v,
 				      int prefer_column_vector) 
 {
   int len = v.capacity ();
@@ -387,24 +387,18 @@ tree_constant_rep::tree_constant_rep (const char *s)
   type_tag = string_constant;
 }
 
-tree_constant_rep::tree_constant_rep (String& s)
-{
-  string = strsave (s);
-  type_tag = string_constant;
-}
-
 tree_constant_rep::tree_constant_rep (double b, double l, double i)
 {
   range = new Range (b, l, i);
   int nel = range->nelem ();
   if (nel < 0)
     {
+      delete range;
+      type_tag = unknown_constant;
       if (nel == -1)
 	error ("number of elements in range exceeds INT_MAX");
       else
 	error ("invalid range");
-
-      jump_to_top_level ();
     }
   else if (nel > 1)
     type_tag = range_constant;
@@ -426,7 +420,7 @@ tree_constant_rep::tree_constant_rep (double b, double l, double i)
     }
 }
 
-tree_constant_rep::tree_constant_rep (Range& r)
+tree_constant_rep::tree_constant_rep (const Range& r)
 {
   if (r.nelem () > 1)
     {
@@ -454,7 +448,7 @@ tree_constant_rep::tree_constant_rep (tree_constant_rep::constant_type t)
   type_tag = magic_colon;
 }
 
-tree_constant_rep::tree_constant_rep (tree_constant_rep& t)
+tree_constant_rep::tree_constant_rep (const tree_constant_rep& t)
 {
   type_tag = t.type_tag;
 
@@ -588,14 +582,11 @@ tree_constant_rep::maybe_resize (int i, int j)
       else
 	{
 	  if (i > nr)
-	    message ((char *) NULL,
-		     "row index = %d exceeds max row dimension = %d", i, nr);
-	  if (j > nc)
-	    message ((char *) NULL,
-		     "column index = %d exceeds max column dimension = %d",
-		     j, nc);
+	    error ("row index = %d exceeds max row dimension = %d", i, nr);
 
-	  jump_to_top_level ();
+	  if (j > nc)
+	    error ("column index = %d exceeds max column dimension = %d",
+		   j, nc);
 	}
     }
 }
@@ -624,38 +615,26 @@ tree_constant_rep::maybe_resize (int i, force_orient f_orient = no_orient)
 	    resize (1, i, 0.0);
 	}
       else
-	{
-	  message ((char *) NULL,
-		   "matrix index = %d exceeds max dimension = %d", i, nc);
-	  jump_to_top_level ();
-	}
+	error ("matrix index = %d exceeds max dimension = %d", i, nc);
     }
   else if (nr == 1 && i > nc)
     {
       if (user_pref.resize_on_range_error)
 	resize (1, i, 0.0);
       else
-	{
-	  message ((char *) NULL,
-		   "matrix index = %d exceeds max dimension = %d", i, nc);
-	  jump_to_top_level ();
-	}
+	error ("matrix index = %d exceeds max dimension = %d", i, nc);
     }
   else if (nc == 1 && i > nr)
     {
       if (user_pref.resize_on_range_error)
 	resize (i, 1, 0.0);
       else
-	{
-	  message ((char *) NULL,
-		   "matrix index = %d exceeds max dimension = ", i, nc);
-	  jump_to_top_level ();
-	}
+	error ("matrix index = %d exceeds max dimension = ", i, nc);
     }
 }
 
 double
-tree_constant_rep::to_scalar (void)
+tree_constant_rep::to_scalar (void) const
 {
   tree_constant tmp = make_numeric ();
 
@@ -702,7 +681,7 @@ tree_constant_rep::to_scalar (void)
 }
 
 ColumnVector
-tree_constant_rep::to_vector (void)
+tree_constant_rep::to_vector (void) const
 {
   tree_constant tmp = make_numeric ();
 
@@ -743,7 +722,7 @@ tree_constant_rep::to_vector (void)
 }
 
 Matrix
-tree_constant_rep::to_matrix (void)
+tree_constant_rep::to_matrix (void) const
 {
   tree_constant tmp = make_numeric ();
 
@@ -829,7 +808,7 @@ tree_constant_rep::force_numeric (int force_str_conv = 0)
 }
 
 tree_constant
-tree_constant_rep::make_numeric (int force_str_conv = 0)
+tree_constant_rep::make_numeric (int force_str_conv = 0) const
 {
   tree_constant retval;
   switch (type_tag)
@@ -865,6 +844,8 @@ tree_constant_rep::make_numeric (int force_str_conv = 0)
 tree_constant
 do_binary_op (tree_constant& a, tree_constant& b, tree::expression_type t)
 {
+  tree_constant ans;
+
   int first_empty = (a.rows () == 0 || a.columns () == 0);
   int second_empty = (b.rows () == 0 || b.columns () == 0);
 
@@ -876,7 +857,7 @@ do_binary_op (tree_constant& a, tree_constant& b, tree::expression_type t)
       else if (flag == 0)
 	{
 	  error ("invalid binary operation on empty matrix");
-	  jump_to_top_level ();
+	  return ans;
 	}
     }
 
@@ -890,8 +871,6 @@ do_binary_op (tree_constant& a, tree_constant& b, tree::expression_type t)
   Matrix m1, m2;
   Complex c1, c2;
   ComplexMatrix cm1, cm2;
-
-  tree_constant ans;
 
   switch (a_type)
     {
@@ -1010,6 +989,8 @@ do_binary_op (tree_constant& a, tree_constant& b, tree::expression_type t)
 tree_constant
 do_unary_op (tree_constant& a, tree::expression_type t)
 {
+  tree_constant ans;
+
   if (a.rows () == 0 || a.columns () == 0)
     {
       int flag = user_pref.propagate_empty_matrices;
@@ -1018,13 +999,11 @@ do_unary_op (tree_constant& a, tree::expression_type t)
       else if (flag == 0)
 	{
 	  error ("invalid unary operation on empty matrix");
-	  jump_to_top_level ();
+	  return ans;
 	}
     }
 
   tree_constant tmp_a = a.make_numeric ();
-
-  tree_constant ans;
 
   switch (tmp_a.const_type ())
     {
@@ -1118,6 +1097,9 @@ tree_constant_rep::bump_value (tree::expression_type etype)
 void
 tree_constant_rep::eval (int print)
 {
+  if (error_state)
+    return;
+
   switch (type_tag)
     {
     case complex_scalar_constant:
@@ -1149,11 +1131,53 @@ tree_constant_rep::eval (int print)
       break;
     }
 
+// Avoid calling rows() and columns() for things like magic_colon.
+
+  int nr = 1;
+  int nc = 1;
+  if (type_tag == matrix_constant
+      || type_tag == complex_matrix_constant
+      || type_tag == range_constant)
+    {
+      nr = rows ();
+      nc = columns ();
+    }
+
+  switch (type_tag)
+    {
+    case matrix_constant:
+      if (nr == 1 && nc == 1)
+	{
+	  double d = matrix->elem (0, 0);
+	  delete matrix;
+	  scalar = d;
+	  type_tag = scalar_constant;
+	}
+      break;
+    case complex_matrix_constant:
+      if (nr == 1 && nc == 1)
+	{
+	  Complex c = complex_matrix->elem (0, 0);
+	  delete complex_matrix;
+	  complex_scalar = new Complex (c);
+	  type_tag = complex_scalar_constant;
+	}
+      break;
+    case range_constant:
+      if (nr == 1 && nc == 1)
+	{
+	  double d = range->base ();
+	  delete range;
+	  scalar = d;
+	  type_tag = scalar_constant;
+	}
+      break;
+    default:
+      break;
+    }
+
   if (print)
     {
-      int nr = rows ();
-      int nc = columns ();
-
       ostrstream output_buf;
       switch (type_tag)
 	{
@@ -1203,9 +1227,12 @@ tree_constant_rep::eval (int print)
 }
 
 tree_constant *
-tree_constant_rep::eval (tree_constant *args, int nargin, int nargout,
+tree_constant_rep::eval (const tree_constant *args, int nargin, int nargout,
 			 int print)
 {
+  if (error_state)
+    return NULL_TREE_CONST;
+
   tree_constant *retval = new tree_constant [2];
   switch (type_tag)
     {
@@ -1487,81 +1514,112 @@ tree_constant_rep::load (istream& is, tree_constant_rep::constant_type t)
 }
 
 double
-tree_constant_rep::double_value (void)
+tree_constant_rep::double_value (void) const
 {
-  assert (type_tag == scalar_constant || type_tag == complex_scalar_constant);
-
-  if (type_tag == scalar_constant)
-    return scalar;
-  else if (type_tag == complex_scalar_constant)
+  switch (type_tag)
     {
-      int flag = user_pref.ok_to_lose_imaginary_part;
-      if (flag == -1)
-	warning ("implicit conversion of complex value to real value");
+    case scalar_constant:
+      return scalar;
+    case complex_scalar_constant:
+      {
+	int flag = user_pref.ok_to_lose_imaginary_part;
+	if (flag == -1)
+	  warning ("implicit conversion of complex value to real value");
 
-      if (flag != 0)
-	return real (*complex_scalar);
-      else
-	{
-	  error ("implicit conversion of complex value to real value not allowed");
-	  jump_to_top_level ();
-	}
+	if (flag != 0)
+	  return real (*complex_scalar);
+
+	error ("implicit conversion of complex value to real value not allowed");
+	jump_to_top_level ();
+      }
+    default:
+      panic_impossible ();
+      break;
     }
 }
 
 Matrix
-tree_constant_rep::matrix_value (void)
+tree_constant_rep::matrix_value (void) const
 {
-  assert (type_tag == matrix_constant || type_tag == complex_matrix_constant);
-
-  if (type_tag == matrix_constant)
-    return *matrix;
-  else if (type_tag == complex_matrix_constant)
+  switch (type_tag)
     {
-      int flag = user_pref.ok_to_lose_imaginary_part;
-      if (flag == -1)
-	warning ("implicit conversion of complex matrix to real matrix"); 
+    case matrix_constant:
+      return *matrix;
+    case complex_matrix_constant:
+      {
+	int flag = user_pref.ok_to_lose_imaginary_part;
+	if (flag == -1)
+	  warning ("implicit conversion of complex matrix to real matrix"); 
 
-      if (flag != 0)
-	return real (*complex_matrix);
-      else
-	{
+	if (flag != 0)
+	  return real (*complex_matrix);
+	else
 	  error ("implicit conversion of complex matrix to real matrix not allowed");
-	  jump_to_top_level ();
-	}
+	jump_to_top_level ();
+      }
+    default:
+      panic_impossible ();
+      break;
     }
 }
 
 Complex
-tree_constant_rep::complex_value (void)
+tree_constant_rep::complex_value (void) const
 {
-  assert (type_tag == complex_scalar_constant);
-  return *complex_scalar;
+  switch (type_tag)
+    {
+    case complex_scalar_constant:
+      return *complex_scalar;
+    case scalar_constant:
+      return Complex (scalar);
+    default:
+      panic_impossible ();
+      break;
+    }
 }
 
 ComplexMatrix
-tree_constant_rep::complex_matrix_value (void)
+tree_constant_rep::complex_matrix_value (void) const
 {
-  assert (type_tag == complex_matrix_constant);
-  return *complex_matrix;
+  switch (type_tag)
+    {
+    case scalar_constant:
+      {
+	return ComplexMatrix (scalar);
+      }
+    case complex_scalar_constant:
+      {
+	return ComplexMatrix (*complex_scalar);
+      }
+    case matrix_constant:
+      {
+        return ComplexMatrix (*matrix);
+      }
+    case complex_matrix_constant:
+      return *complex_matrix;
+      break;
+    default:
+      panic_impossible ();
+      break;
+    }
 }
 
 char *
-tree_constant_rep::string_value (void)
+tree_constant_rep::string_value (void) const
 {
   assert (type_tag == string_constant);
   return string;
 }
 
 Range
-tree_constant_rep::range_value (void)
+tree_constant_rep::range_value (void) const
 {
   assert (type_tag == range_constant);
   return *range;
 }
 
 int
-tree_constant_rep::rows (void)
+tree_constant_rep::rows (void) const
 {
   int retval = -1;
   switch (type_tag)
@@ -1592,7 +1650,7 @@ tree_constant_rep::rows (void)
 }
 
 int
-tree_constant_rep::columns (void)
+tree_constant_rep::columns (void) const
 {
   int retval = -1;
   switch (type_tag)
@@ -1627,7 +1685,7 @@ tree_constant_rep::columns (void)
 }
 
 tree_constant
-tree_constant_rep::all (void)
+tree_constant_rep::all (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -1673,7 +1731,7 @@ tree_constant_rep::all (void)
 }
 
 tree_constant
-tree_constant_rep::any (void)
+tree_constant_rep::any (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -1719,10 +1777,10 @@ tree_constant_rep::any (void)
 }
 
 tree_constant
-tree_constant_rep::isstr (void)
+tree_constant_rep::isstr (void) const
 {
   double status = 0.0;
-  if (const_type () == string_constant)
+  if (type_tag == string_constant)
     status = 1.0;
   tree_constant retval (status);
   return retval;
@@ -1800,7 +1858,7 @@ tree_constant_rep::convert_to_str (void)
 }
 
 tree_constant
-tree_constant_rep::cumprod (void)
+tree_constant_rep::cumprod (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -1840,7 +1898,7 @@ tree_constant_rep::cumprod (void)
 }
 
 tree_constant
-tree_constant_rep::cumsum (void)
+tree_constant_rep::cumsum (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -1880,7 +1938,7 @@ tree_constant_rep::cumsum (void)
 }
 
 tree_constant
-tree_constant_rep::prod (void)
+tree_constant_rep::prod (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -1920,7 +1978,7 @@ tree_constant_rep::prod (void)
 }
 
 tree_constant
-tree_constant_rep::sum (void)
+tree_constant_rep::sum (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -1960,7 +2018,7 @@ tree_constant_rep::sum (void)
 }
 
 tree_constant
-tree_constant_rep::sumsq (void)
+tree_constant_rep::sumsq (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -2003,7 +2061,7 @@ tree_constant_rep::sumsq (void)
 }
 
 static tree_constant
-make_diag (Matrix& v, int k)
+make_diag (const Matrix& v, int k)
 {
   int nr = v.rows ();
   int nc = v.columns ();
@@ -2045,7 +2103,7 @@ make_diag (Matrix& v, int k)
 }
 
 static tree_constant
-make_diag (ComplexMatrix& v, int k)
+make_diag (const ComplexMatrix& v, int k)
 {
   int nr = v.rows ();
   int nc = v.columns ();
@@ -2087,7 +2145,7 @@ make_diag (ComplexMatrix& v, int k)
 }
 
 tree_constant
-tree_constant_rep::diag (void)
+tree_constant_rep::diag (void) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -2143,7 +2201,7 @@ tree_constant_rep::diag (void)
 }
 
 tree_constant
-tree_constant_rep::diag (tree_constant& a)
+tree_constant_rep::diag (const tree_constant& a) const
 {
   if (type_tag == string_constant || type_tag == range_constant)
     {
@@ -2247,17 +2305,8 @@ tree_constant_rep::diag (tree_constant& a)
   return retval;
 }
 
-void
-tree_constant_rep::print_if_string (ostream& os, int warn)
-{
-  if (type_tag == string_constant)
-    os << string << "\n";
-  else if (warn)
-    warning ("expecting string, found numeric constant");
-}
-
 tree_constant
-tree_constant_rep::mapper (Mapper_fcn& m_fcn, int print)
+tree_constant_rep::mapper (Mapper_fcn& m_fcn, int print) const
 {
   tree_constant retval;
 
@@ -2390,6 +2439,34 @@ tree_constant::operator delete (void *p, size_t size)
   ::delete p;
 }
 #endif
+
+/*
+ * Construct return vector of empty matrices.  Return empty matrices
+ * and/or gripe when appropriate.
+ */
+tree_constant *
+vector_of_empties (int nargout, const char *fcn_name)
+{
+  tree_constant *retval = NULL_TREE_CONST;
+
+// Got an empty argument, check if should gripe/return empty values.
+
+  int flag = user_pref.propagate_empty_matrices;
+  if (flag != 0)
+    {
+      if (flag < 0)
+	gripe_empty_arg (fcn_name, 0);
+
+      Matrix m;
+      retval = new tree_constant [nargout+1];
+      for (int i = 0; i < nargout; i++)
+	retval[i] = tree_constant (m);
+    }
+  else
+    gripe_empty_arg (fcn_name, 1);
+
+  return retval;
+}
 
 /*
 ;;; Local Variables: ***

@@ -119,6 +119,3 @@ extern char *history_arg_extract ();
 /* Return the number of bytes that the primary history entries are using.
    This just adds up the lengths of the_history->lines. */
 extern int history_total_bytes ();
-
-/* Do an anchored search for string through the history in DIRECTION. */
-extern int history_search_prefix ();

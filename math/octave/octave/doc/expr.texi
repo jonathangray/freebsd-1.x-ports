@@ -34,14 +34,20 @@ combinations of these with various operators.
 * Operator Precedence::         
 @end menu
 
-@node Constant Expressions, Matrices,  , Expressions
+@node Constant Expressions, Matrices, Expressions, Expressions
 @section Constant Expressions
 
 The simplest type of expression is the @dfn{constant}, which always has
 the same value.  There are two types of constants: numeric constants and
 string constants.
 
-@unnumberedsubsec Numeric Constants
+@menu
+* Numeric Constants::           
+* String Constants::            
+@end menu
+
+@node Numeric Constants, String Constants, Constant Expressions, Constant Expressions
+@subsection Numeric Constants
 @cindex numeric constant
 @cindex numeric value
 
@@ -97,9 +103,13 @@ parse error:
 You may also use @samp{j}, @samp{I}, or @samp{J} in place of the
 @samp{i} above.  All four forms are equivalent.
 
-@unnumberedsubsec String Constants
+@node String Constants,  , Numeric Constants, Constant Expressions
+@subsection String Constants
 @cindex strings
 @cindex character strings
+
+@opindex "
+@opindex '
 
 A @dfn{string constant} consists of a sequence of characters enclosed in
 either double-quote or single-quote marks.  For example, both of the
@@ -139,7 +149,7 @@ Another use of backslash is to represent unprintable characters
 such as newline.  While there is nothing to stop you from writing most
 of these characters directly in a string constant, they may look ugly.
 
-Here is a table of all the escape sequences used in @code{awk}:
+Here is a table of all the escape sequences used in Octave:
 
 @table @code
 @item \\
@@ -203,10 +213,153 @@ produces the string whose contents are @samp{foobarbaz}
 @section Matrices
 @cindex matrices
 
+@opindex [
+@opindex ]
+@opindex ;
+@opindex ,
+
+It is easy to define a matrix of values in Octave.  The size of the
+matrix is determined automatically, so it is not necessary to explicitly
+state the dimensions.  The expression
+
+@example
+a = [1, 2; 3, 4]
+@end example
+
+@noindent
+results in the matrix
+
+@example
+a =
+
+  1  2
+  3  4
+@end example
+
+The commas which separate the elements on a row may be omitted, and the
+semicolon that marks the beginning of a new row may be replaced by one
+or more new lines.  The expression
+
+@example
+a = [ 1 2
+      3 4 ]
+@end example
+
+@noindent
+is equivalent to the one above.
+
+Elements of a matrix may be arbitrary expressions, provided that the
+dimensions all agree.  For example, given the above matrix 
+
+Inside the square brackets that delimit a matrix expression, Octave
+looks at the surrounding context to determine whether spaces should be
+converted into element separators, or simply ignored, so commands like
+
+@example
+[ linspace (1, 2) ]
+@end example
+
+@noindent
+will work.  However, some possible sources of confusion remain.  For
+example, in the expression
+
+@example
+[ 1 - 1 ]
+@end example
+
+@noindent
+the @samp{-} is treated as a binary operator and the result is the
+scalar 0, but in the expression
+
+@example
+[ 1 -1 ]
+@end example
+
+@noindent
+the @samp{-} is treated as a unary operator and the result is the
+vector @code{[ 1 -1 ]}.
+
+Given @code{a = 1}, the expression
+
+@example
+[ 1 a' ]
+@end example
+
+@noindent
+results in the single quote character @samp{'} being treated as a
+transpose operator and the result is the vector @code{[ 1 1 ]}, but the
+expression
+
+@example
+[ 1 a ' ]
+@end example
+
+@noindent
+produces the error message
+
+@example
+error: unterminated string constant
+@end example
+
+@noindent
+because to not do so would make it impossible to correctly parse the
+valid expression
+
+@example
+[ a 'foo' ]
+@end example
+
+For clarity, it is probably best to always use commas and semicolons to
+separate matrix elements and rows.
+
+@menu
+* Empty Matrices::              
+@end menu
+
+@node Empty Matrices,  , Matrices, Matrices
+@subsection Empty Matrices
+
+A matrix may have one or both dimensions zero, and operations on empty
+matrices are handled as described by Carl de Boor in @cite{An Empty
+Exercise}, SIGNUM, Volume 25, pages 2--6, 1990 and C. N. Nett and W. M.
+Haddad, in @cite{A System-Theoretic Appropriate Realization of the Empty
+Matrix Concept}, IEEE Transactions on Automatic Control, Volume 38,
+Number 5, May 1993.  Briefly, given a scalar @code{s}, and an @var{m} by
+@var{n} matrix @code{M(mxn)}, and an @var{m} by @var{n} empty matrix
+@code{[](mxn)} (with either one or both dimensions equal to zero), the
+following are true:
+
+@example
+s * [](mxn) = [](mxn) * s = [](mxn)
+
+    [](mxn) + [](mxn) = [](mxn)
+
+    [](0xm) * M(mxn) = [](0xn)
+
+    M(mxn) * [](nx0) = [](mx0)
+
+    [](mx0) + [](0xn) = 0(mxn)
+@end example
+
+By default, dimensions of the empty matrix are now printed along
+with the empty matrix symbol, @samp{[]}.  For example:
+
+@example
+octave:13> zeros (3, 0)
+ans = 
+
+[](3x0)
+@end example
+
+The built-in variable @code{print_empty_dimensions} controls this
+behavior (@pxref{User Preferences}).
+
 @node Ranges, Variables, Matrices, Expressions
 @section Ranges
 @cindex range expressions
 @cindex expression, range
+
+@opindex :
 
 A @dfn{range} is a convenient way to write a row vector with evenly
 spaced elements.  A range constant is defined by the value of the first
@@ -232,14 +385,15 @@ defines the set of values @samp{[ 1 2 3 4 5 ]}, and the range
 defines the set of values @samp{[ 1 4 ]}.
 
 The increment is specified between the base and the limit in order to
-be compatible with Matlab.
+be compatible with @sc{matlab}@footnote{@sc{matlab} is a trademark of the
+MathWorks, Inc.}.
 
 Note that the upper bound on the range is not always included in the set
 of values, and that ranges defined by floating point values can produce
 surprising results because Octave uses floating point arithmetic to
 compute the values in the range.  If it is important to include the
 endpoints of a range and the number of elements is known, you should use
-the @code{linspace} function instead @xref{Built-in Functions}.
+the @code{linspace} function instead (@pxref{Special Matrices}).
 
 @node Variables, Index Expressions, Ranges, Expressions
 @section Variables
@@ -271,6 +425,92 @@ results in an error.
 @node Index Expressions, Calling Functions, Variables, Expressions
 @section Index Expressions
 
+An @dfn{index expression} allows you to reference or extract selected
+elements of a matrix or vector.
+
+Indices may be scalars, vectors, ranges, or the special operator
+@samp{:}, which may be used to select entire rows or columns.
+
+Vectors are indexed using a single expression.  Matrices require two
+indices unless the value of the built-in variable
+@code{do_fortran_indexing} is @code{true}, in which case a matrix may
+also be indexed by a single expression (@pxref{User Preferences}).
+
+Given the matrix
+
+@example
+a = [1, 2; 3, 4]
+@end example
+
+@noindent
+all of the following expressions are equivalent
+
+@example
+a (1, [1, 2])
+a (1, 1:2)
+a (1, :)
+@end example
+
+@noindent
+and select the first row of the matrix.
+
+A special form of indexing may be used to select elements of a matrix or
+vector.  If the indices are vectors made up of only ones and zeros, the
+result is a new matrix whose elements correspond to the elements of the
+index vector that are equal to one.  For example,
+
+@example
+a = [1, 2; 3, 4];
+a ([1, 0], :)
+@end example
+
+@noindent
+selects the first row of the matrix @samp{a}.
+
+This operation can be useful for selecting elements of a matrix based on
+some condition, since the comparison operators return matrices of ones
+and zeros.
+
+This special zero-one form of indexing leads to a conflict with the
+standard indexing operation.  For example, do the following statements
+
+@example
+a = [1, 2; 3, 4];
+a ([1, 1], :)
+@end example
+
+@noindent
+return the original matrix, or the matrix formed by selecting the first
+row twice?  Although this conflict is not likely to arise very often in
+practice, you may select the behavior you prefer by setting the built-in
+variable @code{prefer_zero_one_indexing} (@pxref{User Preferences}).
+
+Finally, indexing a scalar with a vector of ones can be used to create a
+vector the same size as the the index vector, with each element equal to
+the value of the original scalar.  For example, the following statements
+
+@example
+a = 13;
+a ([1, 1, 1, 1])
+@end example
+
+@noindent
+produce a vector whose four elements are all equal to 13.
+
+Similarly, indexing a scalar with two vectors of ones can be used to
+create a matrix.  For example the following statements
+
+@example
+a = 13;
+a ([1, 1], [1, 1, 1])
+@end example
+
+@noindent
+create a 2 by 3 matrix with all elements equal to 13.
+
+This form of indexing is rarely used.  The same effect can be achieved
+using the @code{ones} function.  @xref{Special Matrices}.
+
 @node Calling Functions, Global Variables, Index Expressions, Expressions
 @section Calling Functions
 
@@ -280,10 +520,9 @@ example, the function @code{sqrt} computes the square root of a number.
 
 A fixed set of functions are @dfn{built-in}, which means they are
 available in every Octave program.  The @code{sqrt} function is one of
-these.  @xref{Built-in Functions}, for a list of built-in functions and
-their descriptions.  In addition, you can define your own functions in
-the program for use elsewhere in the same program.  @xref{Defining
-Functions}, for how to do this.
+these.  In addition, you can define your own functions in the program
+for use elsewhere in the same program.  @xref{Defining Functions}, for
+how to do this.
 
 @cindex arguments in function call
 The way to use a function is with a @dfn{function call} expression,
@@ -321,18 +560,66 @@ the argument.  A function can also have side effects, such as assigning
 the values of certain variables or doing input or output operations.
 
 Unlike most languages, functions in Octave may return multiple values.
-@c XXX FIXME XXX -- explain that here.
+For example, the following statement
+
+@example
+[u, s, v] = svd (a)
+@end example
+
+@noindent
+computes the singular value decomposition of the matrix @samp{a}, and
+assigns the result to @samp{u}, @samp{s}, and @samp{v}.
+
+The left side of a multiple assignment expression is itself a list of
+expressions, and is allowed to be a list of variable names or index
+expressions.  See also @ref{Index Expressions}, and @ref{Assignment Ops}.
 
 @node Global Variables, Keywords, Calling Functions, Expressions
 @section Global Variables
 
-Passing a global variable in a function parameter list will make a local
-copy and not modify the global value.  For example:
+A variable that has been declared @dfn{global} may be accessed from
+within a function body without having to pass it as a formal parameter.
+
+A variable may be declared @dfn{global} using a @code{global}
+declaration statement.  The following statements are all global
+declarations.
+
+@example
+global a
+global b = 2
+global c = 3, d, e = 5
+@end example
+
+It is necessary declare a variable as global within a function body in
+order to access it.  For example,
+
+@example
+global x
+function f ()
+x = 1;
+endfunction
+f ()
+@end example
+
+@noindent
+does @emph{not} set the value of the global variable @samp{x} to 1.  In
+order to change the value of the global variable @samp{x}, you must also
+declare it to be global within the function body, like this
+
+@example
+function f ()
+  global x;
+  x = 1;
+endfunction
+@end example
+
+Passing a global variable in a function parameter list will
+make a local copy and not modify the global value.  For example:
 
 @example
 octave:1> function f (x)
 > x = 3
-> end
+> endfunction
 octave:2> global x = 0
 octave:3> x              # This is the value of the global variable.
 x = 0
@@ -361,10 +648,10 @@ The following text-style functions are also keywords, and may not be
 used as variable or function names:
 
 @example
-casesen     document       history     set
-cd          edit           load        show
-clear       help           ls          who
-dir         format         save
+casesen   document       history       set
+cd        edit_history   load          show
+clear     help           ls            who
+dir       format         run_history   save
 @end example
 
 @node Arithmetic Ops, Comparison Ops, Keywords, Expressions
@@ -385,46 +672,99 @@ dir         format         save
 @cindex transpose, complex-conjugate
 @cindex complex-conjugate transpose
 
-The arithmetic operators in Octave are:
+@opindex +
+@opindex -
+@opindex *
+@opindex /
+@opindex \
+@opindex **
+@opindex ^
+@opindex '
+@opindex .+
+@opindex .-
+@opindex .*
+@opindex ./
+@opindex .\
+@opindex .**
+@opindex .^
+@opindex .'
+
+The following arithmetic operators are available, and work on scalars
+and matrices.
 
 @table @code
 @item @var{x} + @var{y}
-Addition.
+Addition.  If both operands are matrices, the number of rows and columns
+must both agree.  If one operand is a scalar, its value is added to
+all the elements of the other operand.
 
 @item @var{x} .+ @var{y}
 Element by element addition.  This operator is equivalent to @code{+}.
 
 @item @var{x} - @var{y}
-Subtraction.
+Subtraction.  If both operands are matrices, the number of rows and
+columns of both must agree.
 
 @item @var{x} .- @var{y}
 Element by element subtraction.  This operator is equivalent to @code{-}.
 
 @item @var{x} * @var{y}
-Matrix multiplication.
+Matrix multiplication.  The number of columns of @samp{x} must agree
+with the number of rows of @samp{y}.
 
 @item @var{x} .* @var{y}
-Element by element multiplication.
+Element by element multiplication.  If both operands are matrices, the
+number of rows and columns must both agree.
 
 @item @var{x} / @var{y}
-Right division.
+Right division.  This is conceptually equivalent to the expression
+
+@example
+(inverse (y') * x')'
+@end example
+
+@noindent
+but it is computed without computing the inverse of @samp{y'}.
+
+If the system is not square, or if the coefficient matrix is singular,
+a minimum norm solution is computed.
 
 @item @var{x} ./ @var{y}
 Element by element right division.
 
 @item @var{x} \ @var{y}
-Left division.
+Left division.  This is conceptually equivalent to the expression
+
+@example
+inverse (x) * y
+@end example
+
+@noindent
+but it is computed without computing the inverse of.
+
+If the system is not square, or if the coefficient matrix is singular,
+a minimum norm solution is computed.
 
 @item @var{x} .\ @var{y}
-Element by element left division.
+Element by element left division.  Each element of @samp{y} is divided
+by each corresponding element of @samp{x}.
 
 @item @var{x} ^ @var{y}
 @itemx @var{x} ** @var{y}
-Power operator.
+Power operator.  If @var{x} and @var{y} are both scalars, this operator
+returns @var{x} raised to the power @var{y}.  If @var{x} is a scalar and
+@var{y} is a square matrix, the result is computed using an eigenvalue
+expansion.  If @var{x} is a square matrix. the result is computed by
+repeated multiplication if @var{y} is an integer, and by an eigenvalue
+expansion if @var{y} is not an integer.  An error results if both
+@var{x} and @var{y} are matrices.
+
+The implementation of this operator needs to be improved.
 
 @item @var{x} .^ @var{y}
 @item @var{x} .** @var{y}
-Element by element power operator.
+Element by element power operator.  If both operands are matrices, the
+number of rows and columns must both agree.
 
 @item -@var{x}
 Negation.
@@ -433,7 +773,13 @@ Negation.
 Unary plus.  This operator has no effect on the operand.
 
 @item @var{x}'
-Complex conjugate transpose.
+Complex conjugate transpose.  For real arguments, this operator is the
+same as the transpose operator.  For complex arguments, this operator is
+equivalent to the expression
+
+@example
+conj (x.')
+@end example
 
 @item @var{x}.'
 Transpose.
@@ -451,7 +797,16 @@ Transpose.
 @cindex tests for equality
 @cindex equality, tests for
 
-@emph{Comparison operators} compare numeric values for relationships
+@opindex <
+@opindex <=
+@opindex ==
+@opindex >=
+@opindex >
+@opindex !=
+@opindex ~=
+@opindex <>
+
+@dfn{Comparison operators} compare numeric values for relationships
 such as equality.  They are written using @emph{relational operators},
 which are a superset of those in C.
 
@@ -512,6 +867,13 @@ not with the comparison operators listed above.
 @cindex or operator
 @cindex not operator
 
+@opindex |
+@opindex ||
+@opindex &
+@opindex &&
+@opindex ~
+@opindex !
+
 A @dfn{boolean expression} is a combination of comparison expressions or
 matching expressions, using the boolean operators ``or'' (@samp{||}),
 ``and'' (@samp{&&}), and ``not'' (@samp{!}), along with parentheses to
@@ -538,30 +900,43 @@ the same boolean operators in patterns instead of expressions.@refill
 @itemx @var{boolean1} && @var{boolean2}
 True if both @var{boolean1} and @var{boolean2} are true.
 
-The subexpression @var{boolean2} is evaluated only if @var{boolean1} is
-true.  This can make a difference when @var{boolean2} is an expression
-that has side effects.  For example, in the expression
+@item @var{boolean1} | @var{boolean2}
+@item @var{boolean1} || @var{boolean2}
+True if at least one of @var{boolean1} or @var{boolean2} is true.
+
+Both subexpressions @var{boolean1} and @var{boolean2} are evaluated
+before computing the result.  This can make a difference when the
+expressions have side effects.
+
+@item ! @var{boolean}
+@itemx ~ @var{boolean}
+True if @var{boolean} is false.
+@end table
+
+For matrix operands, the boolean operators work on an element by element
+basis.  For example, the expression
+
+@example
+[1, 2; 3, 4] && [1, 3; 2, 4]
+@end example
+
+@noindent
+returns a two by two identity matrix.
+
+For the binary boolean operators, both subexpressions @var{boolean1} and
+@var{boolean2} are evaluated before computing the result.  This can make
+a difference when the expressions have side effects.  For example, in
+the expression
 
 @example
 a && b++
 @end example
 
 @noindent
-the value of the variable @var{b} is only incremented if @var{a} is
-nonzero.
+the value of the variable @var{b} is incremented even if @var{a} zero.
 
-@item @var{boolean1} | @var{boolean2}
-@item @var{boolean1} || @var{boolean2}
-True if at least one of @var{boolean1} or @var{boolean2} is true.
-
-The subexpression @var{boolean2} is evaluated only if @var{boolean1} is
-false.  This can make a difference when @var{boolean2} is an expression
-that has side effects.
-
-@item ! @var{boolean}
-@itemx ~ @var{boolean}
-True if @var{boolean} is false.
-@end table
+This behavior is necessary for the boolean operators to work as
+described for matrix-valued operands.
 
 @node Assignment Ops, Increment Ops, Boolean Expressions, Expressions
 @section Assignment Expressions
@@ -569,6 +944,8 @@ True if @var{boolean} is false.
 @cindex assignment operators
 @cindex operators, assignment
 @cindex expressions, assignment
+
+@opindex =
 
 An @dfn{assignment} is an expression that stores a new value into a
 variable.  For example, let's assign the value 1 to the variable
@@ -693,6 +1070,14 @@ and then test whether @code{x} equals 1.  But this style tends to make
 programs hard to read.  Except in a one-shot program, you should rewrite
 it to get rid of such nesting of assignments.  This is never very hard.
 
+@cindex increment operator
+@cindex decrement operator
+@cindex operators, increment
+@cindex operators, decrement
+
+@opindex ++
+@opindex --
+
 @node Increment Ops, Operator Precedence, Assignment Ops, Expressions
 @section Increment Operators
 
@@ -734,6 +1119,8 @@ value of the expression is the @emph{old} value of @var{x}.
 This expression causes the variable @var{x} to be decremented.  The
 value of the expression is the @emph{old} value of @var{x}.
 @end table
+
+@cindex operator precedence
 
 @node Operator Precedence,  , Increment Ops, Expressions
 @section Operator Precedence

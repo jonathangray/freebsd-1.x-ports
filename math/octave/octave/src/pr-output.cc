@@ -27,6 +27,7 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include <iostream.h>
 #include <strstream.h>
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <float.h>
@@ -138,7 +139,7 @@ abs (const Matrix& a)
 }
 
 static double
-pr_max_internal (Matrix& m)
+pr_max_internal (const Matrix& m)
 {
   int nr = m.rows ();
   int nc = m.columns ();
@@ -159,7 +160,7 @@ pr_max_internal (Matrix& m)
 }
 
 static double
-pr_min_internal (Matrix& m)
+pr_min_internal (const Matrix& m)
 {
   int nr = m.rows ();
   int nc = m.columns ();
@@ -271,7 +272,7 @@ set_format (double d)
 }
 
 static void
-set_format (Matrix& m, int& fw)
+set_format (const Matrix& m, int& fw)
 {
   curr_real_fmt = (char *) NULL;
   curr_imag_fmt = (char *) NULL;
@@ -378,14 +379,14 @@ set_format (Matrix& m, int& fw)
 }
 
 static inline void
-set_format (Matrix& m)
+set_format (const Matrix& m)
 {
   int fw;
   set_format (m, fw);
 }
 
 static void
-set_format (Complex& c, int& r_fw, int& i_fw)
+set_format (const Complex& c, int& r_fw, int& i_fw)
 {
   curr_real_fmt = (char *) NULL;
   curr_imag_fmt = (char *) NULL;
@@ -517,14 +518,14 @@ set_format (Complex& c, int& r_fw, int& i_fw)
 }
 
 static inline void
-set_format (Complex& c)
+set_format (const Complex& c)
 {
   int r_fw, i_fw;
   set_format (c, r_fw, i_fw);
 }
 
 static void
-set_format (ComplexMatrix& cm, int& r_fw, int& i_fw)
+set_format (const ComplexMatrix& cm, int& r_fw, int& i_fw)
 {
   curr_real_fmt = (char *) NULL;
   curr_imag_fmt = (char *) NULL;
@@ -655,7 +656,7 @@ set_format (ComplexMatrix& cm, int& r_fw, int& i_fw)
 }
 
 static int
-all_elements_are_ints (Range& r)
+all_elements_are_ints (const Range& r)
 {
 // If the base and increment are ints, the final value in the range
 // will also be an integer, even if the limit is not.
@@ -667,14 +668,14 @@ all_elements_are_ints (Range& r)
 }
 
 static inline void
-set_format (ComplexMatrix& cm)
+set_format (const ComplexMatrix& cm)
 {
   int r_fw, i_fw;
   set_format (cm, r_fw, i_fw);
 }
 
 static void
-set_format (Range& r, int& fw)
+set_format (const Range& r, int& fw)
 {
   curr_real_fmt = (char *) NULL;
   curr_imag_fmt = (char *) NULL;
@@ -776,14 +777,14 @@ set_format (Range& r, int& fw)
 }
 
 static inline void
-set_format (Range& r)
+set_format (const Range& r)
 {
   int fw;
   set_format (r, fw);
 }
 
 static inline void
-pr_any_float (char *fmt, ostrstream& os, double d, int fw = 0)
+pr_any_float (const char *fmt, ostrstream& os, double d, int fw = 0)
 {
   if (d == -0.0)
     d = 0.0;
@@ -830,7 +831,7 @@ pr_imag_float (ostrstream& os, double d, int fw = 0)
 }
 
 static inline void
-pr_complex (ostrstream& os, Complex& c, int r_fw = 0, int i_fw = 0)
+pr_complex (ostrstream& os, const Complex& c, int r_fw = 0, int i_fw = 0)
 {
   double r = c.real ();
   pr_float (os, r, r_fw);
@@ -874,7 +875,7 @@ octave_print_internal (ostrstream& os, double d)
 }
 
 void
-octave_print_internal (ostrstream& os, Matrix& m)
+octave_print_internal (ostrstream& os, const Matrix& m)
 {
   int nr = m.rows ();
   int nc = m.columns ();
@@ -952,7 +953,7 @@ octave_print_internal (ostrstream& os, Matrix& m)
 }
 
 void
-octave_print_internal (ostrstream& os, Complex& c)
+octave_print_internal (ostrstream& os, const Complex& c)
 {
   if (plus_format)
     {
@@ -973,7 +974,7 @@ octave_print_internal (ostrstream& os, Complex& c)
 }
 
 void
-octave_print_internal (ostrstream& os, ComplexMatrix& cm)
+octave_print_internal (ostrstream& os, const ComplexMatrix& cm)
 {
   int nr = cm.rows ();
   int nc = cm.columns ();
@@ -1055,7 +1056,7 @@ octave_print_internal (ostrstream& os, ComplexMatrix& cm)
 }
 
 void
-octave_print_internal (ostrstream& os, Range& r)
+octave_print_internal (ostrstream& os, const Range& r)
 {
   double b = r.base ();
   double increment = r.inc ();
@@ -1144,10 +1145,10 @@ set_output_prec_and_fw (int prec, int fw)
   tree_constant *tmp = NULL_TREE_CONST;
 
   tmp = new tree_constant ((double) prec);
-  bind_variable ("output_precision", tmp);
+  bind_builtin_variable ("output_precision", tmp);
 
   tmp = new tree_constant ((double) fw);
-  bind_variable ("output_max_field_width", tmp);
+  bind_builtin_variable ("output_max_field_width", tmp);
 }
 
 void

@@ -334,8 +334,7 @@ DiagMatrix::row (int i) const
     FAIL;
 
   RowVector retval (nc, 0.0);
-  if (nr < nc ||
-      (nr > nc && i < nc))
+  if (nr <= nc || (nr > nc && i < nc))
     retval.data [i] = data[i];
 
   return retval;
@@ -363,8 +362,7 @@ DiagMatrix::column (int i) const
     FAIL;
 
   ColumnVector retval (nr, 0.0);
-  if (nr > nc ||
-      (nr < nc && i < nr))
+  if (nr >= nc || (nr < nc && i < nr))
     retval.data [i] = data[i];
 
   return retval;
@@ -434,14 +432,14 @@ DiagMatrix::operator - (double s) const
 }
 
 ComplexMatrix
-DiagMatrix::operator + (Complex s) const
+DiagMatrix::operator + (const Complex& s) const
 {
   ComplexMatrix tmp (nr, nc, s);
   return *this + tmp;
 }
 
 ComplexMatrix
-DiagMatrix::operator - (Complex s) const
+DiagMatrix::operator - (const Complex& s) const
 {
   ComplexMatrix tmp (nr, nc, -s);
   return *this + tmp;
@@ -462,13 +460,13 @@ DiagMatrix::operator / (double s) const
 }
 
 ComplexDiagMatrix
-DiagMatrix::operator * (Complex s) const
+DiagMatrix::operator * (const Complex& s) const
 {
   return ComplexDiagMatrix (multiply (data, len, s), nr, nc);
 }
 
 ComplexDiagMatrix
-DiagMatrix::operator / (Complex s) const
+DiagMatrix::operator / (const Complex& s) const
 {
   return ComplexDiagMatrix (divide (data, len, s), nr, nc);
 }
@@ -902,9 +900,9 @@ operator << (ostream& os, const DiagMatrix& a)
       for (int j = 0; j < a.nc; j++)
 	{
 	  if (i == j)
-	    os << /* setw (field_width) << */ a.data[i];
+	    os << " " /* setw (field_width) */ << a.data[i];
 	  else
-	    os << /* setw (field_width) << */ ZERO;
+	    os << " " /* setw (field_width) */ << ZERO;
 	}
       os << "\n";
     }
@@ -946,7 +944,7 @@ ComplexDiagMatrix::ComplexDiagMatrix (int n, double val)
     data = (Complex *) NULL;
 }
 
-ComplexDiagMatrix::ComplexDiagMatrix (int n, Complex val)
+ComplexDiagMatrix::ComplexDiagMatrix (int n, const Complex& val)
 {
   if (n < 0)
     FAIL;
@@ -994,7 +992,7 @@ ComplexDiagMatrix::ComplexDiagMatrix (int r, int c, double val)
     data = (Complex *) NULL;
 }
 
-ComplexDiagMatrix::ComplexDiagMatrix (int r, int c, Complex val)
+ComplexDiagMatrix::ComplexDiagMatrix (int r, int c, const Complex& val)
 {
   if (r < 0 || c < 0)
     FAIL;
@@ -1104,7 +1102,7 @@ ComplexDiagMatrix::ComplexDiagMatrix (double a)
   data[0] = a;
 }
 
-ComplexDiagMatrix::ComplexDiagMatrix (Complex a)
+ComplexDiagMatrix::ComplexDiagMatrix (const Complex& a)
 {
   nr = 1;
   nc = 1;
@@ -1209,7 +1207,7 @@ ComplexDiagMatrix::resize (int r, int c, double val)
 }
 
 ComplexDiagMatrix&
-ComplexDiagMatrix::resize (int r, int c, Complex val)
+ComplexDiagMatrix::resize (int r, int c, const Complex& val)
 {
   if (r < 0 || c < 0)
     FAIL;
@@ -1270,7 +1268,7 @@ ComplexDiagMatrix::fill (double val)
 }
 
 ComplexDiagMatrix&
-ComplexDiagMatrix::fill (Complex val)
+ComplexDiagMatrix::fill (const Complex& val)
 {
   copy (data, len, val);
   return *this;
@@ -1288,7 +1286,7 @@ ComplexDiagMatrix::fill (double val, int beg, int end)
 }
 
 ComplexDiagMatrix&
-ComplexDiagMatrix::fill (Complex val, int beg, int end)
+ComplexDiagMatrix::fill (const Complex& val, int beg, int end)
 {
   if (beg < 0 || end >= len || end < beg)
     FAIL;
@@ -1440,8 +1438,7 @@ ComplexDiagMatrix::row (int i) const
     FAIL;
 
   ComplexRowVector retval (nc, 0.0);
-  if (nr < nc ||
-      (nr > nc && i < nc))
+  if (nr <= nc || (nr > nc && i < nc))
     retval.data [i] = data[i];
 
   return retval;
@@ -1469,8 +1466,7 @@ ComplexDiagMatrix::column (int i) const
     FAIL;
 
   ComplexColumnVector retval (nr, 0.0);
-  if (nr > nc ||
-      (nr < nc && i < nr))
+  if (nr >= nc || (nr < nc && i < nr))
     retval.data [i] = data[i];
 
   return retval;
@@ -1536,14 +1532,14 @@ ComplexDiagMatrix::operator - (double s) const
 }
 
 ComplexMatrix
-ComplexDiagMatrix::operator + (Complex s) const
+ComplexDiagMatrix::operator + (const Complex& s) const
 {
   ComplexMatrix tmp (nr, nc, s);
   return *this + tmp;
 }
 
 ComplexMatrix
-ComplexDiagMatrix::operator - (Complex s) const
+ComplexDiagMatrix::operator - (const Complex& s) const
 {
   ComplexMatrix tmp (nr, nc, -s);
   return *this + tmp;
@@ -1564,13 +1560,13 @@ ComplexDiagMatrix::operator / (double s) const
 }
 
 ComplexDiagMatrix
-ComplexDiagMatrix::operator * (Complex s) const
+ComplexDiagMatrix::operator * (const Complex& s) const
 {
   return ComplexDiagMatrix (multiply (data, len, s), nr, nc);
 }
 
 ComplexDiagMatrix
-ComplexDiagMatrix::operator / (Complex s) const
+ComplexDiagMatrix::operator / (const Complex& s) const
 {
   return ComplexDiagMatrix (divide (data, len, s), nr, nc);
 }
@@ -1590,13 +1586,13 @@ operator - (double s, const ComplexDiagMatrix& a)
 }
 
 ComplexMatrix
-operator + (Complex s, const ComplexDiagMatrix& a)
+operator + (const Complex& s, const ComplexDiagMatrix& a)
 {
   return a + s;
 }
 
 ComplexMatrix
-operator - (Complex s, const ComplexDiagMatrix& a)
+operator - (const Complex& s, const ComplexDiagMatrix& a)
 {
   return -a + s;
 }
@@ -1616,13 +1612,13 @@ ComplexDiagMatrix
 }
 
 ComplexDiagMatrix
- operator * (Complex s, const ComplexDiagMatrix& a)
+ operator * (const Complex& s, const ComplexDiagMatrix& a)
 {
   return ComplexDiagMatrix (multiply (a.data, a.len, s), a.nr, a.nc);
 }
 
 ComplexDiagMatrix
-operator / (Complex s, const ComplexDiagMatrix& a)
+operator / (const Complex& s, const ComplexDiagMatrix& a)
 {
   return ComplexDiagMatrix (divide (s, a.data, a.len), a.nr, a.nc);
 }
@@ -2057,9 +2053,9 @@ operator << (ostream& os, const ComplexDiagMatrix& a)
       for (int j = 0; j < a.nc; j++)
 	{
 	  if (i == j)
-	    os << /* setw (field_width) << */ a.data[i];
+	    os << " " /* setw (field_width) */ << a.data[i];
 	  else
-	    os << /* setw (field_width) << */ ZERO;
+	    os << " " /* setw (field_width) */ << ZERO;
 	}
       os << "\n";
     }

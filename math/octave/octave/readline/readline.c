@@ -231,19 +231,7 @@ extern int rl_initialize_funmap (), rl_add_funmap_entry ();
 /* Other functions that are defined and used only in readline.c */
 static void
   update_line (), output_character_function (), delete_chars (),
-  insert_some_chars (), rl_set_signals (), rl_clear_signals (),
-  rl_on_new_line (), free_history_entry (), rl_reset_terminal (),
-  rl_clean_up_for_exit (), readline_initialize_everything (),
-  start_using_history (), init_terminal_io (),
-  readline_default_bindings (), rl_digit_loop (),
-  move_vert (), backspace (), rl_add_undo (), rl_change_case (),
-  rl_modifying (), rl_search_history (), rl_execute_next (),
-  rl_parse_and_bind (), rl_variable_bind (), rl_initialize (),
-  rl_init_argument (), free_undo_list ();
-
-static int
-  rl_read_init_file (), rl_bind_key (), rl_translate_keyseq (),
-  glean_key_from_name ();
+  insert_some_chars ();
 
 #if defined (VOID_SIGHANDLER)
 #  define sighandler void
@@ -632,7 +620,7 @@ rl_signal_handler (sig)
 #endif /* !VOID_SIGHANDLER */
 }
 
-static void
+int
 rl_set_signals ()
 {
   old_int = (SigHandler *)signal (SIGINT, rl_signal_handler);
@@ -662,9 +650,11 @@ rl_set_signals ()
 #if defined (SIGWINCH)
   old_sigwinch = (SigHandler *)signal (SIGWINCH, rl_handle_sigwinch);
 #endif
+
+  return 0;
 }
 
-static void
+int
 rl_clear_signals ()
 {
   signal (SIGINT, old_int);
@@ -682,6 +672,8 @@ rl_clear_signals ()
 #if defined (SIGWINCH)
       signal (SIGWINCH, old_sigwinch);
 #endif
+
+  return 0;
 }
 #endif  /* HANDLE_SIGNALS */
 
@@ -1163,7 +1155,7 @@ rl_call_last_kbd_macro (count, ignore)
 /* **************************************************************** */
 
 /* Initliaze readline (and terminal if not already). */
-static void
+int
 rl_initialize ()
 {
   /* If we have never been called before, initialize the
@@ -1201,10 +1193,12 @@ rl_initialize ()
 
   /* Parsing of key-bindings begins in an enabled state. */
   parsing_conditionalized_out = 0;
+
+  return 0;
 }
 
 /* Initialize the entire state of the world. */
-static void
+int
 readline_initialize_everything ()
 {
   /* Find out if we are running in Emacs. */
@@ -1242,12 +1236,14 @@ readline_initialize_everything ()
     if (rl_completer_word_break_characters == (char *)NULL)
       rl_completer_word_break_characters = rl_basic_word_break_characters;
   }
+
+  return 0;
 }
 
 /* If this system allows us to look at the values of the regular
    input editing characters, then bind them to their readline
    equivalents, iff the characters are not bound to keymaps. */
-static void
+int
 readline_default_bindings ()
 {
 #ifndef __GO32__
@@ -1343,6 +1339,8 @@ readline_default_bindings ()
     }
 #endif /* !NEW_TTY_DRIVER */
 #endif /* def __GO32__ */
+
+  return 0;
 }
 
 
@@ -1375,11 +1373,12 @@ rl_discard_argument ()
 }
 
 /* Create a default argument. */
-static void
+int
 rl_init_argument ()
 {
   rl_numeric_arg = rl_arg_sign = 1;
   rl_explicit_arg = 0;
+  return 0;
 }
 
 /* C-u, universal argument.  Multiply the current argument by 4.
@@ -1393,7 +1392,7 @@ rl_universal_argument ()
   return 0;
 }
 
-static void
+int
 rl_digit_loop ()
 {
   int key, c;
@@ -1428,10 +1427,12 @@ rl_digit_loop ()
 	    {
 	      rl_clear_message ();
 	      rl_dispatch (key, keymap);
-	      return;
+	      return 0;
 	    }
 	}
     }
+
+  return 0;
 }
 
 
@@ -1876,7 +1877,7 @@ update_line (old, new, current_line)
 
 /* (PWP) tell the update routines that we have moved onto a
    new (empty) line. */
-static void
+int
 rl_on_new_line ()
 {
   if (visible_line)
@@ -1884,6 +1885,8 @@ rl_on_new_line ()
 
   last_c_pos = last_v_pos = 0;
   vis_botlin = last_lmargin = 0;
+
+  return 0;
 }
 
 /* Actually update the display, period. */
@@ -1958,17 +1961,18 @@ move_cursor_relative (new, data)
 }
 
 /* PWP: move the cursor up or down. */
-static void
+int
 move_vert (to)
      int to;
 {
   void output_character_function ();
   register int delta, i;
 
-  if (last_v_pos == to) return;
+  if (last_v_pos == to)
+    return 0;
 
   if (to > screenheight)
-    return;
+    return 0;
 
 #ifdef __GO32__
   {
@@ -1992,6 +1996,8 @@ move_vert (to)
     }
 #endif /* __GO32__ */
   last_v_pos = to;		/* now to is here */
+
+  return 0;
 }
 
 /* Physically print C on out_stream.  This is for functions which know
@@ -2117,14 +2123,15 @@ char *visible_bell;
 
 /* Re-initialize the terminal considering that the TERM/TERMCAP variable
    has changed. */
-static void
+int
 rl_reset_terminal (terminal_name)
      char *terminal_name;
 {
   init_terminal_io (terminal_name);
+  return 0;
 }
 
-static void
+int
 init_terminal_io (terminal_name)
      char *terminal_name;
 {
@@ -2174,7 +2181,7 @@ init_terminal_io (terminal_name)
       term_forward_char = (char *)NULL;
 #endif
       terminal_can_insert = 0;
-      return;
+      return 0;
     }
 
   BC = tgetstr ("pc", &buffer);
@@ -2238,6 +2245,8 @@ init_terminal_io (terminal_name)
 
   visible_bell = tgetstr ("vb", &buffer);
 #endif /* !__GO32__ */
+
+  return 0;
 }
 
 /* A function for the use of tputs () */
@@ -2337,7 +2346,7 @@ insert_some_chars (string, count)
 }
 
 /* Move the cursor back. */
-static void
+int
 backspace (count)
      int count;
 {
@@ -2351,6 +2360,8 @@ backspace (count)
 #endif /* !__GO32__ */
     for (i = 0; i < count; i++)
       putc ('\b', out_stream);
+
+  return 0;
 }
 
 /* Move to the start of the next line. */
@@ -3293,7 +3304,7 @@ rl_newline (count, key)
   return 0;
 }
 
-static void
+int
 rl_clean_up_for_exit ()
 {
   if (readline_echoing_p)
@@ -3303,6 +3314,7 @@ rl_clean_up_for_exit ()
       fflush (out_stream);
       rl_restart_output ();
     }
+  return 0;
 }
 
 /* What to do for some uppercase characters, like meta characters,
@@ -3491,7 +3503,7 @@ rl_capitalize_word (count)
    OP is one of UpCase, DownCase, or CapCase.
    If a negative argument is given, leave point where it started,
    otherwise, leave it where it moves to. */
-static void
+int
 rl_change_case (count, op)
      int count, op;
 {
@@ -3542,6 +3554,8 @@ rl_change_case (count, op)
 	}
     }
   rl_point = end;
+
+  return 0;
 }
 
 /* **************************************************************** */
@@ -4350,7 +4364,7 @@ UNDO_LIST *rl_undo_list = (UNDO_LIST *)NULL;
 
 /* Remember how to undo something.  Concatenate some undos if that
    seems right. */
-static void
+int
 rl_add_undo (what, start, end, text)
      enum undo_code what;
      int start, end;
@@ -4363,21 +4377,24 @@ rl_add_undo (what, start, end, text)
   temp->text = text;
   temp->next = rl_undo_list;
   rl_undo_list = temp;
+  return 0;
 }
 
 /* Free the existing undo list. */
-static void
+int
 free_undo_list ()
 {
-  while (rl_undo_list) {
-    UNDO_LIST *release = rl_undo_list;
-    rl_undo_list = rl_undo_list->next;
+  while (rl_undo_list)
+    {
+      UNDO_LIST *release = rl_undo_list;
+      rl_undo_list = rl_undo_list->next;
 
-    if (release->what == UNDO_DELETE)
-      free (release->text);
+      if (release->what == UNDO_DELETE)
+	free (release->text);
 
-    free (release);
-  }
+      free (release);
+    }
+  return 0;
 }
 
 /* Undo the next thing in the list.  Return 0 if there
@@ -4453,7 +4470,7 @@ rl_end_undo_group ()
 }
 
 /* Save an undo entry for the text from START to END. */
-static void
+int
 rl_modifying (start, end)
      int start, end;
 {
@@ -4472,6 +4489,8 @@ rl_modifying (start, end)
       rl_add_undo (UNDO_INSERT, start, end, (char *)NULL);
       rl_end_undo_group ();
     }
+
+  return 0;
 }
 
 /* Revert the current line to its previous state. */
@@ -4526,7 +4545,7 @@ rl_undo_command (count)
 HIST_ENTRY *saved_line_for_history = (HIST_ENTRY *)NULL;
 
 /* Set the history pointer back to the last entry in the history. */
-static void
+int
 start_using_history ()
 {
   using_history ();
@@ -4534,17 +4553,21 @@ start_using_history ()
     free_history_entry (saved_line_for_history);
 
   saved_line_for_history = (HIST_ENTRY *)NULL;
+
+  return 0;
 }
 
 /* Free the contents (and containing structure) of a HIST_ENTRY. */
-static void
+int
 free_history_entry (entry)
      HIST_ENTRY *entry;
 {
-  if (!entry) return 0;
+  if (!entry)
+    return 0;
   if (entry->line)
     free (entry->line);
   free (entry);
+  return 0;
 }
 
 /* Perhaps put back the current line if it has changed. */
@@ -4814,7 +4837,7 @@ rl_display_search (search_string, reverse_p, where)
    This is analogous to i-search.  We start the search in the current line.
    DIRECTION is which direction to search; >= 0 means forward, < 0 means
    backwards. */
-static void
+int
 rl_search_history (direction, invoking_key)
      int direction;
      int invoking_key;
@@ -4934,7 +4957,7 @@ rl_search_history (direction, invoking_key)
 	  rl_point = orig_point;
 	  rl_end = strlen (the_line);
 	  rl_clear_message ();
-	  return;
+	  return 0;
 
 	default:
 	  if (c < 32 || c > 126)
@@ -5070,14 +5093,17 @@ rl_search_history (direction, invoking_key)
     rl_point = index;
     rl_clear_message ();
   }
+
+  return 0;
 }
 
 /* Make C be the next command to be executed. */
-static void
+int
 rl_execute_next (c)
      int c;
 {
   rl_pending_input = c;
+  return 0;
 }
 
 /* **************************************************************** */
@@ -5653,7 +5679,7 @@ rl_add_defun (name, function, key)
 }
 
 /* Bind KEY to FUNCTION.  Returns non-zero if KEY is out of range. */
-static int
+int
 rl_bind_key (key, function)
      int key;
      Function *function;
@@ -5814,7 +5840,7 @@ rl_generic_bind (type, keyseq, data, map)
    values into ARRAY, an array of characters.  LEN gets the
    final length of ARRAY.  Return non-zero if there was an
    error parsing SEQ. */
-static int
+int
 rl_translate_keyseq (seq, array, len)
      char *seq, *array;
      int *len;
@@ -5910,7 +5936,7 @@ rl_re_read_init_file (count, ignore)
 /* Do key bindings from a file.  If FILENAME is NULL it defaults
    to `~/.inputrc'.  If the file existed and could be opened and
    read, 0 is returned, otherwise errno is returned. */
-static int
+int
 rl_read_init_file (filename)
      char *filename;
 {
@@ -6157,7 +6183,7 @@ static int substring_member_of_array ();
    A key binding command looks like: Keyname: function-name\0,
    a variable binding command looks like: set variable value.
    A new-style keybinding looks like "\C-x\C-x": exchange-point-and-mark. */
-static void
+int
 rl_parse_and_bind (string)
      char *string;
 {
@@ -6170,18 +6196,18 @@ rl_parse_and_bind (string)
     string++;
 
   if (!string || !*string || *string == '#')
-    return;
+    return 0;
 
   /* If this is a parser directive, act on it. */
   if (*string == '$')
     {
       handle_parser_directive (&string[1]);
-      return;
+      return 0;
     }
 
   /* If we are supposed to be skipping parsing right now, then do it. */
   if (parsing_conditionalized_out)
-    return;
+    return 0;
 
   i = 0;
   /* If this keyname is a complex key expression surrounded by quotes,
@@ -6219,7 +6245,7 @@ rl_parse_and_bind (string)
       while (*value && whitespace (*value)) value++;
 
       rl_variable_bind (var, value);
-      return;
+      return 0;
     }
 
   /* Skip any whitespace between keyname and funname. */
@@ -6279,7 +6305,7 @@ rl_parse_and_bind (string)
       else
 	rl_set_key (seq, rl_named_function (funname), keymap);
 
-      return;
+      return 0;
     }
 
   /* Get the actual character we want to deal with. */
@@ -6323,9 +6349,11 @@ rl_parse_and_bind (string)
 #endif /* PREFIX_META_HACK */
   else
     rl_bind_key (key, rl_named_function (funname));
+
+  return 0;
 }
 
-static void
+int
 rl_variable_bind (name, value)
      char *name, *value;
 {
@@ -6385,6 +6413,8 @@ rl_variable_bind (name, value)
 	}
 #endif /* VI_MODE */
     }
+
+  return 0;
 }
 
 /* Return the character which matches NAME.

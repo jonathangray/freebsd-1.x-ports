@@ -67,6 +67,30 @@ max (const Matrix& a, const Matrix& b)
   return result;
 }
 
+ComplexMatrix
+max (const ComplexMatrix& a, const ComplexMatrix& b)
+{
+  int nr = a.rows ();
+  int nc = a.columns ();
+  if (nr != b.rows () || nc != b.columns ())
+    FAIL;
+
+  ComplexMatrix result (nr, nc);
+
+  for (int j = 0; j < nc; j++)
+    for (int i = 0; i < nr; i++)
+      {
+        double abs_a_elem = abs (a.elem (i, j));
+        double abs_b_elem = abs (b.elem (i, j));
+        if (abs_a_elem > abs_b_elem)
+          result.elem (i, j) = a.elem (i, j);
+        else
+          result.elem (i, j) = b.elem (i, j);
+      }
+
+  return result;
+}
+
 Matrix
 min (const Matrix& a, const Matrix& b)
 {
@@ -88,8 +112,33 @@ min (const Matrix& a, const Matrix& b)
   return result;
 }
 
+ComplexMatrix
+min (const ComplexMatrix& a, const ComplexMatrix& b)
+{
+  int nr = a.rows ();
+  int nc = a.columns ();
+  if (nr != b.rows () || nc != b.columns ())
+    FAIL;
+
+  ComplexMatrix result (nr, nc);
+
+  for (int j = 0; j < nc; j++)
+    for (int i = 0; i < nr; i++)
+      {
+        double abs_a_elem = abs (a.elem (i, j));
+        double abs_b_elem = abs (b.elem (i, j));
+        if (abs_a_elem < abs_b_elem)
+          result.elem (i, j) = a.elem (i, j);
+        else
+          result.elem (i, j) = b.elem (i, j);
+      }
+
+  return result;
+}
+
 static void
-get_dimensions (tree_constant& a, char *warn_for, int& nr, int& nc)
+get_dimensions (const tree_constant& a, const char *warn_for,
+		int& nr, int& nc)
 {
   tree_constant tmpa = a.make_numeric ();
 
@@ -104,12 +153,12 @@ get_dimensions (tree_constant& a, char *warn_for, int& nr, int& nc)
       nc = a.columns ();
     }
 
-  check_dimensions (nr, nc, warn_for); // No return on error.
+  check_dimensions (nr, nc, warn_for); // May set error_state.
 }
 
 static void
-get_dimensions (tree_constant& a, tree_constant& b, char *warn_for,
-		int& nr, int& nc)
+get_dimensions (const tree_constant& a, const tree_constant& b,
+		const char *warn_for, int& nr, int& nc)
 {
   tree_constant tmpa = a.make_numeric ();
   tree_constant tmpb = b.make_numeric ();
@@ -119,20 +168,20 @@ get_dimensions (tree_constant& a, tree_constant& b, char *warn_for,
       nr = NINT (tmpa.double_value ());
       nc = NINT (tmpb.double_value ());
 
-      check_dimensions (nr, nc, warn_for); // No return on error.
+      check_dimensions (nr, nc, warn_for); // May set error_state.
     }
   else
-    {
-      error ("%s: expecting two scalar arguments", warn_for);
-      jump_to_top_level ();
-    }
+    error ("%s: expecting two scalar arguments", warn_for);
 }
 
 tree_constant
-fill_matrix (tree_constant& a, double val, char *warn_for)
+fill_matrix (const tree_constant& a, double val, const char *warn_for)
 {
   int nr, nc;
-  get_dimensions (a, warn_for, nr, nc); // No return on error.
+  get_dimensions (a, warn_for, nr, nc);
+
+  if (error_state)
+    return  tree_constant ();
 
   Matrix m (nr, nc, val);
 
@@ -140,10 +189,14 @@ fill_matrix (tree_constant& a, double val, char *warn_for)
 }
 
 tree_constant
-fill_matrix (tree_constant& a, tree_constant& b, double val, char *warn_for)
+fill_matrix (const tree_constant& a, const tree_constant& b,
+	     double val, const char *warn_for)
 {
   int nr, nc;
-  get_dimensions (a, b, warn_for, nr, nc); // No return on error.
+  get_dimensions (a, b, warn_for, nr, nc); // May set error_state.
+
+  if (error_state)
+    return tree_constant ();
 
   Matrix m (nr, nc, val);
 
@@ -151,10 +204,13 @@ fill_matrix (tree_constant& a, tree_constant& b, double val, char *warn_for)
 }
 
 tree_constant
-identity_matrix (tree_constant& a)
+identity_matrix (const tree_constant& a)
 {
   int nr, nc;
-  get_dimensions (a, "eye", nr, nc); // No return on error.
+  get_dimensions (a, "eye", nr, nc); // May set error_state.
+
+  if (error_state)
+    return tree_constant ();
 
   Matrix m (nr, nc, 0.0);
 
@@ -169,10 +225,13 @@ identity_matrix (tree_constant& a)
 }
 
 tree_constant
-identity_matrix (tree_constant& a, tree_constant& b)
+identity_matrix (const tree_constant& a, const tree_constant& b)
 {
   int nr, nc;
-  get_dimensions (a, b, "eye", nr, nc);  // No return on error.
+  get_dimensions (a, b, "eye", nr, nc);  // May set error_state.
+
+  if (error_state)
+    return tree_constant ();
 
   Matrix m (nr, nc, 0.0);
 
@@ -280,7 +339,7 @@ find_nonzero_elem_idx (const ComplexMatrix& m)
 }
 
 tree_constant
-find_nonzero_elem_idx (tree_constant& a)
+find_nonzero_elem_idx (const tree_constant& a)
 {
   tree_constant retval;
 
@@ -326,116 +385,11 @@ find_nonzero_elem_idx (tree_constant& a)
   return retval;
 }
 
-// XXX FIXME XXX -- the next three functions should really be just
+// XXX FIXME XXX -- the next two functions (and expm) should really be just
 // one...
 
 tree_constant *
-matrix_exp (tree_constant& a)
-{
-  tree_constant *retval = new tree_constant [2];
-
-  tree_constant tmp = a.make_numeric ();;
-    
-  if (tmp.rows () == 0 || tmp.columns () == 0)
-    {
-      int flag = user_pref.propagate_empty_matrices;
-      if (flag != 0)
-	{
-	  if (flag < 0)
-	    gripe_empty_arg ("expm", 0);
-	  Matrix m;
-	  retval = new tree_constant [2];
-	  retval[0] = tree_constant (m);
-	  return retval;
-	}
-      else
-	gripe_empty_arg ("expm", 1);
-    }
-
-  switch (tmp.const_type ())
-    {
-    case tree_constant_rep::matrix_constant:
-      {
-	Matrix m = tmp.matrix_value ();
-
-	int nr = m.rows ();
-	int nc = m.columns ();
-
-	if (nr == 0 || nc == 0 || nr != nc)
-	  gripe_square_matrix_required ("expm");
-	else
-	  {
-	    EIG m_eig (m);
-	    ComplexColumnVector lambda (m_eig.eigenvalues ());
-	    ComplexMatrix Q (m_eig.eigenvectors ());
-
-	    for (int i = 0; i < nr; i++)
-	      {
-		Complex elt = lambda.elem (i);
-		if (imag (elt) == 0.0)
-		  lambda.elem (i) = exp (real (elt));
-		else
-		  lambda.elem (i) = exp (elt);
-	      }
-
-	    ComplexDiagMatrix D (lambda);
-	    ComplexMatrix result = Q * D * Q.inverse ();
-
-	    retval[0] = tree_constant (result);
-	  }
-      }
-      break;
-    case tree_constant_rep::complex_matrix_constant:
-      {
-	ComplexMatrix m = tmp.complex_matrix_value ();
-
-	int nr = m.rows ();
-	int nc = m.columns ();
-
-	if (nr == 0 || nc == 0 || nr != nc)
-	  gripe_square_matrix_required ("expm");
-	else
-	  {
-	    EIG m_eig (m);
-	    ComplexColumnVector lambda (m_eig.eigenvalues ());
-	    ComplexMatrix Q (m_eig.eigenvectors ());
-
-	    for (int i = 0; i < nr; i++)
-	      {
-		Complex elt = lambda.elem (i);
-		if (imag (elt) == 0.0)
-		  lambda.elem (i) = exp (real (elt));
-		else
-		  lambda.elem (i) = exp (elt);
-	      }
-
-	    ComplexDiagMatrix D (lambda);
-	    ComplexMatrix result = Q * D * Q.inverse ();
-
-	    retval[0] = tree_constant (result);
-	  }
-      }
-      break;
-    case tree_constant_rep::scalar_constant:
-      {
-	double d = tmp.double_value ();
-	retval[0] = tree_constant (exp (d));
-      }
-      break;
-    case tree_constant_rep::complex_scalar_constant:
-      {
-	Complex c = tmp.complex_value ();
-	retval[0] = tree_constant (exp (c));
-      }
-      break;
-    default:
-      break;
-    }
-  return retval;
-}
-
-tree_constant *
-matrix_log (tree_constant& a)
+matrix_log (const tree_constant& a)
 {
   tree_constant *retval = new tree_constant [2];
 
@@ -546,7 +500,7 @@ matrix_log (tree_constant& a)
 }
 
 tree_constant *
-matrix_sqrt (tree_constant& a)
+matrix_sqrt (const tree_constant& a)
 {
   tree_constant *retval = new tree_constant [2];
 
@@ -657,7 +611,7 @@ matrix_sqrt (tree_constant& a)
 }
 
 tree_constant *
-column_max (tree_constant *args, int nargin, int nargout)
+column_max (const tree_constant *args, int nargin, int nargout)
 {
   tree_constant *retval = NULL_TREE_CONST;
 
@@ -686,38 +640,136 @@ column_max (tree_constant *args, int nargin, int nargout)
   if (nargin == 2 && nargout == 1)
     {
       retval = new tree_constant [2];
-      if (arg1_type == tree_constant_rep::scalar_constant)
-	retval[0] = tree_constant (arg1.double_value ());
-      else
+      switch (arg1_type)
 	{
-	  Matrix m = arg1.matrix_value ();
-	  if (m.rows () == 1)
-	    retval[0] = tree_constant (m.row_max ());
-	  else
-	    retval[0] = tree_constant (m.column_max (), 0);
+        case tree_constant_rep::scalar_constant:
+	  retval[0] = tree_constant (arg1.double_value ());
+          break;
+        case tree_constant_rep::complex_scalar_constant:
+          retval[0] = tree_constant (arg1.complex_value ());
+          break;
+        case tree_constant_rep::matrix_constant:
+          {
+  	    Matrix m = arg1.matrix_value ();
+	    if (m.rows () == 1)
+	      retval[0] = tree_constant (m.row_max ());
+	    else
+	      retval[0] = tree_constant (m.column_max (), 0);
+ 	  }
+          break;
+        case tree_constant_rep::complex_matrix_constant:
+          {
+            ComplexMatrix m = arg1.complex_matrix_value ();
+            if (m.rows () == 1)
+              retval[0] = tree_constant (m.row_max ());
+            else
+              retval[0] = tree_constant (m.column_max (), 0);
+          }
+	  break;
+	default:
+	  panic_impossible ();
+	  break;
 	}
     }
   else if (nargin == 2 && nargout == 2)
-    message ((char *) NULL, "[X, I] = max (A):  Not implemented");
+    {
+      retval = new tree_constant [2];
+      switch (arg1_type)
+        {
+	case tree_constant_rep::scalar_constant:
+	  {
+	    retval[0] = tree_constant (arg1.double_value ());
+	    retval[1] = tree_constant (1);
+	  }
+          break;
+	case tree_constant_rep::complex_scalar_constant:
+	  {
+	    retval[0] = tree_constant (arg1.complex_value ());
+	    retval[1] = tree_constant (1);
+	  }
+          break;
+	case tree_constant_rep::matrix_constant:
+	  {
+	    Matrix m = arg1.matrix_value ();
+	    if (m.rows () == 1)
+	      {
+		retval[0] = tree_constant (m.row_max ());
+		retval[1] = tree_constant (m.row_max_loc ());
+	      }
+	    else
+	      {
+		retval[0] = tree_constant (m.column_max (), 0);
+		retval[1] = tree_constant (m.column_max_loc (), 0);
+	      }
+	  }
+          break;
+	case tree_constant_rep::complex_matrix_constant:
+	  {
+	    ComplexMatrix m = arg1.complex_matrix_value ();
+	    if (m.rows () == 1)
+	      {
+		retval[0] = tree_constant (m.row_max ());
+		retval[1] = tree_constant (m.row_max_loc ());
+	      }
+	    else
+	      {
+		retval[0] = tree_constant (m.column_max (), 0);
+		retval[1] = tree_constant (m.column_max_loc (), 0);
+	      }
+	  }
+          break;
+	default:
+	  panic_impossible ();
+	  break;
+        }
+    }
   else if (nargin == 3)
     {
       if (arg1.rows () == arg2.rows ()
 	  && arg1.columns () == arg2.columns ())
 	{
 	  retval = new tree_constant [2];
-	  if (arg1_type == tree_constant_rep::scalar_constant)
-	    {
-	      double result;
-	      double a_elem = arg1.double_value ();
-	      double b_elem = arg2.double_value ();
-	      result = MAX (a_elem, b_elem);
-	      retval[0] = tree_constant (result);
-	    }
-	  else
-	    {
-	      Matrix result;
-	      result = max (arg1.matrix_value (), arg2.matrix_value ());
-	      retval[0] = tree_constant (result);
+          switch (arg1_type)
+            {
+	    case tree_constant_rep::scalar_constant:
+	      {
+		double result;
+		double a_elem = arg1.double_value ();
+		double b_elem = arg2.double_value ();
+		result = MIN (a_elem, b_elem);
+		retval[0] = tree_constant (result);
+	      }
+              break;
+	    case tree_constant_rep::complex_scalar_constant:
+	      {
+		Complex result;
+		Complex a_elem = arg1.complex_value ();
+		Complex b_elem = arg2.complex_value ();
+		if (abs(a_elem) < abs(b_elem))
+		  result = a_elem;
+		else
+		  result = b_elem;
+		retval[0] = tree_constant (result);
+	      }
+              break;
+	    case tree_constant_rep::matrix_constant:
+	      {
+		Matrix result;
+		result = max (arg1.matrix_value (), arg2.matrix_value ());
+		retval[0] = tree_constant (result);
+	      }
+              break;
+	    case tree_constant_rep::complex_matrix_constant:
+	      {
+		ComplexMatrix result;
+		result = max (arg1.complex_matrix_value (),
+			      arg2.complex_matrix_value ());
+		retval[0] = tree_constant (result);
+	      }
+	      break;
+	    default:
+	      panic_impossible ();
+	      break;
 	    }
 	}
       else
@@ -730,7 +782,7 @@ column_max (tree_constant *args, int nargin, int nargout)
 }
 
 tree_constant *
-column_min (tree_constant *args, int nargin, int nargout)
+column_min (const tree_constant *args, int nargin, int nargout)
 {
   tree_constant *retval = NULL_TREE_CONST;
 
@@ -759,38 +811,136 @@ column_min (tree_constant *args, int nargin, int nargout)
   if (nargin == 2 && nargout == 1)
     {
       retval = new tree_constant [2];
-      if (arg1_type == tree_constant_rep::scalar_constant)
-	retval[0] = tree_constant (arg1.double_value ());
-      else
+      switch (arg1_type)
 	{
-	  Matrix m = arg1.matrix_value ();
-	  if (m.rows () == 1)
-	    retval[0] = tree_constant (m.row_min ());
-	  else
-	    retval[0] = tree_constant (m.column_min (), 0);
+        case tree_constant_rep::scalar_constant:
+	  retval[0] = tree_constant (arg1.double_value ());
+          break;
+        case tree_constant_rep::complex_scalar_constant:
+          retval[0] = tree_constant (arg1.complex_value ());
+          break;
+        case tree_constant_rep::matrix_constant:
+          {
+  	    Matrix m = arg1.matrix_value ();
+	    if (m.rows () == 1)
+	      retval[0] = tree_constant (m.row_min ());
+	    else
+	      retval[0] = tree_constant (m.column_min (), 0);
+ 	  }
+          break;
+        case tree_constant_rep::complex_matrix_constant:
+          {
+            ComplexMatrix m = arg1.complex_matrix_value ();
+            if (m.rows () == 1)
+              retval[0] = tree_constant (m.row_min ());
+            else
+              retval[0] = tree_constant (m.column_min (), 0);
+          }
+	  break;
+	default:
+	  panic_impossible ();
+	  break;
 	}
     }
   else if (nargin == 2 && nargout == 2)
-    message ((char *) NULL, "[X, I] = min (A):  Not implemented");
+    {
+      retval = new tree_constant [2];
+      switch (arg1_type)
+        {
+	case tree_constant_rep::scalar_constant:
+	  {
+	    retval[0] = tree_constant (arg1.double_value ());
+	    retval[1] = tree_constant (1);
+	  }
+          break;
+	case tree_constant_rep::complex_scalar_constant:
+	  {
+	    retval[0] = tree_constant (arg1.complex_value ());
+	    retval[1] = tree_constant (1);
+	  }
+          break;
+	case tree_constant_rep::matrix_constant:
+	  {
+	    Matrix m = arg1.matrix_value ();
+	    if (m.rows () == 1)
+	      {
+		retval[0] = tree_constant (m.row_min ());
+		retval[1] = tree_constant (m.row_min_loc ());
+	      }
+	    else
+	      {
+		retval[0] = tree_constant (m.column_min (), 0);
+		retval[1] = tree_constant (m.column_min_loc (), 0);
+	      }
+	  }
+          break;
+	case tree_constant_rep::complex_matrix_constant:
+	  {
+	    ComplexMatrix m = arg1.complex_matrix_value ();
+	    if (m.rows () == 1)
+	      {
+		retval[0] = tree_constant (m.row_min ());
+		retval[1] = tree_constant (m.row_min_loc ());
+	      }
+	    else
+	      {
+		retval[0] = tree_constant (m.column_min (), 0);
+		retval[1] = tree_constant (m.column_min_loc (), 0);
+	      }
+	  }
+          break;
+	default:
+	  panic_impossible ();
+	  break;
+        }
+    }
   else if (nargin == 3)
     {
       if (arg1.rows () == arg2.rows ()
 	  && arg1.columns () == arg2.columns ())
 	{
 	  retval = new tree_constant [2];
-	  if (arg1_type == tree_constant_rep::scalar_constant)
-	    {
-	      double result;
-	      double a_elem = arg1.double_value ();
-	      double b_elem = arg2.double_value ();
-	      result = MIN (a_elem, b_elem);
-	      retval[0] = tree_constant (result);
-	    }
-	  else
-	    {
-	      Matrix result;
-	      result = min (arg1.matrix_value (), arg2.matrix_value ());
-	      retval[0] = tree_constant (result);
+          switch (arg1_type)
+            {
+	    case tree_constant_rep::scalar_constant:
+	      {
+		double result;
+		double a_elem = arg1.double_value ();
+		double b_elem = arg2.double_value ();
+		result = MIN (a_elem, b_elem);
+		retval[0] = tree_constant (result);
+	      }
+              break;
+	    case tree_constant_rep::complex_scalar_constant:
+	      {
+		Complex result;
+		Complex a_elem = arg1.complex_value ();
+		Complex b_elem = arg2.complex_value ();
+		if (abs(a_elem) < abs(b_elem))
+		  result = a_elem;
+		else
+		  result = b_elem;
+		retval[0] = tree_constant (result);
+	      }
+              break;
+	    case tree_constant_rep::matrix_constant:
+	      {
+		Matrix result;
+		result = min (arg1.matrix_value (), arg2.matrix_value ());
+		retval[0] = tree_constant (result);
+	      }
+              break;
+	    case tree_constant_rep::complex_matrix_constant:
+	      {
+		ComplexMatrix result;
+		result = min (arg1.complex_matrix_value (),
+			      arg2.complex_matrix_value ());
+		retval[0] = tree_constant (result);
+	      }
+	      break;
+	    default:
+	      panic_impossible ();
+	      break;
 	    }
 	}
       else
@@ -937,7 +1087,7 @@ mx_sort (ComplexRowVector& cv, RowVector& idx, int return_idx)
 }
 
 tree_constant *
-sort (tree_constant *args, int nargin, int nargout)
+sort (const tree_constant *args, int nargin, int nargout)
 {
 // Assumes that we have been given the correct number of arguments.
 
@@ -1032,7 +1182,7 @@ sort (tree_constant *args, int nargin, int nargout)
 }
 
 tree_constant *
-feval (tree_constant *args, int nargin, int nargout)
+feval (const tree_constant *args, int nargin, int nargout)
 {
 // Assumes that we have been given the correct number of arguments.
 
@@ -1053,7 +1203,7 @@ feval (tree_constant *args, int nargin, int nargout)
 }
 
 tree_constant
-eval_string (char *string, int print, int ans_assign,
+eval_string (const char *string, int print, int ans_assign,
 	     int& parse_status)
 {
   begin_unwind_frame ("eval_string");
@@ -1100,7 +1250,7 @@ eval_string (char *string, int print, int ans_assign,
 }
 
 tree_constant
-eval_string (tree_constant& arg, int& parse_status)
+eval_string (const tree_constant& arg, int& parse_status)
 {
   if (! arg.is_string_type ())
     {
@@ -1116,13 +1266,13 @@ eval_string (tree_constant& arg, int& parse_status)
 }
 
 static int
-match_sans_spaces (char *standard, char *test)
+match_sans_spaces (const char *standard, const char *test)
 {
-  char *tp = test;
+  const char *tp = test;
   while (*tp == ' ' || *tp == '\t')
     tp++;
 
-  char *ep = test + strlen (test) - 1;
+  const char *ep = test + strlen (test) - 1;
   while (*ep == ' ' || *ep == '\t')
     ep--;
 
@@ -1132,7 +1282,8 @@ match_sans_spaces (char *standard, char *test)
 }
 
 tree_constant
-get_user_input (tree_constant *args, int nargin, int nargout, int debug = 0)
+get_user_input (const tree_constant *args, int nargin, int nargout,
+		int debug = 0)
 {
   tree_constant retval;
 

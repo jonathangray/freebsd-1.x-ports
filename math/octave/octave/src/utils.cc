@@ -59,20 +59,20 @@ Free Software Foundation, Inc.
 
 #define NLENGTH(dirent) (strlen((dirent)->d_name))
 
-#ifdef HAVE_TERMIO_H
+extern "C"
+{
+#if defined (HAVE_TERMIOS_H)
+#include <termios.h>
+#elif defined (HAVE_TERMIO_H)
 #include <termio.h>
-#else
-#ifdef HAVE_SGTTY_H
+#elif defined (HAVE_SGTTY_H)
 #include <sgtty.h>
 #else
 LOSE! LOSE!
 #endif
-#endif
 
-extern "C"
-{
-  extern int ioctl (int, unsigned long, ...);
-  char *tilde_expand (char *s); /* From readline's tilde.c */
+extern int ioctl (int, int, ...);
+char *tilde_expand (char *s); /* From readline's tilde.c */
 }
 
 #include "SLStack.h"
@@ -83,12 +83,18 @@ extern "C"
 #include "variables.h"
 #include "error.h"
 #include "utils.h"
+#include "input.h"
 #include "octave.h"
 #include "mappers.h"
 #include "version.h"
+#include "defaults.h"
 #include "tree-const.h"
 #include "unwind-prot.h"
 #include "octave-hist.h"
+
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 1
+#endif
 
 // Top level context (?)
 extern jmp_buf toplevel;
@@ -178,17 +184,15 @@ discard_until (istream& stream, char character)
 } 
 
 void
-check_dimensions (int& nr, int& nc, char *warnfor)
+check_dimensions (int& nr, int& nc, const char *warnfor)
 {
   if (nr < 0 || nc < 0)
     {
       if (user_pref.treat_neg_dim_as_zero)
 	nr = nc = 0;
       else
-	{
-	  message (warnfor, "can't create a matrix with negative dimensions");
-	  jump_to_top_level ();
-	}
+	error ("%s: can't create a matrix with negative dimensions",
+	       warnfor);
     }
 }
 
@@ -210,23 +214,27 @@ raw_mode (int on)
 {
   static int curr_on = 0;
 
-// HACK! HACK!
-
-  int tty_fd = 1;
+  int tty_fd = STDIN_FILENO;
+  if (! isatty (tty_fd))
+    {
+      if (interactive || forced_interactive)
+	error ("stdin is not a tty!");
+      return;
+    }
 
   if (on == curr_on)
     return;
 
-#ifdef HAVE_TERMIO_H
+#if defined (HAVE_TERMIOS_H)
   {
-    struct termio s;
-    static struct termio save_term;
+    struct termios s;
+    static struct termios save_term;
 
     if (on)
       {
 // Get terminal modes.
 
-	ioctl(tty_fd, TCGETA, &s);
+	tcgetattr (tty_fd, &s);
 
 // Save modes and set certain variables dependent on modes.
 
@@ -238,7 +246,7 @@ raw_mode (int on)
 // Set the modes to the way we want them.
 
 	s.c_lflag &= ~(ICANON|ECHO|ECHOE|ECHOK|ECHONL);
-	s.c_oflag |=  (OPOST|ONLCR|TAB3);
+	s.c_oflag |=  (OPOST|ONLCR);
 	s.c_oflag &= ~(OCRNL|ONOCR|ONLRET);
 	s.c_cc[VMIN] = 1;
 	s.c_cc[VTIME] = 0;
@@ -248,10 +256,42 @@ raw_mode (int on)
 // Restore saved modes.
 	s = save_term;
       }
-    ioctl(tty_fd, TCSETAW, &s);
+    tcsetattr (tty_fd, TCSAFLUSH, &s);
   }
-#else
-#ifdef HAVE_SGTTY_H
+#elif defined (HAVE_TERMIO_H)
+  {
+    struct termio s;
+    static struct termio save_term;
+
+    if (on)
+      {
+// Get terminal modes.
+
+	ioctl (tty_fd, TCGETA, &s);
+
+// Save modes and set certain variables dependent on modes.
+
+	save_term = s;
+//	ospeed = s.c_cflag & CBAUD;
+//	erase_char = s.c_cc[VERASE];
+//	kill_char = s.c_cc[VKILL];
+
+// Set the modes to the way we want them.
+
+	s.c_lflag &= ~(ICANON|ECHO|ECHOE|ECHOK|ECHONL);
+	s.c_oflag |=  (OPOST|ONLCR);
+	s.c_oflag &= ~(OCRNL|ONOCR|ONLRET);
+	s.c_cc[VMIN] = 1;
+	s.c_cc[VTIME] = 0;
+      }      
+    else
+      {
+// Restore saved modes.
+	s = save_term;
+      }
+    ioctl (tty_fd, TCSETAW, &s);
+  }
+#elif defined (HAVE_SGTTY_H)
   {
     struct sgttyb s;
     static struct sgttyb save_term;
@@ -260,7 +300,7 @@ raw_mode (int on)
       {
 // Get terminal modes.
 
-	ioctl(tty_fd, TIOCGETP, &s);
+	ioctl (tty_fd, TIOCGETP, &s);
 
 // Save modes and set certain variables dependent on modes.
 
@@ -272,18 +312,17 @@ raw_mode (int on)
 // Set the modes to the way we want them.
 
 	s.sg_flags |= CBREAK;
-	s.sg_flags &= ~(ECHO|XTABS);
+	s.sg_flags &= ~(ECHO);
       } 
     else
       {
 // Restore saved modes.
 	s = save_term;
       }
-    ioctl(tty_fd, TIOCSETN, &s);
+    ioctl (tty_fd, TIOCSETN, &s);
   }
 #else
 LOSE! LOSE!
-#endif
 #endif
 
   curr_on = on;
@@ -347,7 +386,7 @@ pathstring_to_vector (char *pathstring)
   return path;
 }
 
-static char *
+char *
 octave_home (void)
 {
   static char *home =  (char *) NULL;
@@ -360,7 +399,7 @@ octave_home (void)
   return home;
 }
 
-static char *
+char *
 octave_lib_dir (void)
 {
   static char *ol = (char *) NULL;
@@ -369,6 +408,16 @@ octave_lib_dir (void)
   char *tmp = strconcat (oh, "/lib/octave/");
   ol = strconcat (tmp, version_string);
   return ol;
+}
+
+char *
+octave_info_dir (void)
+{
+  static char *oi = (char *) NULL;
+  delete [] oi;
+  char *oh = octave_home ();
+  oi = strconcat (oh, "/info/");
+  return oi;
 }
 
 char *
@@ -385,6 +434,35 @@ default_path (void)
       pathstring = strconcat (".:", libdir);
     }
   return pathstring;
+}
+
+char *
+default_info_file (void)
+{
+  static char *info_file_string = (char *) NULL;
+  delete [] info_file_string;
+  char *oct_info_file = getenv ("OCTAVE_INFO_FILE");
+  if (oct_info_file != (char *) NULL)
+    info_file_string = strsave (oct_info_file);
+  else
+    {
+      char *infodir = octave_info_dir ();
+      info_file_string = strconcat (infodir, "octave.info");
+    }
+  return info_file_string;
+}
+
+char *
+default_editor (void)
+{
+  static char *editor_string = (char *) NULL;
+  delete [] editor_string;
+  char *env_editor = getenv ("EDITOR");
+  if (env_editor == (char *) NULL || *env_editor == '\0')
+    editor_string = strsave ("vi");
+  else
+    editor_string = strsave (env_editor);
+  return editor_string;
 }
 
 char *
@@ -419,7 +497,7 @@ default_pager (void)
  * See if the given file is in the path.
  */
 char *
-file_in_path (char *name, char *suffix)
+file_in_path (const char *name, const char *suffix)
 {
   char *nm = strconcat ("/", name);
   char *tmp = nm;
@@ -463,7 +541,7 @@ file_in_path (char *name, char *suffix)
  * to the file.
  */
 char *
-m_file_in_path (char *name)
+m_file_in_path (const char *name)
 {
   return file_in_path (name, ".m");
 }
@@ -492,7 +570,7 @@ polite_directory_format (char *name)
  * Return 1 if STRING contains an absolute pathname, else 0.
  */
 int
-absolute_pathname (char *string)
+absolute_pathname (const char *string)
 {
   if (!string || !*string)
     return 0;
@@ -518,7 +596,7 @@ absolute_pathname (char *string)
  * look up through $PATH.
  */
 int
-absolute_program (char *string)
+absolute_program (const char *string)
 {
   return (strchr (string, '/') != (char *)NULL);
 }
@@ -546,7 +624,7 @@ base_pathname (char *string)
  * the string contained a bad number.
  */
 int
-read_octal (char *string)
+read_octal (const char *string)
 {
   int result = 0;
   int digits = 0;
@@ -609,7 +687,7 @@ sub_append_string (char *source, char *target, int *index, int *size)
  *	\\	a backslash
  */
 char *
-decode_prompt_string (char *string)
+decode_prompt_string (const char *string)
 {
   int result_size = PROMPT_GROWTH;
   int result_index = 0;
@@ -658,7 +736,7 @@ decode_prompt_string (char *string)
 	    case 'd':
 	      /* Make the current time/date into a string. */
 	      {
-		long the_time = time (0);
+		time_t the_time = time (0);
 		char *ttemp = ctime (&the_time);
 		temp = strsave (ttemp);
 
@@ -812,7 +890,7 @@ decode_prompt_string (char *string)
 
 /*
  * Remove the last N directories from PATH.  Do not PATH blank.
- * PATH must contain enoung space for MAXPATHLEN characters.
+ * PATH must contain enough space for MAXPATHLEN characters.
  */
 void
 pathname_backup (char *path, int n)
@@ -843,7 +921,7 @@ pathname_backup (char *path, int n)
  * begin with.
  */
 char *
-make_absolute (char *string, char *dot_path)
+make_absolute (const char *string, const char *dot_path)
 {
   static char current_path[MAXPATHLEN];
   register char *cp;
@@ -905,7 +983,7 @@ make_absolute (char *string, char *dot_path)
  * FOR_WHOM is the name of the caller for error printing.
  */ 
 char *
-get_working_directory (char *for_whom)
+get_working_directory (const char *for_whom)
 {
   if (!follow_symbolic_links)
     {
@@ -938,7 +1016,7 @@ get_working_directory (char *for_whom)
  * link following, etc.
  */ 
 int
-change_to_directory (char *newdir)
+change_to_directory (const char *newdir)
 {
   char *t;
 
@@ -994,7 +1072,7 @@ change_to_directory (char *newdir)
  *   stat on a fails        returns   -1
  */
 int
-is_newer (char *fa, time_t t)
+is_newer (const char *fa, time_t t)
 {
   struct stat fa_sb;
   register int fa_stat;
@@ -1013,7 +1091,7 @@ is_newer (char *fa, time_t t)
 /*
  * Return to the main command loop in octave.cc.
  */
-volatile void
+void
 jump_to_top_level (void)
 {
   run_all_unwind_protects ();
@@ -1151,7 +1229,7 @@ close_plot_stream (void)
 }
 
 int
-almost_match (char *std, char *s, int min_match_len = 1)
+almost_match (const char *std, const char *s, int min_match_len = 1)
 {
   int stdlen = strlen (std);
   int slen = strlen (s);
@@ -1162,7 +1240,7 @@ almost_match (char *std, char *s, int min_match_len = 1)
 }
 
 char **
-get_m_file_names (int& num, char *dir, int no_suffix)
+get_m_file_names (int& num, const char *dir, int no_suffix)
 {
   static int num_max = 256;
   char **retval = new char * [num_max];
@@ -1196,7 +1274,7 @@ get_m_file_names (int& num, char *dir, int no_suffix)
 		}
 	    }
 	}
-      free (dirp);
+      closedir (dirp);
     }
 
   retval[i] = (char *) NULL;

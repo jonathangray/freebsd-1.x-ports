@@ -29,7 +29,8 @@ Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <iostream.h>
+#include <string.h>
 #include <assert.h>
 
 // This must come before anything that includes iostream.h...
@@ -41,7 +42,32 @@ extern "C"
  * Yes, this sucks, but it avoids a conflict with another readline
  * function declared in iostream.h.
  */
-char *gnu_readline (char *s) { return readline (s); }
+#if 0
+#define LINE_SIZE 8192
+static int no_line_editing = 1;
+#endif
+
+char *
+gnu_readline (char *s)
+{
+#if 0
+  static int state = 0;
+  static char *line_from_stdin = (char *) NULL;
+  if (no_line_editing)
+    {
+      if (! state)
+	{
+	  line_from_stdin = (char *) malloc (LINE_SIZE);
+	  state = 1;
+	}
+      fputs ("octave> ", stdout);
+      fgets (line_from_stdin, LINE_SIZE, stdin);
+      return line_from_stdin;
+    }
+  else
+#endif
+    return readline (s);
+}
 }
 
 #include "variables.h"
@@ -50,7 +76,6 @@ char *gnu_readline (char *s) { return readline (s); }
 #include "input.h"
 #include "pager.h"
 #include "help.h"
-#include "symtab.h"
 #include "octave-hist.h"
 #include "sighandlers.h"
 #include "parse.h"
@@ -58,7 +83,7 @@ char *gnu_readline (char *s) { return readline (s); }
 #include "builtins.h"
 
 // Global pointer for eval().
-char *current_eval_string = (char *) NULL;
+const char *current_eval_string = (char *) NULL;
 
 // Nonzero means get input from current_eval_string.
 int get_input_from_eval_string = 0;
@@ -104,7 +129,10 @@ char *
 octave_gets (void)
 {
   if (octave_gets_line != NULL)
-    free (octave_gets_line);
+    {
+      free (octave_gets_line);
+      octave_gets_line = (char *) NULL;
+    }
 
   if (interactive || forced_interactive)
     {
@@ -201,10 +229,17 @@ octave_read (char *buf, int max_size)
       if (fgets (buf, max_size, curr_stream) != (char *) NULL)
 	{
 	  int len = strlen (buf);
-	  if (len >= max_size)
+	  if (len > max_size - 2)
 	    status = -1;
 	  else
-	    status = len;
+	    {
+	      if (buf[len-1] != '\n')
+		{
+		  buf[len++] = '\n';
+		  buf[len] = '\0';
+		}
+	      status = len;
+	    }
 	}
       else
 	status = 0; // Tell yylex that we found EOF.
