@@ -1,0 +1,56 @@
+CC       = cc
+IFLAGS   = -I.. -I../support
+LFLAGS   = -L../support
+CFLAGS   = -O -DDEBUG ${IFLAGS} ${LFLAGS}
+LIBES    = -lsupport
+LIBC     = /usr/lib/libc.a
+LINTFLAGS=	
+LKERB    = -lauth -lckrb -lkrb -ldes
+MKDEP    = ../util/mkdep
+
+.if exists(${DESTDIR}/usr/lib/libcrypt.a)
+LIBES+=	-lcrypt
+.endif
+
+SRCS   = ftpd.c ftpcmd.c glob.c logwtmp.c popen.c vers.c access.c extensions.c \
+		 realpath.c acl.c private.c authenticate.c conversions.c hostacc.c
+OBJS   = ftpd.o ftpcmd.o glob.o logwtmp.o popen.o access.o extensions.o \
+		 realpath.o acl.o private.o authenticate.o conversions.o hostacc.o
+
+all: ftpd ftpcount ftpshut ckconfig
+
+ftpcount:	ftpcount.c pathnames.h vers.o
+	${CC} ${CFLAGS} -o $@ ftpcount.c vers.o ${LIBES}
+
+ftpshut:    ftpshut.c pathnames.h vers.o
+	${CC} ${CFLAGS} -o $@ ftpshut.c vers.o ${LIBES}
+
+ftpd: ${OBJS} ${LIBC} vers.o
+	${CC} ${CFLAGS} -o $@ ${OBJS} vers.o ${LIBES}
+
+ckconfig:   ckconfig.c
+	${CC} ${CFLAGS} -o $@ ckconfig.c
+
+index:	index.o ${LIBC}
+	${CC} -Bstatic -o $@ index.o
+
+vers.o: ftpd.c ftpcmd.y ${SRCS}
+	${CC} ${CFLAGS} -c vers.c
+
+vers.c: ${OBJS}
+	sh newvers.sh
+clean:
+	rm -f ${OBJS} vers.o ftpd ftpcmd.c ftpshut ftpshut.o ftpcount ftpcount.o
+	rm -f core index index.o
+
+cleandir: clean
+	rm -f tags .depend
+
+depend: ${SRCS}
+	${MKDEP} ${CFLAGS} ${SRCS}
+
+lint: ${SRCS}
+	lint ${CFLAGS} ${LINTFLAGS} ${SRCS}
+
+tags: ${SRCS}
+	ctags ${SRCS}
