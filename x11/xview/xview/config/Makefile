@@ -411,7 +411,7 @@ _percentC_ = %C
 # config directory
 # @(#)Imakefile	1.9 28 Jun 1993 SMI
 
-XVFILES = XView.cf XView.lib XView.obj XView.rules XView.tmpl # library.tmpl
+XVFILES = XView.cf XView.lib XView.obj XView.rules XView.tmpl XView.prog
 CFFILES = $(XVFILES) $(HEADERS)
 
 install:: $(CFFILES)
