@@ -1,5 +1,5 @@
 #ifndef lint
-static const char *rcsid = "$Id: perform.c,v 1.7 1993/09/18 03:39:20 jkh Exp $";
+static const char *rcsid = "$Id: perform.c,v 1.8 1994/05/19 18:27:41 alm Exp $";
 #endif
 
 /*
@@ -145,6 +145,8 @@ make_dist(char *home, char *pkg, char *suffix, Package *plist)
     sprintf(tball, "%s/%s.%s", home, pkg, suffix);
     if (index(suffix, 'z'))	/* Compress/gzip? */
 	strcat(args, "z");
+    if (Dereference)
+	strcat(args, "h");
     if (Verbose)
 	printf("Creating gzip'd tar ball in '%s'\n", tball);
     strcat(args, "cf");
