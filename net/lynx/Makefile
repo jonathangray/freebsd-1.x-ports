@@ -131,8 +131,9 @@ mips:
 		WWWLIB="../WWW/Library/mips/libwww.a"
 
 freebsd:
-	cd WWW/Library/freebsd; make LYFLAGS=""
-	cd src; make all CC="cc" MCFLAGS="-O -DUNIX -DNO_KEYPAD -I../$(WWWINC)"\
+	cd WWW/Library/freebsd; make LYFLAGS="-DDIRED_SUPPORT"
+	cd src; make all CC="cc" MCFLAGS="-O -DUNIX -DNO_KEYPAD -I../$(WWWINC)\
+		-DDIRED_SUPPORT -DOK_TAR -DOK_GZIP -DOK_OVERRIDE"\
 		LIBS="-lcurses -ltermcap $(WAISLIB)" \
 		WWWLIB="../WWW/Library/freebsd/libwww.a"
 
@@ -283,7 +284,7 @@ traversal:
 clean:
 	rm -f WWW/Library/*/*.[aob]
 	cd src; make clean
-	rm -f *.b src/lynx core
+	rm -f *.b lynx core
 
 tar:  clean
 	rm -f lynx
