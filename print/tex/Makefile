@@ -35,7 +35,9 @@ MFSCRROW=600
 
 ### For ANY DVI-DRIVER (Beebe, dvips and xdvi): The default resolution
 ### given in dpi
-DEFRES=360
+### Note: Since we are using the default Postscript convertions, 300 DPI
+### is the standard laser printer resolution that MetaFont can create
+DEFRES=300
 
 ### For DVIPS and XDVI: The "last resort" fontsizes, if no better PK,
 ### GF or PXL font was found, try these sizes. This isn't really
@@ -226,24 +228,23 @@ EXPORT= CC INSTALL PSOUT DEFDEV DEFRES RESRES GERMAN FORMATS BASES MANEXT \
 ### important to have different names for the target and the directory
 ### otherwise make will end prematurely with '.. is up to date!'.
 TeX=TeX3.14
-dvips=dvips-5.515
+Dvips=dvips
 Xdvi=xdvi
 dvidrv=beebe
 dviutils=dvi2tty
 
-ALL= TeX dvips Xdvi dvidrv dviutils
-ALLDIR= $(TeX) $(dvips) $(Xdvi) $(dvidrv) $(dviutils)
+ALL= TeX Dvips Xdvi dvidrv dviutils
+ALLDIR= $(TeX) $(Dvips) $(Xdvi) $(dvidrv) $(dviutils)
 
 # Build targets
-all: Makefile.inc stamp-port $(ALL) $(INTERNATIONAL) user-tree
+all: Makefile.inc stamp-port $(ALL) $(INTERNATIONAL) #user-tree
 
 # in fact this is notreally used by the current release, since I lost
 # most of the originals during hacking. But for subsequent releases
 # this may be a good method to leave installed packages untouched
-ORIGINAL-FILES= $(TeX)/Makefile $(dvips)/Makefile $(Xdvi)/Imakefile \
-	$(dvidrv)/Makefile $(dviutils)/Makefile $(TeX)/tex/convert \
-	$(TeX)/mf/convert $(TeX)/Install_INPUTS $(TeX)/site.h \
-	$(dvips)/config.ps
+ORIGINAL-FILES= $(TeX)/Makefile $(dvidrv)/Makefile $(dviutils)/Makefile \
+	$(TeX)/tex/convert $(TeX)/mf/convert $(TeX)/Install_INPUTS \
+	$(TeX)/site.h 
 
 stamp-backup:
 	for i in $(ORIGINAL-FILES) ;\
@@ -268,37 +269,34 @@ restore-originals:
 stamp-port: stamp-backup
 	cd ./scripts ; \
 	cp ./$(TeX).Makefile ../$(TeX)/Makefile ; \
-	cp ./$(dvips).Makefile ../$(dvips)/Makefile ; \
-	cp ./$(Xdvi).Imakefile ../$(Xdvi)/Imakefile ; \
 	cp ./$(dvidrv).Makefile ../$(dvidrv)/Makefile ; \
 	cp ./$(dviutils).Makefile ../$(dviutils)/Makefile ; \
 	cp ./tex.convert ../$(TeX)/tex/convert ; \
-	cp ./mf.convert ../$(TeX)/mf/convert ; \
-	cp ./askmf.awk ../$(dvips) ; \
-	cp ./askmf.mf ../$(dvips)
-	rm -f $(TeX)/mf/MFwindow/x11.c
-	ln $(TeX)/mf/MFwindow/x11-Xlib.c $(TeX)/mf/MFwindow/x11.c 
-	touch stamp-port
+	cp ./mf.convert ../$(TeX)/mf/convert 
+	rm -f $(TeX)/mf/MFwindow/x11.c 
+	-ln $(TeX)/mf/MFwindow/x11-Xlib.c $(TeX)/mf/MFwindow/x11.c 
+	touch stamp-port 
 #
-#	patch -d ../$(dvips) -N -c < dvips.diff
+#	patch -d ../$(Dvips) -N -c < dvips.diff
 
 stamp-expand: Makefile
 	cd ./scripts ; \
 	echo $(seddef) |sed -f mksedscript.sed > var.sed ; \
 	sed -f ./var.sed ./Install_INPUTS.raw > ../$(TeX)/Install_INPUTS ; \
 	sed -f ./var.sed ./site.h.raw > ../$(TeX)/site.h ; \
-	sed -f ./var.sed ./config.ps.raw > ../$(dvips)/config.ps ; \
-	sed -f ./var.sed ./mftopk.raw > ../$(dvips)/mftopk ; \
-	sed -f ./var.sed ./mftopk.1.raw > ../$(dvips)/mftopk.1 ; \
 	sed -f ./var.sed ./dvidr.raw > ./dvidr ; \
 	sed -f ./var.sed ./dvidr.1.raw > ./dvidr.1 ; \
+	if [ ! -d ../usr ] ; then \
+	  echo "making ../usr"; \
+	  mkdir -p ../usr ; \
+	fi ; \
 	sed -f ./var.sed ./Xdefaults.raw > ../usr/.Xdefaults-`hostname` ; \
 	sed -f ./var.sed ./environ.sh.raw > ../usr/texsetup.sh ; \
 	sed -f ./var.sed ./environ.csh.raw > ../usr/texsetup.csh ; \
 	sed -f ./var.sed ./modes.mf.raw > ./modes.mf ;
 	touch stamp-expand
 
-TeX: stamp-port stamp-expand stamp-inputs TeXprog
+TeX: stamp-port stamp-expand TeXprog
 
 ######
 # Target to make TeX, MF & close friends
@@ -306,9 +304,11 @@ TeX: stamp-port stamp-expand stamp-inputs TeXprog
 TeXprog:
 	cd $(TeX) ; \
 	make $(makedef) all ; \
-	make $(makedef) formats ; \
-	make $(makedef) bases ; \
 	make $(makedef) manpages
+# These have to be put off until later as we haven't yet installed
+# the inputs
+#	make $(makedef) formats 
+#	make $(makedef) bases ; \
 #
 ######
 # this is here because we sometimes want to bypass the default make
@@ -323,13 +323,12 @@ TeXpass:
 ######
 # the targets for make in package
 #
-dvips: stamp-port
-	cd $(dvips) ; \
+Dvips: 
+	cd $(Dvips) ; \
 	make $(makedef) all	
 
-Xdvi: stamp-port
+Xdvi: 
 	cd $(Xdvi) ;\
-	xmkmf ;\
 	make $(makedef) all
 
 dvidrv: stamp-port
@@ -349,23 +348,25 @@ stamp-inputs: stamp-tree
 	sh Install_INPUTS
 	touch $(.TARGET)
 
-install: $(ALL:S/^/install./g)
+install: stamp-inputs $(ALL:S/^/install./g)
 	$(INSTALL) -m 755 scripts/dvidr $(BINDIR)
 	$(INSTALL) -m 644 scripts/dvidr.1 $(MANDIR)/man$(MANEXT)
 	-ln $(BINDIR)/dvidr $(BINDIR)/dvi
 	-ln $(BINDIR)/dvidr $(BINDIR)/dvipr
 	-ln $(BINDIR)/dvidr $(BINDIR)/mkfonts
-	cp -R usr $(LIBROOT)
+#	cp -R usr $(LIBROOT)
 
 install.TeX: stamp-tree
 	cd $(TeX) ; \
 	make $(makedef) install ; \
+	make $(makedef) formats ; \
 	make $(makedef) install-formats ; \
+	make $(makedef) bases ; \
 	make $(makedef) install-bases ; \
 	make $(makedef) install-manpages ; \
 
-install.dvips: stamp-tree
-	cd $(dvips) ; \
+install.Dvips: stamp-tree
+	cd $(Dvips) ; \
 	make $(makedef) install
 
 install.Xdvi:
@@ -392,12 +393,12 @@ clean: $(ALL:S/^/clean./g)
 	cd ./scripts ; rm -f var.sed modes.mf dvidr.1 dvidr
 	rm -r -f ./usr/*
 
-clean.TeX: stamp-tree
+clean.TeX: 
 	cd $(TeX) ; \
 	make $(makedef) clean ; \
 
-clean.dvips: stamp-tree
-	cd $(dvips) ; \
+clean.Dvips: 
+	cd $(Dvips) ; \
 	make $(makedef) clean
 
 clean.Xdvi:
@@ -421,15 +422,14 @@ veryclean: $(ALL:S/^/veryclean./g)
 	rm -r -f ./usr/*
 	cd $(TeX) ; rm -f ./Makefile ./site.h ./Install_INPUTS \
 			./mf/convert ./tex/convert 
-	cd $(dvips) ; rm -f ./Makefile ./config.ps
-	rm -f ./$(Xdvi)/Imakefile ./$(dvidrv)/Makefile ./$(dviutils)/Makefile
+	rm -f ./$(dvidrv)/Makefile ./$(dviutils)/Makefile
 
 veryclean.TeX:
 	cd $(TeX) ; \
 	make $(makedef) veryclean ; \
 
-veryclean.dvips:
-	cd $(dvips) ; \
+veryclean.Dvips:
+	cd $(Dvips) ; \
 	make $(makedef) veryclean
 
 veryclean.Xdvi:
@@ -456,6 +456,7 @@ stamp-tree:
 	    mkdir -p $$i ; \
 	  fi ; \
 	done
+	chmod 1777 $(PK)
 	touch $(.TARGET)
 
 user-tree:
