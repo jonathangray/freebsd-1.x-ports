@@ -10,7 +10,7 @@ make-octave:
 	./configure; \
 	gmake
 
-install: make-octave
+install:
 	cd octave; \
 	gmake install
 clean:
