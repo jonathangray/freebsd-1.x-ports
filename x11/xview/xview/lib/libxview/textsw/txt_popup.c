@@ -125,6 +125,7 @@ textsw_popup_destroy_func(client, status)
     return notify_next_destroy_func(client,status);
 }
 
+static void            add_exten_item();
 Pkg_private void
 textsw_create_popup_frame(view, popup_type)
     Textsw_view_handle view;
@@ -135,7 +136,6 @@ textsw_create_popup_frame(view, popup_type)
     Frame           popup_frame, base_frame;
     Panel           panel = NULL;
     char           *label;
-    void            add_exten_item();
 #ifdef OW_I18N
     int		    win_use_im = ((popup_type != TEXTSW_MENU_SEL_MARK_TEXT) &&
 				  (popup_type != TEXTSW_MENU_NORMALIZE_LINE));
@@ -492,6 +492,9 @@ textsw_set_pop_up_location(frame_parent, pop_up_frame)
 #undef MY_OFFSET
 }
 
+static int  fc_exten_func();
+static void show_dot_files_proc();
+
 static void
 add_exten_item( fc )
      File_chooser fc;
@@ -502,8 +505,6 @@ add_exten_item( fc )
     int frame_width;
     int frame_height;
     Panel_item item;
-    void show_dot_files_proc();
-    int  fc_exten_func();
  
     
     panel = xv_get(fc, FRAME_CMD_PANEL);

@@ -12,6 +12,7 @@ static char     sccsid[] = "@(#)attr_copy.c 20.14 93/06/28 Copyr 1985 Sun Micro"
 
 #include <xview/attr.h>
 
+static int copy_1_attr();
 /*
  * attr_copy:	copy an attribute list, returning the size in bytes
  */
