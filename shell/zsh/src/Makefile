@@ -32,7 +32,7 @@ DFLAGS = # -DQDEBUG
 #CC=gcc -fpcc-struct-return
 #CFLAGS= -O2 -g -Wall -Wno-implicit -Wno-parentheses -Wno-comment $(DFLAGS)
 
-CC=gcc -O2 
+CC=cc
 CFLAGS= -O
 LIBS= -ltermcap
 

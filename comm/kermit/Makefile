@@ -12,12 +12,8 @@ SRCS=   ckcmai.c ckucmd.c ckuusr.c ckuus2.c ckuus3.c ckuus4.c ckuus5.c \
 #BINOWN= uucp
 #BINGRP= dialer
 
-.if !defined(${BINDIR})
-BINDIR=/usr/local/bin
-.endif
-.if !defined(${MANDIR})
-MANDIR=/usr/local/man/man
-.endif
+BINDIR?=/usr/local/bin
+MANDIR?=/usr/local/man/man
 
 DPADD=  ${LIBCURSES} ${LIBTERM}
 LDADD=  -lcurses -ltermcap
