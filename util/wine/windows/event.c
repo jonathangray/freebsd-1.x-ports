@@ -17,10 +17,6 @@ static char Copyright[] = "Copyright  Alexandre Julliard, 1993";
 #include "class.h"
 #include "message.h"
 
-#ifndef FamilyAmoeba
-typedef char *XPointer;
-#endif
-
 #define NB_BUTTONS      3     /* Windows can handle 3 buttons */
 
 extern int desktopX, desktopY;   /* misc/main.c */
