@@ -20,10 +20,10 @@ World:	config
 	@echo Don't forget to set OPENWINHOME in your ~/.tcshrc or equiv.
 
 package:	World pkg/+ONELINE pkg/+DESC pkg/+PLIST
-	pkg_create -c pkg/+ONELINE  -d pkg/+DESC -f pkg/+PLIST xview32_bin
+	pkg_create -c pkg/+ONELINE  -d pkg/+DESC -f pkg/+PLIST xview_bin
 
 clean:
-	rm -f xview32b.tgz xview32l.tgz
+	rm -f xview_bin.tgz
 	if [ -f stamp-config ] ; then \
 		(cd xview; $(MAKE) clean) ; \
 		(cd xview; $(MAKE) SUBDIRS=clients clean) ; \
