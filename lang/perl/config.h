@@ -644,7 +644,7 @@
  *	This symbol has a value like gid_t, int, ushort, or whatever type is
  *	used in the return value of getgroups().
  */
-#define GROUPSTYPE gid_t		/**/
+#define GROUPSTYPE int		/**/
 
 /* I_FCNTL
  *	This manifest constant tells the C program to include <fcntl.h>.
