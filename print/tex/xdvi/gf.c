@@ -1,14 +1,7 @@
-#include <stdio.h>
-#include "xdvi.h"
-
 /***
  ***	GF font reading routines.
- ***	Public routines are read_index and read_char.
+ ***	Public routines are read_GF_index and read_GF_char.
  ***/
-
-static	void	read_index(), read_char();
-
-read_font_index_proc	read_GF_index	= read_index;
 
 #define	PAINT_0		0
 #define	PAINT1		64
@@ -61,93 +54,9 @@ too_many_bits(ch)
  *	Public routines
  */
 
-static	void
-read_index(fontp)
-	register struct font *fontp;
-{
-	int	hppp, vppp;
-	ubyte	ch, cmnd;
-	register struct glyph *g;
-
-	fontp->read_char = read_char;
-	GF_file = fontp->file;
-	if (debug & DBG_PK)
-	    Printf("Reading GF pixel file %s\n", fontp->filename);
-/*
- *	Find postamble.
- */
-	Fseek(GF_file, (long) -4, 2);
-	while (four(GF_file) !=
-		((long) TRAILER << 24 | TRAILER << 16 | TRAILER << 8 | TRAILER))
-	    Fseek(GF_file, (long) -5, 1);
-	Fseek(GF_file, (long) -5, 1);
-	for (;;) {
-	    ch = one(GF_file);
-	    if (ch != TRAILER) break;
-	    Fseek(GF_file, (long) -2, 1);
-	}
-	if (ch != GF_ID_BYTE) oops("Bad end of font file %s", fontp->fontname);
-	Fseek(GF_file, (long) -6, 1);
-	expect(POST_POST);
-	Fseek(GF_file, sfour(GF_file), 0);	/* move to postamble */
-/*
- *	Read postamble.
- */
-	expect(POST);
-	(void) four(GF_file);		/* pointer to last eoc + 1 */
-	(void) four(GF_file);		/* skip design size */
-	(void) four(GF_file);		/* skip checksum */
-	hppp = sfour(GF_file);
-	vppp = sfour(GF_file);
-	if (hppp != vppp && (debug & DBG_PK))
-	    Printf("Font has non-square aspect ratio %d:%d\n", vppp, hppp);
-	(void) four(GF_file);		/* skip min_m */
-	(void) four(GF_file);		/* skip max_m */
-	(void) four(GF_file);		/* skip min_n */
-	(void) four(GF_file);		/* skip max_n */
-/*
- *	Prepare glyph array.
- */
-	for (g = fontp->glyph; g < fontp->glyph + 256; ++g) {
-	    g->addr = 0;
-	    g->bitmap.bits = NULL;
-	    g->bitmap2.bits = NULL;
-	}
-/*
- *	Read glyph directory.
- */
-	while ((cmnd = one(GF_file)) != POST_POST) {
-	    ubyte ch;
-	    int addr;
-
-	    ch = one(GF_file);			/* character code */
-	    g = &fontp->glyph[ch];
-	    switch (cmnd) {
-		case CHAR_LOC:
-		    /* g->pxl_adv = sfour(GF_file); */
-		    (void) four(GF_file);
-		    (void) four(GF_file);	/* skip dy */
-		    break;
-		case CHAR_LOC0:
-		    /* g->pxl_adv = one(GF_file) << 16; */
-		    (void) one(GF_file);
-		    break;
-		default:
-		    oops("Non-char_loc command found in GF preamble:  %d",
-			cmnd);
-	    }
-	    g->dvi_adv = ((double) fontp->scale * sfour(GF_file)) / (1 << 20);
-	    addr = four(GF_file);
-	    if (addr != -1) g->addr = addr;
-	    if (debug & DBG_PK)
-		Printf("Read GF glyph for character %d; dy = %d, addr = %d\n",
-			ch, g->dvi_adv, addr);
-	}
-}
-
 
 static	void
-read_char(fontp, ch)
+read_GF_char(fontp, ch)
 	register struct font *fontp;
 	ubyte ch;
 {
@@ -175,7 +84,8 @@ read_char(fontp, ch)
 		case XXX2:
 		case XXX3:
 		case XXX4:
-		    Fseek(GF_file, (long) num(GF_file, cmnd - XXX1 + 1), 1);
+		    Fseek(GF_file, (long) num(GF_file,
+			WIDEARG(,(int)) cmnd - XXX1 + 1), 1);
 		    continue;
 		case YYY:
 		    (void) four(GF_file);
@@ -233,7 +143,7 @@ read_char(fontp, ch)
 		case PAINT1:
 		case PAINT2:
 		case PAINT3:
-		    count = num(GF_file, cmnd - PAINT1 + 1);
+		    count = num(GF_file, WIDEARG(,(int)) cmnd - PAINT1 + 1);
 		    break;
 		case EOC:
 		    if (cp >= ADD(basep, bytes_wide)) too_many_bits(ch);
@@ -242,7 +152,7 @@ read_char(fontp, ch)
 		case SKIP2:
 		case SKIP3:
 		    *((char **) &basep) +=
-			num(GF_file, cmnd - SKIP0) * bytes_wide;
+			num(GF_file, WIDEARG(,(int)) cmnd - SKIP0) * bytes_wide;
 		case SKIP0:
 		    new_row = True;
 		    paint_switch = White;
@@ -251,7 +161,8 @@ read_char(fontp, ch)
 		case XXX2:
 		case XXX3:
 		case XXX4:
-		    Fseek(GF_file, (long) num(GF_file, cmnd - XXX1 + 1), 1);
+		    Fseek(GF_file, (long) num(GF_file,
+			WIDEARG(,(int)) cmnd - XXX1 + 1), 1);
 		    break;
 		case YYY:
 		    (void) four(GF_file);
@@ -298,4 +209,86 @@ read_char(fontp, ch)
 		paint_switch = 1 - paint_switch;
 	    }
 	} /* end for */
+}
+
+
+void
+read_GF_index(fontp)
+	register struct font *fontp;
+{
+	int	hppp, vppp;
+	ubyte	ch, cmnd;
+	register struct glyph *g;
+
+	fontp->read_char = read_GF_char;
+	GF_file = fontp->file;
+	if (debug & DBG_PK)
+	    Printf("Reading GF pixel file %s\n", fontp->filename);
+/*
+ *	Find postamble.
+ */
+	Fseek(GF_file, (long) -4, 2);
+	while (four(GF_file) !=
+		((long) TRAILER << 24 | TRAILER << 16 | TRAILER << 8 | TRAILER))
+	    Fseek(GF_file, (long) -5, 1);
+	Fseek(GF_file, (long) -5, 1);
+	for (;;) {
+	    ch = one(GF_file);
+	    if (ch != TRAILER) break;
+	    Fseek(GF_file, (long) -2, 1);
+	}
+	if (ch != GF_ID_BYTE) oops("Bad end of font file %s", fontp->fontname);
+	Fseek(GF_file, (long) -6, 1);
+	expect(POST_POST);
+	Fseek(GF_file, sfour(GF_file), 0);	/* move to postamble */
+/*
+ *	Read postamble.
+ */
+	expect(POST);
+	(void) four(GF_file);		/* pointer to last eoc + 1 */
+	(void) four(GF_file);		/* skip design size */
+	(void) four(GF_file);		/* skip checksum */
+	hppp = sfour(GF_file);
+	vppp = sfour(GF_file);
+	if (hppp != vppp && (debug & DBG_PK))
+	    Printf("Font has non-square aspect ratio %d:%d\n", vppp, hppp);
+	(void) four(GF_file);		/* skip min_m */
+	(void) four(GF_file);		/* skip max_m */
+	(void) four(GF_file);		/* skip min_n */
+	(void) four(GF_file);		/* skip max_n */
+/*
+ *	Prepare glyph array.
+ */
+	fontp->glyph = (struct glyph *) xmalloc(256 * sizeof(struct glyph),
+	    "glyph array");
+	bzero((char *) fontp->glyph, 256 * sizeof(struct glyph));
+/*
+ *	Read glyph directory.
+ */
+	while ((cmnd = one(GF_file)) != POST_POST) {
+	    int addr;
+
+	    ch = one(GF_file);			/* character code */
+	    g = &fontp->glyph[ch];
+	    switch (cmnd) {
+		case CHAR_LOC:
+		    /* g->pxl_adv = sfour(GF_file); */
+		    (void) four(GF_file);
+		    (void) four(GF_file);	/* skip dy */
+		    break;
+		case CHAR_LOC0:
+		    /* g->pxl_adv = one(GF_file) << 16; */
+		    (void) one(GF_file);
+		    break;
+		default:
+		    oops("Non-char_loc command found in GF preamble:  %d",
+			cmnd);
+	    }
+	    g->dvi_adv = fontp->dimconv * sfour(GF_file);
+	    addr = four(GF_file);
+	    if (addr != -1) g->addr = addr;
+	    if (debug & DBG_PK)
+		Printf("Read GF glyph for character %d; dy = %d, addr = %d\n",
+			ch, g->dvi_adv, addr);
+	}
 }

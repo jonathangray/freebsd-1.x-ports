@@ -1,2 +1,81 @@
-#!/bin/sh -f
-csh -f <./cscript
+#!/bin/sh
+FONTPATH=$1
+FONTSIZES=$2
+VFPATH=$3
+shift 3
+
+X10=
+BUTTONS=
+A4=
+SUBDIR=
+TEXFONTS=
+GREY=
+MAKEPK=
+BDPI=
+
+while test $# -gt 0
+do
+	case $1 in
+	-DX10)			X10=y;;
+	-DBUTTONS)		BUTTONS=y;;
+	-DA4)			A4=y;;
+	-DSEARCH_SUBDIRECTORIES) SUBDIR=y;;
+	-DXDVIFONTS_ONLY)	TEXFONTS=y;;
+	-DGREY)			GREY=y;;
+	-DMAKEPK)		MAKEPK=-DMAKEPKCMD=\\\"MakeTeXPK\\\";;
+	-DMAKEPKCMD*)		MAKEPK=$1;;
+	-DBDPI=*)		BDPI=$1;;
+	esac
+	shift
+done
+
+if test -n "$X10"
+then
+	echo	'/^#ifx11/,/^#/d'
+	echo	's/%%dot%%//'
+else
+	echo	'/^#ifx10/,/^#/d'
+	echo	's/%%dot%%/./'
+fi
+
+if test -z "$BUTTONS";	then	echo	'/^#ifbuttons/,/^#/d';	fi
+if test -z "$SUBDIR";	then	echo	'/^#ifsubdir/,/^#/d';	fi
+if test -n "$TEXFONTS";	then	echo	'/^#iftexfonts/,/^#/d';	fi
+if test -z "$GREY";	then	echo	'/^#ifgrey/,/^#/d';	fi
+if test -z "$MAKEPK";	then	echo	'/^#ifmakepk/,/^#/d'
+	else	echo	"s:%%mkpk%%:`echo $MAKEPK | sed s:-DMAKEPKCMD=::`:"
+	fi
+echo	'/^#/d'
+
+if test -n "$A4"
+then
+	echo	's/%%defaultpagesize%%/21 x 29.7 cm (A4 size)/'
+else
+	echo	's/%%defaultpagesize%%/8.5 x 11 inches/'
+fi
+
+if test -n "$BDPI"
+then
+	echo	"s/%%bdpi%%/`echo $BDPI | sed s/-DBDPI=//`/"
+else
+	echo	's/%%bdpi%%/300/'
+fi
+
+echo	"s@%%DEFAULT_FONT_PATH%%   @.B $FONTPATH\\
+@" | sed -e "s@:@\\\\\\
+.TP\\\\\\
+.B @g"
+
+echo	"s/%%DEFAULT_FONT_SIZES%%/$FONTSIZES/" | sed -e "s/:/ :\\\\\\
+/g"
+
+if test -n "$VFPATH"
+then
+	echo	"s@%%DEFAULT_VF_PATH%%   @.TP\\
+.B $VFPATH\\
+@" | sed -e "s@:@\\\\\\
+.TP\\\\\\
+.B @g"
+else
+	echo	'/%%DEFAULT_VF_PATH%%/d'
+fi

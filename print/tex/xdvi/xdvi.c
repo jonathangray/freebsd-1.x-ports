@@ -6,15 +6,16 @@
  * Code derived from dvi-imagen.c.
  *
  * Modification history:
- * 1/1986	Modified for X.10 by Bob Scheifler, MIT LCS.
- * 7/1988	Modified for X.11 by Mark Eichin, MIT
+ * 1/1986	Modified for X.10	--Bob Scheifler, MIT LCS.
+ * 7/1988	Modified for X.11	--Mark Eichin, MIT
  * 12/1988	Added 'R' option, toolkit, magnifying glass
- *			--Paul Vojta, UC Berkeley.
+ *					--Paul Vojta, UC Berkeley.
  * 2/1989	Added tpic support	--Jeffrey Lee, U of Toronto
- * 4/1989	Modified for System V by Donald Richardson, Clarkson Univ.
+ * 4/1989	Modified for System V	--Donald Richardson, Clarkson Univ.
  * 3/1990	Added VMS support	--Scott Allendorf, U of Iowa
- * 9/1992       -ar option for aspect ratios other than 1 added
- *                                      --Gunther Schadow, Uni-Tuebingen 
+ * 7/1990	Added reflection mode	--Michael Pak, Hebrew U of Jerusalem
+ * 1/1992	Added greyscale code	--Till Brychcy, Techn. Univ. Muenchen
+ *					  and Lee Hetherington, MIT
  *
  *	Compilation options:
  *	SYSV	compile for System V
@@ -27,18 +28,9 @@
  *	BMLONG	store bitmaps in longs instead of bytes
  *	ALTFONT	default for -altfont option
  *	A4	use European size paper
+ *	TEXXET	support reflection dvi codes (right-to-left typesetting)
+ *	GREY	use grey levels to shrink fonts
  */
-#ifndef lint
-#include "patchlevel.h"
-static	struct {char	a[36], b, c, d;}
-#ifndef X10
-	dv_c = {"$Header: xdvi.c (X11), patchlevel = ", '0' + PATCHLEVEL / 10,
-		'0' + PATCHLEVEL % 10, 0};
-#else
-	dv_c = {"$Header: xdvi.c (X10), patchlevel = ", '0' + PATCHLEVEL / 10,
-		'0' + PATCHLEVEL % 10, 0};
-#endif
-#endif	/* lint */
 
 #ifndef	ALTFONT
 #define	ALTFONT	"cmr10"
@@ -57,18 +49,40 @@ static	struct {char	a[36], b, c, d;}
 #undef	BUTTONS
 #endif
 
+#include <ctype.h>
+
+#define	EXTERN
+#define	INIT(x)	=x
+#ifndef	TOOLKIT
+#define	NTINIT(x)	=x
+#else
+#define	NTINIT(x)
+#endif
+#include "xdvi.h"
+
+#include "patchlevel.h"
+static	struct {_Xconst char	a[33], b, c, d;}
 #ifndef X10
-#undef Boolean
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
+	version = {"This is xdvi for X11, patchlevel ", '0' + PATCHLEVEL / 10,
+		'0' + PATCHLEVEL % 10, 0};
+#else
+	version = {"This is xdvi for X10, patchlevel ", '0' + PATCHLEVEL / 10,
+		'0' + PATCHLEVEL % 10, 0};
+#endif
+
+#ifndef	X_NOT_STDC_ENV
+#include <stdlib.h>
+#endif
+
+#ifndef X10
+/* Xlib and Xutil are already included */
 #include <X11/cursorfont.h>
 #include <X11/keysym.h>
 #include "xdvi.icon"
-#else /* X10 */
-#include <X/Xlib.h>
 #endif /* X10 */
 
 #ifdef	TOOLKIT
+#undef Boolean
 #include <X11/Intrinsic.h>
 #ifdef OLD_X11_TOOLKIT
 #include <X11/Atoms.h>
@@ -86,6 +100,7 @@ static	struct {char	a[36], b, c, d;}
 #include <X11/Xaw/Command.h>
 #endif
 #else	/* XtSpecificationRelease < 4 */
+#define	XtPointer caddr_t
 #include <X11/Viewport.h>
 #ifdef	BUTTONS
 #include <X11/Command.h>
@@ -96,7 +111,7 @@ static	struct {char	a[36], b, c, d;}
 typedef	int		Position;
 typedef	unsigned int	Dimension;
 #ifndef X10
-typedef	unsigned int	Pixel;
+typedef	unsigned long	Pixel;
 #define	XtPending()	XPending(DISP)
 #else
 #define	XtPending	XPending
@@ -104,19 +119,17 @@ typedef	unsigned int	Pixel;
 #endif
 #endif	/* TOOLKIT */
 
-#include <stdio.h>
-#include <ctype.h>
-#include "xdvi.h"
-
 #ifdef	HAS_SIGIO
 #include <fcntl.h>
 #include <signal.h>
 #endif
 
 #ifndef X10
+#ifndef	GREY
 static	Display	*DISP;
-#define	DPY	DISP,
 static	Screen	*SCRN;
+#endif
+#define	DPY	DISP,
 static	Cursor	redraw_cursor, ready_cursor;
 
 #ifdef	VMS
@@ -173,64 +186,92 @@ static	Pixmap	MagnifyPixmap;	/* Pixmap to hold our special mag-glass  */
 #endif	/* X10 */
 
 #define	MAGBORD	1	/* border size for magnifier */
-char	*alt_font = ALTFONT;
 
 /*
  * Command line flags.
  */
-int	debug = 0;
-Boolean	list_fonts = False;
 
-int	density = 40;
-int	pixels_per_inch = DEFAULT_RESOLUTION;
-int     aspect_ratio_option = DEFAULT_ASPECT_RATIO; 
-double  aspect_ratio; /* = aspect_ratio_option / 1000 */
+static	Dimension	bwidth	= 2;
 
-int	offset_x, offset_y;
-int	unshrunk_paper_w, unshrunk_paper_h;
-int	unshrunk_page_w, unshrunk_page_h;
-Boolean	hush_spec	= False;
-Boolean	hush_chars	= False;
-static	char	*paper		= DEFAULT_PAPER;
+#ifdef	TOOLKIT
+
+#define	RESOURCE(x)	resource.x
+
+static	struct _resource {
+	char	*debug_arg;
+	int	_shrink_factor;
+	int	density;
+#ifdef	GREY
+	float	gamma;
+#endif
+	int	pixels_per_inch;
+	char	*sidemargin;
+	char	*topmargin;
+	char	*xoffset;
+	char	*yoffset;
+	_Xconst char	*paper;
+	char	*alt_font;
+	Boolean	list_fonts;
+	Boolean	reverse;
+	Boolean	hush_spec;
+	Boolean	hush_chars;
+	Pixel	fore_Pixel;
+	char	*fore_color;
+	Pixel	back_Pixel;
+	char	*back_color;
+	Pixel	brdr_Pixel;
+	char	*brdr_color;
+	Pixel	hl_Pixel;
+	char	*high_color;
+	Pixel	cr_Pixel;
+	char	*curs_color;
+	char	*icon_geometry;
+	Boolean	keep_flag;
+	char	*copy_arg;
+	Boolean	copy;
+	Boolean	thorough;
+	Boolean	version_flag;
+#ifdef	BUTTONS
+	Boolean	expert;
+#endif
+	int	mg_size[5];
+#ifdef	GREY
+	Boolean	use_grey;
+#endif
+} resource;
+
+#else	/* !TOOLKIT */
+
+#define	RESOURCE(x)	x
+static	char	*debug_arg;
+#ifdef	GREY
+static	float	gamma	= 1.0;
+#endif
 static	char	*sidemargin, *topmargin;
 static	char	*xoffset, *yoffset;
+static	_Xconst	char	*paper		= DEFAULT_PAPER;
 static	Boolean	reverse;
-static	Dimension	bwidth	= 2;
-static	int	bak_shrink;
-static	char	*debug_arg;
-static	int	mg_size[5] = {200, 350, 600, 900, 1200};
-
-char	*dvi_name = NULL;
-FILE	*dvi_file;				/* user's file */
-char	*prog;
-char	*curr_page = NULL;
-
-int	pageno_correct	= 1;
-Boolean	keep_flag	= False;
-static	double	specialConv_x;
-static	double	specialConv_y;
-#ifdef	BUTTONS
-Boolean	expert		= False;
-#endif
-
+static	Boolean	keep_flag	= False;
 #ifndef X10
-#ifdef	TOOLKIT
-		/* fg and bg colors */
-static	Arg	fore_args = {XtNforeground,	(XtArgVal) 0};
-#define	fore_Pixel	fore_args.value
-static	Arg	back_args = {XtNbackground,	(XtArgVal) 0};
-#define	back_Pixel	back_args.value
-#else	/* !TOOLKIT */
-static	Pixel	fore_Pixel, back_Pixel;
-#endif	/* TOOLKIT */
-static	Pixel	brdr_Pixel, hl_Pixel, cr_Pixel;
+static	Pixel	fore_Pixel, back_Pixel, brdr_Pixel, hl_Pixel, cr_Pixel;
+static	char	*icon_geometry;
+static	Boolean	copy	= 2;
+static	Boolean	thorough;
 #endif	/* X10 */
+static	Boolean	version_flag	= False;
+static	int	mg_size[5]	= {200, 350, 600, 900, 1200};
 
+#endif	/* TOOLKIT */
+
+static	char	*curr_page;
+
+#ifndef	TOOLKIT
 static	char	*fore_color;
 static	char	*back_color;
 static	char	*brdr_color;
 static	char	*high_color;
 static	char	*curs_color;
+#endif
 static	GC	foreGC, highGC;
 #ifndef X10
 static	GC	ruleGC;
@@ -239,13 +280,16 @@ static	GC	foreGC2;
 #define	ruleGC	foreGC
 #endif	/* X10 */
 
-int	page_w, page_h;
+static	int	pageno_correct	= 1;
+static	int	bak_shrink;
+
 #define	clip_w	mane.width
 #define	clip_h	mane.height
 static	Dimension	window_w, window_h;
 #ifndef X10
 static	Position	main_x, main_y;
 static	XImage	*image;
+static	int	backing_store;
 #else	/* X10 */
 #define	main_x	0
 #define	main_y	0
@@ -263,22 +307,20 @@ static	Boolean	mag_moved = False;
 static	int	home_x, home_y;
 static	int	min_x, max_x, min_y, max_y;
 
-struct WindowRec mane	= {NULL, 3, 0, 0, 0, 0, MAXDIM, 0, MAXDIM, 0};
-struct WindowRec alt	= {NULL, 1, 0, 0, 0, 0, MAXDIM, 0, MAXDIM, 0};
-/*	curr is temporary storage except for within redraw() */
-struct WindowRec curr	= {NULL, 3, 0, 0, 0, 0, MAXDIM, 0, MAXDIM, 0};
+struct WindowRec mane	= {(Window) 0, 3, 0, 0, 0, 0, MAXDIM, 0, MAXDIM, 0};
+struct WindowRec alt	= {(Window) 0, 1, 0, 0, 0, 0, MAXDIM, 0, MAXDIM, 0};
+/*	currwin is temporary storage except for within redraw() */
+struct WindowRec currwin = {(Window) 0, 3, 0, 0, 0, 0, MAXDIM, 0, MAXDIM, 0};
 
 #ifdef	TOOLKIT
 static	Widget	top_level, vport_widget, draw_widget, clip_widget;
 #ifdef	BUTTONS
-static	Widget	form_widget, line_widget, right_widget;
+static	Widget	form_widget, line_widget, panel_widget;
 #endif
 static	Widget	x_bar, y_bar;	/* horizontal and vertical scroll bars */
 
 static	Arg	vport_args[] = {
 #ifdef	BUTTONS
-	{XtNwidth,	(XtArgVal) 0},
-	{XtNheight,	(XtArgVal) 0},
 	{XtNborderWidth, (XtArgVal) 0},
 	{XtNtop,	(XtArgVal) XtChainTop},
 	{XtNbottom,	(XtArgVal) XtChainBottom},
@@ -294,6 +336,9 @@ static	Arg	vport_args[] = {
 static	Arg	draw_args[] = {
 	{XtNwidth,	(XtArgVal) 0},
 	{XtNheight,	(XtArgVal) 0},
+#ifdef	GREY
+	{XtNbackground,	(XtArgVal) 0},
+#endif
 	{XtNx,		(XtArgVal) 0},
 	{XtNy,		(XtArgVal) 0},
 	{XtNlabel,	(XtArgVal) ""},
@@ -317,7 +362,7 @@ static	Arg	line_args[] = {
 	{XtNright,	(XtArgVal) XtChainRight},
 };
 
-static	Arg	right_args[] = {
+static	Arg	panel_args[] = {
 	{XtNfromHoriz,	(XtArgVal) NULL},
 	{XtNwidth,	(XtArgVal) (XTRA_WID - 1)},
 	{XtNheight,	(XtArgVal) 0},
@@ -329,8 +374,8 @@ static	Arg	right_args[] = {
 };
 
 static	struct {
-	char	*label;
-	char	*name;
+	_Xconst	char	*label;
+	_Xconst	char	*name;
 	int	closure;
 	int	y_pos;
 	}
@@ -356,7 +401,7 @@ static	XtCallbackRec	command_call[] = {
 };
 
 static	Arg	command_args[] = {
-	{XtNlabel,	NULL},
+	{XtNlabel,	(XtArgVal) NULL},
 	{XtNx,		(XtArgVal) 6},
 	{XtNy,		(XtArgVal) 0},
 	{XtNwidth,	(XtArgVal) 64},
@@ -374,10 +419,10 @@ create_buttons(h)
 	line_args[3].value = (XtArgVal) vport_widget;
 	line_widget = XtCreateManagedWidget("line", widgetClass, form_widget,
 		line_args, XtNumber(line_args));
-	right_args[0].value = (XtArgVal) line_widget;
-	right_args[2].value = h;
-	right_widget = XtCreateManagedWidget("right", compositeWidgetClass,
-		form_widget, right_args, XtNumber(right_args));
+	panel_args[0].value = (XtArgVal) line_widget;
+	panel_args[2].value = h;
+	panel_widget = XtCreateManagedWidget("panel", compositeWidgetClass,
+		form_widget, panel_args, XtNumber(panel_args));
 
 	command_args[2].value = (XtArgVal) vport_widget;
 	for (i = 0; i < XtNumber(command_table); ++i) {
@@ -385,11 +430,72 @@ create_buttons(h)
 	    command_args[2].value = (XtArgVal) command_table[i].y_pos;
 	    command_call[0].closure = (caddr_t) command_table[i].closure;
 	    (void) XtCreateManagedWidget(command_table[i].name,
-		commandWidgetClass, right_widget,
+		commandWidgetClass, panel_widget,
 		command_args, XtNumber(command_args));
 	}
 }
 #endif	/* BUTTONS */
+
+#ifdef	NOQUERY
+#define	drawWidgetClass	widgetClass
+#else
+
+/* ARGSUSED */
+static	XtGeometryResult
+QueryGeometry(w, constraints, reply)
+	Widget	w;
+	XtWidgetGeometry *constraints, *reply;
+{
+	reply->request_mode = CWWidth | CWHeight;
+	reply->width = page_w;
+	reply->height = page_h;
+	return XtGeometryAlmost;
+}
+
+#include <X11/IntrinsicP.h>
+#include <X11/CoreP.h>
+
+	/* if the following gives you trouble, just compile with -DNOQUERY */
+static	WidgetClassRec	drawingWidgetClass = {
+  {
+    /* superclass         */    &widgetClassRec,
+    /* class_name         */    "Draw",
+    /* widget_size        */    sizeof(WidgetRec),
+    /* class_initialize   */    NULL,
+    /* class_part_initialize*/  NULL,
+    /* class_inited       */    FALSE,
+    /* initialize         */    NULL,
+    /* initialize_hook    */    NULL,
+    /* realize            */    XtInheritRealize,
+    /* actions            */    NULL,
+    /* num_actions        */    0,
+    /* resources          */    NULL,
+    /* num_resources      */    0,
+    /* xrm_class          */    NULLQUARK,
+    /* compress_motion    */    FALSE,
+    /* compress_exposure  */    TRUE,
+    /* compress_enterleave*/    FALSE,
+    /* visible_interest   */    FALSE,
+    /* destroy            */    NULL,
+    /* resize             */    XtInheritResize,
+    /* expose             */    XtInheritExpose,
+    /* set_values         */    NULL,
+    /* set_values_hook    */    NULL,
+    /* set_values_almost  */    XtInheritSetValuesAlmost,
+    /* get_values_hook    */    NULL,
+    /* accept_focus       */    XtInheritAcceptFocus,
+    /* version            */    XtVersion,
+    /* callback_offsets   */    NULL,
+    /* tm_table           */    XtInheritTranslations,
+    /* query_geometry       */  QueryGeometry,
+    /* display_accelerator  */  XtInheritDisplayAccelerator,
+    /* extension            */  NULL
+  }
+};
+
+#define	drawWidgetClass	&drawingWidgetClass
+
+#endif	/* NOQUERY */
 
 #else	/* !TOOLKIT */
 #define	BAR_WID		12	/* width of darkened area */
@@ -418,9 +524,9 @@ static	Boolean	alt_canit;	/* stop drawing this window */
  */
 
 static	Boolean	canit		= False,
-		arg		= False;
-static	short	event_counter	= 0,
-		event_freq	= 70;
+		has_arg		= False;
+static	VOLATILE short	event_counter	= 0;
+static	VOLATILE short	event_freq	= 70;
 static	int	number		= 0,
 		sign		= 1;
 static	jmp_buf	canit_env;
@@ -432,6 +538,7 @@ static	void	can_exposures(), read_events(), keystroke();
 char	xdvi_bits[288];
 #ifdef	TOOLKIT
 WidgetClass	viewportWidgetClass, widgetClass;
+WidgetClassRec	widgetClassRec;
 #ifdef	BUTTONS
 WidgetClass	formWidgetClass, compositeWidgetClass, commandWidgetClass;
 #endif	/* BUTTONS */
@@ -442,12 +549,112 @@ Display	*_XlibCurrentDisplay;
 #endif	/* X10 */
 #endif	/* lint */
 
+#ifdef	GREY
+static	void
+init_pix(warn)
+	Boolean	warn;
+{
+	static	int	shrink_allocated_for = 0;
+	static	Boolean	colors_allocated = False;
+	int	i;
+
+	if (!colors_allocated)
+	{
+	    Pixel plane_masks[4];
+	    Pixel pixel;
+	    XColor color, fc, bc;
+	    XGCValues	values;
+
+	    if (RESOURCE(gamma) == 0.0) RESOURCE(gamma) = 1.0;
+
+	    if (!RESOURCE(copy))
+		/* allocate 4 color planes for 16 colors (for GXor drawing) */
+		if (!XAllocColorCells(DISP, DefaultColormapOfScreen(SCRN),
+					  False, plane_masks, 4, &pixel, 1))
+		    RESOURCE(copy) = warn = True;
+
+	    /* get foreground and background RGB values for interpolating */
+	    fc.pixel = RESOURCE(fore_Pixel);
+	    XQueryColor(DISP, DefaultColormapOfScreen(SCRN), &fc);
+	    bc.pixel = RESOURCE(back_Pixel);
+	    XQueryColor(DISP, DefaultColormapOfScreen(SCRN), &bc);
+
+	    for (i = 0; i < 16; ++i) {
+		double	pow();
+		double	frac = RESOURCE(gamma) > 0 ?
+		    pow((double) i / 15, 1 / RESOURCE(gamma))
+		    : 1 - pow((double) (15 - i) / 15, -RESOURCE(gamma));
+
+		color.red = frac * ((double) fc.red - bc.red) + bc.red;
+		color.green = frac * ((double) fc.green - bc.green) + bc.green;
+		color.blue = frac * ((double) fc.blue - bc.blue) + bc.blue;
+
+		color.pixel = pixel;
+		color.flags = DoRed | DoGreen | DoBlue;
+
+		if (!RESOURCE(copy)) {
+		    if (i & 1) color.pixel |= plane_masks[0];
+		    if (i & 2) color.pixel |= plane_masks[1];
+		    if (i & 4) color.pixel |= plane_masks[2];
+		    if (i & 8) color.pixel |= plane_masks[3];
+		    XStoreColor(DISP, DefaultColormapOfScreen(SCRN), &color);
+		    palette[i] = color.pixel;
+		}
+		else {
+		    if (!XAllocColor(DISP, DefaultColormapOfScreen(SCRN),
+			&color))
+			palette[i] = (i * 100 >= density * 15)
+			    ? RESOURCE(fore_Pixel) : RESOURCE(back_Pixel);
+		    else
+			palette[i] = color.pixel;
+		}
+	    }
+
+	    /* Make sure fore_ and back_Pixel are a part of the palette */
+	    RESOURCE(fore_Pixel) = palette[15];
+	    RESOURCE(back_Pixel) = palette[0];
+	    if (WINDOW(mane) != (Window) 0)
+		XSetWindowBackground(DISP, WINDOW(mane), palette[0]);
+
+#define	MakeGC(fcn, fg, bg)	(values.function = fcn, values.foreground=fg,\
+		values.background=bg,\
+		XCreateGC(DISP, RootWindowOfScreen(SCRN),\
+			GCFunction|GCForeground|GCBackground, &values))
+
+	    foreGC = ruleGC = MakeGC(RESOURCE(copy) ? GXcopy : GXor,
+		RESOURCE(fore_Pixel), RESOURCE(back_Pixel));
+	    foreGC2 = NULL;
+
+	    colors_allocated = True;
+	    if (RESOURCE(copy) && warn)
+		Puts("Note:  overstrike characters may be incorrect.");
+	}
+#undef	MakeGC
+
+	if (mane.shrinkfactor == 1) return;
+
+	if (shrink_allocated_for < mane.shrinkfactor) {
+	    if (pixeltbl != NULL) free((char *) pixeltbl);
+	    pixeltbl = (Pixel *) xmalloc((unsigned)
+		(mane.shrinkfactor * mane.shrinkfactor + 1) * sizeof(Pixel),
+		"pixel table");
+	    shrink_allocated_for = mane.shrinkfactor;
+	}
+
+	for (i = 0; i <= mane.shrinkfactor * mane.shrinkfactor; ++i)
+	    pixeltbl[i] =
+		palette[(i * 30 + mane.shrinkfactor * mane.shrinkfactor)
+		    / (2 * mane.shrinkfactor * mane.shrinkfactor)];
+}
+#endif	/* GREY */
+
 #ifdef	sun
-char	*sprintf();
+extern	char	*sprintf();
 #endif
 
-double	atof();
-void	exit();
+#ifndef	atof	/* on the Next it's a macro */
+extern	double	atof();
+#endif
 
 /********************************
  *	  tpic routines		*
@@ -460,8 +667,8 @@ extern int pen_size, blacken, whiten, shade;
 */
 
 #define	toint(x)	((int) ((x) + 0.5))
-#define	xconv(x)	(toint(specialConv_x*(x))/shrink_factor + PXL_H)
-#define	yconv(y)	(toint(specialConv_y*(y))/shrink_factor + PXL_V)
+#define	xconv(x)	(toint(specialConv*(x))/shrink_factor + PXL_H)
+#define	yconv(y)	(toint(specialConv*(y))/shrink_factor + PXL_V)
 
 /*
  *	Draw a line from (fx,fy) to (tx,ty).
@@ -479,13 +686,13 @@ int fx, fy, tx, ty;
 	if ((fcx < max_x || tcx < max_x) && (fcx >= min_x || tcx >= min_x) &&
 	    (fcy < max_y || tcy < max_y) && (fcy >= min_y || tcy >= min_y))
 #ifndef X10
-		XDrawLine(DISP, WINDOW(curr), ruleGC,
-		    fcx - curr.base_x, fcy - curr.base_y,
-		    tcx - curr.base_x, tcy - curr.base_y);
+		XDrawLine(DISP, WINDOW(currwin), ruleGC,
+		    fcx - currwin.base_x, fcy - currwin.base_y,
+		    tcx - currwin.base_x, tcy - currwin.base_y);
 #else
-		XLine(WINDOW(curr),
-		    fcx - curr.base_x, fcy - curr.base_y,
-		    tcx - curr.base_x, tcy - curr.base_y,
+		XLine(WINDOW(currwin),
+		    fcx - currwin.base_x, fcy - currwin.base_y,
+		    tcx - currwin.base_x, tcy - currwin.base_y,
 		    1, 1, ruleGC, GXcopy, AllPlanes);
 #endif
 }
@@ -495,16 +702,17 @@ int fx, fy, tx, ty;
  */
 void
 dot_at(x, y)
+	int	x, y;
 {
 	register int	cx = xconv(x),
 			cy = yconv(y);
 
 	if (cx < max_x && cx >= min_x && cy < max_y && cy >= min_y)
 #ifndef X10
-	    XDrawPoint(DISP, WINDOW(curr), ruleGC,
-		cx - curr.base_x, cy - curr.base_y);
+	    XDrawPoint(DISP, WINDOW(currwin), ruleGC,
+		cx - currwin.base_x, cy - currwin.base_y);
 #else
-	    XPixSet(WINDOW(curr), cx - curr.base_x, cy - curr.base_y,
+	    XPixSet(WINDOW(currwin), cx - currwin.base_x, cy - currwin.base_y,
 		1, 1, ruleGC);
 #endif
 }
@@ -521,33 +729,36 @@ int last_min_x, last_max_x, last_min_y, last_max_y;
 {
 }
 
-/**
- **	Put a rectangle on the screen.  hl determines the GC.
- **/
+/*
+ *	Put a rectangle on the screen.  hl determines the GC.
+ */
 
+void
 put_rectangle(x, y, w, h, hl)
 	int x, y, w, h;
-	Boolean hl;
+	WIDEARG(Boolean, int) hl;
 {
 	if (x < max_x && x + w >= min_x && y < max_y && y + h >= min_y) {
 		if (--event_counter == 0) read_events(False);
 #ifndef X10
-		XFillRectangle(DISP, WINDOW(curr), hl ? highGC : ruleGC,
-			       x - curr.base_x, y - curr.base_y, w?w:1, h?h:1);
+		XFillRectangle(DISP, WINDOW(currwin), hl ? highGC : ruleGC,
+		    x - currwin.base_x, y - currwin.base_y,
+		    w ? w : 1, h ? h : 1);
 #else
-		XPixSet(WINDOW(curr), x - curr.base_x, y - curr.base_y,
-			w?w:1, h?h:1, hl ? highGC : ruleGC);
+		XPixSet(WINDOW(currwin), x - currwin.base_x, y - currwin.base_y,
+		    w ? w : 1, h ? h : 1, hl ? highGC : ruleGC);
 #endif
 	}
 }
 
+void
 put_bitmap(bitmap, x, y)
 	register struct bitmap *bitmap;
 	register int x, y;
 {
 
 	if (debug & DBG_BITMAP)
-		Printf("X(%d,%d)\n", x - curr.base_x, y - curr.base_y);
+		Printf("X(%d,%d)\n", x - currwin.base_x, y - currwin.base_y);
 	if (x < max_x && x + bitmap->w >= min_x &&
 	    y < max_y && y + bitmap->h >= min_y) {
 		if (--event_counter == 0) read_events(False);
@@ -556,31 +767,42 @@ put_bitmap(bitmap, x, y)
 		image->height = bitmap->h;
 		image->data = bitmap->bits;
 		image->bytes_per_line = bitmap->bytes_wide;
-		XPutImage(DISP, WINDOW(curr), foreGC, image,
+		XPutImage(DISP, WINDOW(currwin), foreGC, image,
 			0, 0,
-			x - curr.base_x, y - curr.base_y,
+			x - currwin.base_x, y - currwin.base_y,
 			bitmap->w, bitmap->h);
 		if (foreGC2)
-		    XPutImage(DISP, WINDOW(curr), foreGC2, image,
+		    XPutImage(DISP, WINDOW(currwin), foreGC2, image,
 			0, 0,
-			x - curr.base_x, y - curr.base_y,
+			x - currwin.base_x, y - currwin.base_y,
 			bitmap->w, bitmap->h);
 #else
-		XBitmapBitsPut(WINDOW(curr), x - curr.base_x, y - curr.base_y,
+		XBitmapBitsPut(WINDOW(currwin),
+			x - currwin.base_x, y - currwin.base_y,
 			bitmap->w, bitmap->h, bitmap->bits,
 			foreGC, backpix, NULL, GXfunc, AllPlanes);
 #endif
 	}
 }
 
-put_border(w, h, t)
-	int w, h, t;
+#ifdef	GREY
+void
+put_image(img, x, y)
+	register XImage *img;
+	register int x, y;
 {
-	put_rectangle(0, 0, w, t, True);	/* top */
-	put_rectangle(w, 0, t, h, True);	/* right */
-	put_rectangle(t, h, w, t, True);	/* bottom */
-	put_rectangle(0, t, t, h, True);	/* left */
+	if (x < max_x && x + img->width >= min_x &&
+	    y < max_y && y + img->height >= min_y) {
+
+	    if (--event_counter == 0) read_events (False);
+
+	    XPutImage(DISP, WINDOW(currwin), foreGC, img,
+	    	    0, 0,
+		    x - currwin.base_x, y - currwin.base_y,
+		    img->width, img->height);
+	}
 }
+#endif	/* GREY */
 
 /*
  *	Event-handling routines
@@ -623,9 +845,9 @@ scrollwindow(windowrec, x0, y0)
 	hh = windowrec->height - y;
 	windowrec->base_x = x0;
 	windowrec->base_y = y0;
-	if (curr.win == windowrec->win) {
-	    curr.base_x = x0;
-	    curr.base_y = y0;
+	if (currwin.win == windowrec->win) {
+	    currwin.base_x = x0;
+	    currwin.base_y = y0;
 	}
 	windowrec->min_x -= x;
 	if (windowrec->min_x < 0) windowrec->min_x = 0;
@@ -687,27 +909,21 @@ static	void
 home(scrl)
 	Boolean	scrl;
 {
-	register int coord;
-
 	if (!scrl) XUnmapWindow(DISP, WINDOW(mane));
 	get_xy();
-	if (x_bar) {
-	    coord = 0;
-	    if (page_w > clip_w) {
-		coord = (page_w - clip_w) / 2;
-		if (coord > home_x / mane.shrinkfactor)
-		    coord = home_x / mane.shrinkfactor;
-	    }
-	    XtCallCallbacks(x_bar, XtNscrollProc, window_x + coord);
+	if (x_bar != NULL) {
+	    register int coord = (page_w - clip_w) / 2;
+	    if (coord > home_x / mane.shrinkfactor)
+		coord = home_x / mane.shrinkfactor;
+	    XtCallCallbacks(x_bar, XtNscrollProc,
+		(XtPointer) (window_x + coord));
 	}
-	if (y_bar) {
-	    coord = 0;
-	    if (page_h > clip_h) {
-		coord = (page_h - clip_h) / 2;
-		if (coord > home_y / mane.shrinkfactor)
-		    coord = home_y / mane.shrinkfactor;
-	    }
-	    XtCallCallbacks(y_bar, XtNscrollProc, window_y + coord);
+	if (y_bar != NULL) {
+	    register int coord = (page_h - clip_h) / 2;
+	    if (coord > home_y / mane.shrinkfactor)
+		coord = home_y / mane.shrinkfactor;
+	    XtCallCallbacks(y_bar, XtNscrollProc,
+		(XtPointer) (window_y + coord));
 	}
 	if (!scrl) {
 	    XMapWindow(DISP, WINDOW(mane));
@@ -718,7 +934,7 @@ home(scrl)
 
 static	Boolean	resized	= False;
 
-static
+static	void
 get_geom()
 {
 	static	Dimension	new_clip_w, new_clip_h;
@@ -751,8 +967,8 @@ center(x, y)
 /*	We use the clip widget here because it gives a more exact value. */
 	x -= clip_w/2;
 	y -= clip_h/2;
-	if (x_bar) XtCallCallbacks(x_bar, XtNscrollProc, x);
-	if (y_bar) XtCallCallbacks(y_bar, XtNscrollProc, y);
+	if (x_bar) XtCallCallbacks(x_bar, XtNscrollProc, (XtPointer) x);
+	if (y_bar) XtCallCallbacks(y_bar, XtNscrollProc, (XtPointer) y);
 	XWarpPointer(DISP, None, None, 0, 0, 0, 0, -x, -y);
 }
 
@@ -763,20 +979,22 @@ center(x, y)
 /* The following callback routine should never be called. */
 	/*ARGSUSED*/
 static	void
-handle_key(widget, junk, event)
+handle_key(widget, junk, event, cont)
 	Widget	widget;
-	caddr_t	junk;
+	XtPointer junk;
 	XEvent	*event;
+	Boolean	*cont;		/* unused */
 {
 	XBell(DISP, 20);
 }
 
 	/*ARGSUSED*/
 static	void
-handle_resize(widget, junk, event)
+handle_resize(widget, junk, event, cont)
 	Widget	widget;
-	caddr_t	junk;
+	XtPointer junk;
 	XEvent	*event;
+	Boolean	*cont;		/* unused */
 {
 	resized = True;
 }
@@ -786,13 +1004,24 @@ handle_resize(widget, junk, event)
 static	void
 handle_command(widget, client_data, call_data)
 	Widget	widget;
-	caddr_t	client_data;
-	caddr_t	call_data;
+	XtPointer client_data;
+	XtPointer call_data;
 {
-	keystroke(((int) client_data) & 0xff, ((int) client_data) >> 8,
-		(((int) client_data) >> 8) != 0, (XEvent *) NULL);
+	int	int_client_data	= (int) client_data;	/* Apollo cc bug */
+
+	keystroke((int_client_data) & 0xff, (int_client_data) >> 8,
+		((int_client_data) >> 8) != 0, (XEvent *) NULL);
 }
 #endif	/* BUTTONS */
+
+void
+reconfig()
+{
+	draw_args[0].value = (XtArgVal) page_w;
+	draw_args[1].value = (XtArgVal) page_h;
+	XtSetValues(draw_widget, draw_args, (Cardinal) 2);
+	get_geom();
+}
 
 #else	/* !TOOLKIT */
 
@@ -863,7 +1092,7 @@ scrollmane(x, y)
 	if (old_base_y != mane.base_y && y_bar) paint_y_bar();
 }
 
-static	void
+void
 reconfig()
 {
 	int	x_thick = 0;
@@ -885,16 +1114,18 @@ reconfig()
 		/* process drawing (clip) window */
 	if (mane.win == NULL) {	/* initial creation */
 #ifndef X10
-	    mane.win = (caddr_t) XCreateSimpleWindow(DISP, top_level,
-			y_thick, x_thick,
+	    XWindowAttributes attrs;
+
+	    mane.win = XCreateSimpleWindow(DISP, top_level, y_thick, x_thick,
 			(unsigned int) clip_w, (unsigned int) clip_h, 0,
 			brdr_Pixel, back_Pixel);
-	    XSelectInput(DPY WINDOW(mane), ExposureMask |
+	    XSelectInput(DISP, WINDOW(mane), ExposureMask |
 			ButtonPressMask | ButtonMotionMask | ButtonReleaseMask);
+	    XGetWindowAttributes(DISP, WINDOW(mane), &attrs);
+	    backing_store = attrs.backing_store;
 #else
-	    mane.win = (caddr_t) XCreateWindow(top_level,
-			y_thick, x_thick, clip_w, clip_h, 0,
-			bdrmap, backmap);
+	    mane.win = XCreateWindow(top_level, y_thick, x_thick,
+			clip_w, clip_h, 0, bdrmap, backmap);
 	    XSelectInput(WINDOW(mane),  ExposeRegion | ExposeCopy |
 			ButtonPressed | ButtonReleased |
 			LeftDownMotion | MiddleDownMotion | RightDownMotion);
@@ -998,9 +1229,9 @@ home(scrl)
 	else {
 	    mane.base_x = x;
 	    mane.base_y = y;
-	    if (curr.win == mane.win) {
-		curr.base_x = x;
-		curr.base_y = y;
+	    if (currwin.win == mane.win) {
+		currwin.base_x = x;
+		currwin.base_y = y;
 	    }
 	    if (x_bar) paint_x_bar();
 	    if (y_bar) paint_y_bar();
@@ -1045,28 +1276,32 @@ compute_mag_pos(xp, yp)
 #ifdef	TOOLKIT
 	/*ARGSUSED*/
 static	void
-handle_button(widget, junk, event)
+handle_button(widget, junk, ev, cont)
 	Widget	widget;
-	caddr_t	junk;
+	XtPointer junk;
+	XEvent *ev;
+#define	event	(&(ev->xbutton))
+	Boolean	*cont;		/* unused */
 #else	/* !TOOLKIT */
 static	void
 handle_button(event)
-#endif	/* TOOLKIT */
 	XButtonEvent *event;
+#endif	/* TOOLKIT */
 {
-	int x, y;
+	int	x, y;
 #ifndef X10
+	int	w	= RESOURCE(mg_size[event->button - 1]);
 	XSetWindowAttributes attr;
-
-	alt.width = alt.height = mg_size[event->button - 1];
 #else
-	alt.width = alt.height = mg_size[2 - (event->detail & ValueMask)];
+	int	w	= RESOURCE(mg_size[2 - (event->detail & ValueMask)]);
 #endif
-	if (alt.win != NULL || mane.shrinkfactor == 1 || alt.width <= 0)
+
+	if (alt.win != (Window) 0 || mane.shrinkfactor == 1 || w <= 0)
 	    XBell(DISP, 20);
 	else {
 	    mag_x = event->x;
 	    mag_y = event->y;
+	    alt.width = alt.height = w;
 #ifndef X10
 	    main_x = event->x_root - mag_x;
 	    main_y = event->y_root - mag_y;
@@ -1078,10 +1313,10 @@ handle_button(event)
 		alt.height/2;
 #ifndef X10
 	    attr.save_under = True;
-	    attr.border_pixel = brdr_Pixel;
-	    attr.background_pixel = back_Pixel;
+	    attr.border_pixel = RESOURCE(brdr_Pixel);
+	    attr.background_pixel = RESOURCE(back_Pixel);
 	    attr.override_redirect = True;
-	    alt.win = (caddr_t) XCreateWindow(DISP, RootWindowOfScreen(SCRN),
+	    alt.win = XCreateWindow(DISP, RootWindowOfScreen(SCRN),
 			x, y, alt.width, alt.height, MAGBORD,
 			0,	/* depth from parent */
 			InputOutput, CopyFromParent,
@@ -1089,7 +1324,7 @@ handle_button(event)
 			CWOverrideRedirect, &attr);
 	    XSelectInput(DISP, WINDOW(alt), ExposureMask);
 #else
-	    alt.win = (caddr_t) XCreateWindow(WINDOW(mane),
+	    alt.win = XCreateWindow(WINDOW(mane),
 			x, y, alt.width, alt.height, MAGBORD,
 			bdrmap, backmap);
 	    XSelectInput(WINDOW(alt), ExposeRegion);
@@ -1100,12 +1335,16 @@ handle_button(event)
 }
 
 #ifdef	TOOLKIT
+#undef	event
+
 	/*ARGSUSED*/
 static	void
-handle_motion(widget, junk, event)
+handle_motion(widget, junk, ev, cont)
 	Widget	widget;
-	caddr_t	junk;
-	XMotionEvent *event;
+	XtPointer junk;
+	XEvent *ev;
+#define	event	(&(ev->xmotion))
+	Boolean	*cont;		/* unused */
 {
 	new_mag_x = event->x;
 	main_x = event->x_root - new_mag_x;
@@ -1113,6 +1352,8 @@ handle_motion(widget, junk, event)
 	main_y = event->y_root - new_mag_y;
 	mag_moved = (new_mag_x != mag_x || new_mag_y != mag_y);
 }
+
+#undef	event
 #endif	/* TOOLKIT */
 
 static	void
@@ -1133,10 +1374,12 @@ movemag(x, y)
 #ifdef	TOOLKIT
 	/*ARGSUSED*/
 static	void
-handle_release(widget, junk, event)
+handle_release(widget, junk, ev, cont)
 	Widget	widget;
-	caddr_t	junk;
-	XButtonEvent *event;
+	XtPointer junk;
+	XEvent *ev;
+#define	event	(&(ev->xbutton))
+	Boolean	*cont;		/* unused */
 #else	/* !TOOLKIT */
 static	void
 handle_release()
@@ -1146,31 +1389,39 @@ handle_release()
 	    if (alt_stat) alt_stat = -1;	/* destroy upon expose */
 	    else {
 		XDestroyWindow(DPY WINDOW(alt));
-		if (curr.win == alt.win) alt_canit = True;
-		alt.win = NULL;
+		if (currwin.win == alt.win) alt_canit = True;
+		alt.win = (Window) 0;
 		mag_moved = False;
 		can_exposures(&alt);
 	    }
 }
 
 #ifdef	TOOLKIT
+#undef	event
+
 	/*ARGSUSED*/
 static	void
-handle_exp(widget, windowrec, event)
+handle_exp(widget, closure, ev, cont)
 	Widget	widget;
-	struct WindowRec *windowrec;
-	register XExposeEvent *event;
+	XtPointer closure;
+	register XEvent *ev;
+#define	event	(&(ev->xexpose))
+	Boolean	*cont;		/* unused */
 {
+	struct WindowRec *windowrec = (struct WindowRec *) closure;
+
 	if (windowrec == &alt)
 	    if (alt_stat < 0) {	/* destroy upon exposure */
 		alt_stat = 0;
-		handle_release(widget, (caddr_t) NULL, (XButtonEvent *) event);
+		handle_release(widget, (caddr_t) NULL, ev, (Boolean *) NULL);
 		return;
 	    }
 	    else
 		alt_stat = 0;
 	expose(windowrec, event->x, event->y, event->width, event->height);
 }
+
+#undef	event
 #endif	/* TOOLKIT */
 
 /* |||
@@ -1250,7 +1501,7 @@ keystroke(ch, number0, arg0, eventp)
 		pageno_correct = arg0 * number0 - current_page;
 		return;
 	    case 'k':		/* toggle keep-position flag */
-		keep_flag = (arg0 ? number0 : !keep_flag);
+		RESOURCE(keep_flag) = (arg0 ? number0 : !RESOURCE(keep_flag));
 		return;
 	    case '\f':
 		/* redisplay current page */
@@ -1262,22 +1513,22 @@ keystroke(ch, number0, arg0, eventp)
 	    case 'l':
 		if (!x_bar) goto bad;
 		XtCallCallbacks(x_bar, XtNscrollProc,
-		    -2 * (int) clip_w / 3);
+		    (XtPointer) (-2 * (int) clip_w / 3));
 		return;
 	    case 'r':
 		if (!x_bar) goto bad;
 		XtCallCallbacks(x_bar, XtNscrollProc,
-		    2 * (int) clip_w / 3);
+		    (XtPointer) (2 * (int) clip_w / 3));
 		return;
 	    case 'u':
 		if (!y_bar) goto bad;
 		XtCallCallbacks(y_bar, XtNscrollProc,
-		    -2 * (int) clip_h / 3);
+		    (XtPointer) (-2 * (int) clip_h / 3));
 		return;
 	    case 'd':
 		if (!y_bar) goto bad;
 		XtCallCallbacks(y_bar, XtNscrollProc,
-		    2 * (int) clip_h / 3);
+		    (XtPointer) (2 * (int) clip_h / 3));
 		return;
 	    case 'c':
 		center(eventp->xkey.x, eventp->xkey.y);
@@ -1291,19 +1542,19 @@ keystroke(ch, number0, arg0, eventp)
 		return;
 #ifdef	BUTTONS
 	    case 'x':
-		if (arg0 && expert == (number0 != 0)) return;
-		if (expert) {	/* create buttons */
+		if (arg0 && resource.expert == (number0 != 0)) return;
+		if (resource.expert) {	/* create buttons */
 		    XtResizeWidget(vport_widget, window_w -= XTRA_WID, window_h,
 			0);
 		    create_buttons((XtArgVal) window_h);
-		    expert = False;
+		    resource.expert = False;
 		}
 		else {		/* destroy buttons */
 		    XtResizeWidget(vport_widget, window_w += XTRA_WID, window_h,
 			0);
-		    XtDestroyWidget(right_widget);
+		    XtDestroyWidget(panel_widget);
 		    XtDestroyWidget(line_widget);
-		    expert = True;
+		    resource.expert = True;
 		}
 		return;
 #endif	/* BUTTONS */
@@ -1364,18 +1615,13 @@ keystroke(ch, number0, arg0, eventp)
 		init_page();
 		if (number0 != 1 && number0 != bak_shrink) {
 		    bak_shrink = number0;
+#ifdef	GREY
+		    if (use_grey) init_pix(False);
+#endif
 		    reset_fonts();
 		}
-#ifdef	TOOLKIT
-		draw_args[0].value = (XtArgVal) page_w;
-		draw_args[1].value = (XtArgVal) page_h;
-		XtSetValues(draw_widget, draw_args, (Cardinal) 2);
-		get_geom();
-		home(False);
-#else	/* TOOLKIT */
 		reconfig();
 		home(False);
-#endif	/* TOOLKIT */
 		break;
 	    case 'S':
 		if (!arg0) goto bad;
@@ -1385,6 +1631,13 @@ keystroke(ch, number0, arg0, eventp)
 		reset_fonts();
 		if (mane.shrinkfactor == 1) return;
 		break;
+#ifdef GREY
+	    case 'G':
+		use_grey = (arg0 ? number0 : !use_grey);
+		if (use_grey) init_pix(False);
+		reset_fonts();
+		break;
+#endif
 	    case 'R':
 		/* reread DVI file */
 		--dvi_time;	/* then it will notice a change */
@@ -1396,7 +1649,7 @@ keystroke(ch, number0, arg0, eventp)
 	    if (current_page != next_page) {
 		current_page = next_page;
 		hush_spec_now = hush_spec;
-		if (!keep_flag) home(False);
+		if (!RESOURCE(keep_flag)) home(False);
 	    }
 	    canit = True;
 	    Flush();
@@ -1407,9 +1660,11 @@ keystroke(ch, number0, arg0, eventp)
 	bad:  XBell(DISP, 10);
 }
 
+
 #ifndef X10
 #define	TRSIZE	100
 #endif	/* X10 */
+
 static	void
 read_events(wait)
 	Boolean	wait;
@@ -1444,7 +1699,8 @@ read_events(wait)
 	    if (resized) get_geom();
 	    if (event.xany.window == WINDOW(alt) &&
 		    event.type == Expose) {
-		handle_exp((Widget) NULL, &alt, &event.xexpose);
+		handle_exp((Widget) NULL, (XtPointer) &alt, &event,
+		    (Boolean *) NULL);
 		continue;
 	    }
 	    if (event.type != KeyPress) {
@@ -1571,7 +1827,7 @@ read_events(wait)
 		    if (XANY(event).window == top_level &&
 			(XCONFIG(event).width != window_w ||
 			XCONFIG(event).height != window_h)) {
-			    register caddr_t old_mane_win = mane.win;
+			    register Window old_mane_win = mane.win;
 
 			    window_w = XCONFIG(event).width;
 			    window_h = XCONFIG(event).height;
@@ -1604,12 +1860,12 @@ read_events(wait)
 #endif	/* TOOLKIT */
 	    if (ch == '\0') continue;
 	    if (ch >= '0' && ch <= '9') {
-		arg = True;
+		has_arg = True;
 		number = number * 10 + sign * (ch - '0');
 		continue;
 	    }
 	    else if (ch == '-') {
-		arg = True;
+		has_arg = True;
 		sign = -1;
 		number = 0;
 		continue;
@@ -1617,13 +1873,13 @@ read_events(wait)
 	    number0 = number;
 	    number = 0;
 	    sign = 1;
-	    arg0 = arg;
-	    arg = False;
+	    arg0 = has_arg;
+	    has_arg = False;
 	    keystroke(ch, number0, arg0, &event);
 	}
 }
 
-static
+static	void
 redraw(windowrec)
 	struct WindowRec *windowrec;
 {
@@ -1632,18 +1888,19 @@ redraw(windowrec)
 	static FontInfo *font = 0;
 #endif
 
-	curr = *windowrec;
-	min_x = curr.min_x + curr.base_x;
-	min_y = curr.min_y + curr.base_y;
-	max_x = curr.max_x + curr.base_x;
-	max_y = curr.max_y + curr.base_y;
+	currwin = *windowrec;
+	min_x = currwin.min_x + currwin.base_x;
+	min_y = currwin.min_y + currwin.base_y;
+	max_x = currwin.max_x + currwin.base_x;
+	max_y = currwin.max_y + currwin.base_y;
 	can_exposures(windowrec);
 
 	if (debug & DBG_EVENT)
 	    Printf("Redraw %d x %d at (%d, %d) (base=%d,%d)\n", max_x - min_x,
-		max_y - min_y, min_x, min_y, curr.base_x, curr.base_y);
+		max_y - min_y, min_x, min_y, currwin.base_x, currwin.base_y);
 	SetCursor(redraw_cursor);
-	if (errtext = (char *) setjmp(dvi_env)) {
+	Flush();
+	if ((errtext = (char *) setjmp(dvi_env)) != NULL) {
 	    ClearPage(mane);
 #ifndef X10
 	    get_xy();
@@ -1666,15 +1923,27 @@ redraw(windowrec)
 	}
 }
 
+void
 redraw_page()
 {
 	if (debug & DBG_EVENT) Fputs("Redraw page:  ", stdout);
-	get_xy();
 	ClearPage(mane);
-	mane.min_x = -window_x;
-	mane.max_x = -window_x + clip_w;
-	mane.min_y = -window_y;
-	mane.max_y = -window_y + clip_h;
+#ifndef	X10
+	if (backing_store != NotUseful) {
+	    mane.min_x = mane.min_y = 0;
+	    mane.max_x = page_w;
+	    mane.max_y = page_h;
+	}
+	else {
+#endif
+	    get_xy();
+	    mane.min_x = -window_x;
+	    mane.max_x = -window_x + clip_w;
+	    mane.min_y = -window_y;
+	    mane.max_y = -window_y + clip_h;
+#ifndef	X10
+	}
+#endif
 	redraw(&mane);
 }
 
@@ -1706,18 +1975,18 @@ can_exposures(windowrec)
 	windowrec->max_x = windowrec->max_y = 0;
 }
 
+#ifdef	HAS_SIGIO
 static	void
 handle_intr() {
 	event_counter = 1;
 	event_freq = -1;	/* forget Plan B */
 }
 
-#ifdef	HAS_SIGIO
 static	void
 enable_intr() {
 	int	socket	= ConnectionNumber(DISP);
 	if (!isatty(0)) {
-	    puts("trying...");
+	    Puts("trying...");
 	    if (dup2(socket, 0) == -1) perror(prog);
 	    socket = 0;
 	}
@@ -1727,7 +1996,7 @@ enable_intr() {
 }
 #endif	/* HAS_SIGIO */
 
-static
+static	void
 do_pages()
 {
 	if (debug & DBG_BATCH) {
@@ -1740,13 +2009,18 @@ do_pages()
 #endif	/* TOOLKIT */
 	    for (current_page = 0; current_page < total_pages; ++current_page)
 		redraw_page();
-	    exit(0);
 	}
 	else {	/* normal operation */
 #ifdef	HAS_SIGIO
 	    enable_intr();
 #endif
+#ifdef	__convex__
+	    /* convex C turns off optimization for the entire function
+	       if setjmp return value is discarded.*/
+	    if (setjmp(canit_env))	/*optimize me*/;
+#else
 	    (void) setjmp(canit_env);
+#endif
 	    for (;;) {
 		if (mane.win) SetCursor(ready_cursor);
 		read_events(True);
@@ -1757,7 +2031,7 @@ do_pages()
 		    redraw_page();
 		}
 		else if (mag_moved) {
-		    if (alt.win == NULL) mag_moved = False;
+		    if (alt.win == (Window) 0) mag_moved = False;
 		    else if (abs(new_mag_x - mag_x) >
 			2 * abs(new_mag_y - mag_y))
 			    movemag(new_mag_x, mag_y);
@@ -1773,17 +2047,18 @@ do_pages()
 	}
 }
 
-static
+static	NORETURN void
 usage() {
 #ifndef X10
 #ifndef	VMS
 #ifdef	BUTTONS
 	Fputs("\
-Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-ar <ratio>] [-l] [-rv]\n\
+Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-l] [-rv]\n\
 	[-expert] [-paper <papertype>] [-mgs[n] <size>] [-altfont <font>]\n\
 	[-margins <dimen>] [-sidemargin <dimen>] [-topmargin <dimen>]\n\
 	[-offsets <dimen>] [-xoffset <dimen>] [-yoffset <dimen>] [-keep]\n\
-	[-hushspecials] [-hushchars] [-hush]\n\
+	[-hushspecials] [-hushchars] [-hush] [-nogrey] [-gamma <g>] \
+[-version]\n\
 	[-fg <color>] [-bg <color>] [-hl <color>] [-bd <color>] \
 [-cr <color>]\n\
 	[-bw <width>] [-geometry <geometry>] [-icongeometry <geometry>]\n\
@@ -1791,11 +2066,12 @@ Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-ar <ratio>]
 	stderr);
 #else	/* !BUTTONS */
 	Fputs("\
-Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-ar <ratio>] [-l] [-rv]\n\
+Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-l] [-rv]\n\
 	[-paper <papertype>] [-mgs[n] <size>] [-altfont <font>]\n\
 	[-margins <dimen>] [-sidemargin <dimen>] [-topmargin <dimen>]\n\
 	[-offsets <dimen>] [-xoffset <dimen>] [-yoffset <dimen>] [-keep]\n\
-	[-hushspecials] [-hushchars] [-hush]\n\
+	[-hushspecials] [-hushchars] [-hush] [-nogrey] [-gamma <g>] \
+[-version]\n\
 	[-fg <color>] [-bg <color>] [-hl <color>] [-bd <color>] \
 [-cr <color>]\n\
 	[-bw <width>] [-geometry <geometry>] [-icongeometry <geometry>]\n\
@@ -1804,13 +2080,14 @@ Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-ar <ratio>]
 #endif	/* BUTTONS */
 #else	/* VMS */
 	Fputs("\
-Usage: xdvi [+[<page>]] [-s <shrink>] [-density <%>] [-p <pixels>] [-ar <ratio>] [-l] [-rv]\n\
+Usage: xdvi [+[<page>]] [-s <shrink>] [-density <%>] [-p <pixels>] [-l] [-rv]\n\
 	[-paper <papertype>] [-mgs[n] <size>] [-altfont <font>]\n\
 	[-margins <dimen>] [-sidemargin <dimen>] [-topmargin <dimen>]\
 \n", stderr);
 	Fputs("\
 	[-offsets <dimen>] [-xoffset <dimen>] [-yoffset <dimen>] [-keep]\n\
-	[-hushspecials] [-hushchars] [-hush]\n\
+	[-hushspecials] [-hushchars] [-hush] [-nogrey] [-gamma <g>] \
+[-version]\n\
 	[-fg <color>] [-bg <color>] [-hl <color>] [-bd <color>] \
 [-cr <color>]\n\
 	[-bw <width>] [-geometry <geometry>] [-icongeometry <geometry>]\n\
@@ -1819,11 +2096,11 @@ Usage: xdvi [+[<page>]] [-s <shrink>] [-density <%>] [-p <pixels>] [-ar <ratio>]
 #endif	/* VMS */
 #else	/* X10 */
 	Fputs("\
-Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-ar <ratio>] [-l]\n\
+Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-l]\n\
 	[-paper <papertype>] [-mgs[n] <size>] [-altfont <font>]\n\
 	[-margins <dimen>] [-sidemargin <dimen>] [-topmargin <dimen>]\n\
 	[-offsets <dimen>] [-xoffset <dimen>] [-yoffset <dimen>] [-keep]\n\
-	[-hushspecials] [-hushchars] [-hush]\n\
+	[-hushspecials] [-hushchars] [-hush] [-version]\n\
 	[-fg <color>] [-bg <color>] [-hl <color>] [-bd <color>] \
 [-cr <color>]\n\
 	[-bw <width>] [-geometry <geometry> | =<geometry>]\n\
@@ -1833,8 +2110,8 @@ Usage: xdvi [+[<page>]] [-s <shrink>] [-S <density>] [-p <pixels>] [-ar <ratio>]
 }
 
 static	int
-atopix_x(arg)
-	char	*arg;
+atopix(arg)
+	_Xconst	char	*arg;
 {
 	int	len	= strlen(arg);
 
@@ -1842,26 +2119,9 @@ atopix_x(arg)
 		1.0 / 2.54 : 1.0) * atof(arg) * pixels_per_inch + 0.5;
 }
 
-static int
-atopix_y(arg)
-	char	*arg;
-{
-	int	len	= strlen(arg);
-
-	return (len > 2 && arg[len - 2] == 'c' && arg[len - 1] == 'm' ?
-		1.0 / 2.54 : 1.0) * atof(arg) * pixels_per_inch 
-		  * aspect_ratio + 0.5;
-}
-
 /**
  **	Main programs start here.
  **/
-
-#ifndef X10
-static	char	*icon_geometry;
-static	Boolean	copy	= 2;
-static	Boolean	thorough;
-#endif	/* X10 */
 
 #ifdef	TOOLKIT
 
@@ -1872,8 +2132,10 @@ static	XrmOptionDescRec	options[] = {
 {"-S",		".densityPercent", XrmoptionSepArg,	(caddr_t) NULL},
 #endif
 {"-density",	".densityPercent", XrmoptionSepArg,	(caddr_t) NULL},
+#ifdef	GREY
+{"-gamma",	".gamma",	XrmoptionSepArg,	(caddr_t) NULL},
+#endif
 {"-p",		".pixelsPerInch", XrmoptionSepArg,	(caddr_t) NULL},
-{"-ar",         ".aspectRatio", XrmoptionSepArg,        (caddr_t) NULL},
 {"-margins",	".Margin",	XrmoptionSepArg,	(caddr_t) NULL},
 {"-sidemargin",	".sideMargin",	XrmoptionSepArg,	(caddr_t) NULL},
 {"-topmargin",	".topMargin",	XrmoptionSepArg,	(caddr_t) NULL},
@@ -1903,6 +2165,8 @@ static	XrmOptionDescRec	options[] = {
 {"+copy",	".copy",	XrmoptionNoArg,		(caddr_t) "off"},
 {"-thorough",	".thorough",	XrmoptionNoArg,		(caddr_t) "on"},
 {"+thorough",	".thorough",	XrmoptionNoArg,		(caddr_t) "off"},
+{"-version",	".version",	XrmoptionNoArg,		(caddr_t) "on"},
+{"+version",	".version",	XrmoptionNoArg,		(caddr_t) "off"},
 #ifdef	BUTTONS
 {"-expert",	".expert",	XrmoptionNoArg,		(caddr_t) "on"},
 {"+expert",	".expert",	XrmoptionNoArg,		(caddr_t) "off"},
@@ -1913,82 +2177,101 @@ static	XrmOptionDescRec	options[] = {
 {"-mgs3",	".magnifierSize3",XrmoptionSepArg,	(caddr_t) NULL},
 {"-mgs4",	".magnifierSize4",XrmoptionSepArg,	(caddr_t) NULL},
 {"-mgs5",	".magnifierSize5",XrmoptionSepArg,	(caddr_t) NULL},
+#ifdef	GREY
+{"-nogrey",	".grey",	XrmoptionNoArg,		(caddr_t) "off"},
+{"+nogrey",	".grey",	XrmoptionNoArg,		(caddr_t) "on"},
+#endif
 };
 
-static	XtResource	resources[] = {
+#define	offset(field)	XtOffsetOf(struct _resource, field)
+
+static	int	basedpi	= BDPI;		/* default value for -p option */
+
+static	XtResource	application_resources[] = {
 {"debugLevel", "DebugLevel", XtRString, sizeof(char *),
-  (Cardinal) &debug_arg, XtRString, NULL},
+  offset(debug_arg), XtRString, (caddr_t) NULL},
 {"shrinkFactor", "ShrinkFactor", XtRInt, sizeof(int),
-  (Cardinal) &shrink_factor, XtRInt, (caddr_t) &shrink_factor},
+  offset(_shrink_factor), XtRString, "3"},
 {"densityPercent", "DensityPercent", XtRInt, sizeof(int),
-  (Cardinal) &density, XtRInt, (caddr_t) &density},
+  offset(density), XtRString, "40"},
+#ifdef	GREY
+{"gamma", "Gamma", XtRFloat, sizeof(float),
+  offset(gamma), XtRString, "1"},
+#endif
 {"pixelsPerInch", "PixelsPerInch", XtRInt, sizeof(int),
-  (Cardinal) &pixels_per_inch, XtRInt, (caddr_t) &pixels_per_inch},
-{"aspectRatio", "AspectRatio", XtRInt, sizeof(int),
-  (Cardinal) &aspect_ratio_option, XtRInt, (caddr_t) &aspect_ratio_option},
+  offset(pixels_per_inch), XtRInt, (caddr_t) &basedpi},
 {"sideMargin", "Margin", XtRString, sizeof(char *),
-  (Cardinal) &sidemargin, XtRString, NULL},
+  offset(sidemargin), XtRString, (caddr_t) NULL},
 {"topMargin", "Margin", XtRString, sizeof(char *),
-  (Cardinal) &topmargin, XtRString, NULL},
+  offset(topmargin), XtRString, (caddr_t) NULL},
 {"xOffset", "Offset", XtRString, sizeof(char *),
-  (Cardinal) &xoffset, XtRString, NULL},
+  offset(xoffset), XtRString, (caddr_t) NULL},
 {"yOffset", "Offset", XtRString, sizeof(char *),
-  (Cardinal) &yoffset, XtRString, NULL},
+  offset(yoffset), XtRString, (caddr_t) NULL},
 {"paper", "Paper", XtRString, sizeof(char *),
-  (Cardinal) &paper, XtRString, (caddr_t) DEFAULT_PAPER},
+  offset(paper), XtRString, (caddr_t) DEFAULT_PAPER},
 {"altFont", "AltFont", XtRString, sizeof(char *),
-  (Cardinal) &alt_font, XtRString, (caddr_t) ALTFONT},
+  offset(alt_font), XtRString, (caddr_t) ALTFONT},
 {"listFonts", "ListFonts", XtRBoolean, sizeof(Boolean),
-  (Cardinal) &list_fonts, XtRBoolean, (caddr_t) &list_fonts},
+  offset(list_fonts), XtRString, "false"},
 {"reverseVideo", "ReverseVideo", XtRBoolean, sizeof(Boolean),
-  (Cardinal) &reverse, XtRBoolean, (caddr_t) &reverse},
+  offset(reverse), XtRString, "false"},
 {"hushSpecials", "Hush", XtRBoolean, sizeof(Boolean),
-  (Cardinal) &hush_spec, XtRBoolean, (caddr_t) &hush_spec},
+  offset(hush_spec), XtRString, "false"},
 {"hushLostChars", "Hush", XtRBoolean, sizeof(Boolean),
-  (Cardinal) &hush_chars, XtRBoolean, (caddr_t) &hush_chars},
+  offset(hush_chars), XtRString, "false"},
 {"foreground", "Foreground", XtRPixel, sizeof(Pixel),
-  (Cardinal)&fore_Pixel, XtRPixel, (caddr_t) &fore_Pixel},
+  offset(fore_Pixel), XtRPixel, (caddr_t) &resource.fore_Pixel},
 {"foreground", "Foreground", XtRString, sizeof(char *),
-  (Cardinal)&fore_color, XtRString, NULL},
+  offset(fore_color), XtRString, (caddr_t) NULL},
 {"background", "Background", XtRPixel, sizeof(Pixel),
-  (Cardinal)&back_Pixel, XtRPixel, (caddr_t) &back_Pixel},
+  offset(back_Pixel), XtRPixel, (caddr_t) &resource.back_Pixel},
 {"background", "Background", XtRString, sizeof(char *),
-  (Cardinal)&back_color, XtRString, NULL},
+  offset(back_color), XtRString, (caddr_t) NULL},
 {"borderColor", "BorderColor", XtRPixel, sizeof(Pixel),
-  (Cardinal)&brdr_Pixel, XtRPixel, (caddr_t) &brdr_Pixel},
+  offset(brdr_Pixel), XtRPixel, (caddr_t) &resource.brdr_Pixel},
 {"borderColor", "BorderColor", XtRString, sizeof(char *),
-  (Cardinal)&brdr_color, XtRString, NULL},
+  offset(brdr_color), XtRString, (caddr_t) NULL},
 {"highlight", "Highlight", XtRPixel, sizeof(Pixel),
-  (Cardinal)&hl_Pixel, XtRPixel, (caddr_t) &hl_Pixel},
+  offset(hl_Pixel), XtRPixel, (caddr_t) &resource.hl_Pixel},
 {"highlight", "Highlight", XtRString, sizeof(char *),
-  (Cardinal)&high_color, XtRString, NULL},
+  offset(high_color), XtRString, (caddr_t) NULL},
 {"cursorColor", "CursorColor", XtRPixel, sizeof(Pixel),
-  (Cardinal)&cr_Pixel, XtRPixel, (caddr_t) &cr_Pixel},
+  offset(cr_Pixel), XtRPixel, (caddr_t) &resource.cr_Pixel},
 {"cursorColor", "CursorColor", XtRString, sizeof(char *),
-  (Cardinal)&curs_color, XtRString, NULL},
+  offset(curs_color), XtRString, (caddr_t) NULL},
 {"iconGeometry", "IconGeometry", XtRString, sizeof(char *),
-  (Cardinal)&icon_geometry, XtRString, NULL},
+  offset(icon_geometry), XtRString, (caddr_t) NULL},
 {"keepPosition", "KeepPosition", XtRBoolean, sizeof(Boolean),
-  (Cardinal)&keep_flag, XtRBoolean, (caddr_t) &keep_flag},
+  offset(keep_flag), XtRString, "false"},
+{"copy", "Copy", XtRString, sizeof(char *),
+  offset(copy_arg), XtRString, (caddr_t) NULL},
 {"copy", "Copy", XtRBoolean, sizeof(Boolean),
-  (Cardinal)&copy, XtRBoolean, (caddr_t) &copy},
+  offset(copy), XtRString, "false"},
 {"thorough", "Thorough", XtRBoolean, sizeof(Boolean),
-  (Cardinal)&thorough, XtRBoolean, (caddr_t) &thorough},
+  offset(thorough), XtRString, "false"},
+{"version", "Version", XtRBoolean, sizeof(Boolean),
+  offset(version_flag), XtRString, "false"},
 #ifdef	BUTTONS
 {"expert", "Expert", XtRBoolean, sizeof(Boolean),
-  (Cardinal)&expert, XtRBoolean, (caddr_t) &expert},
+  offset(expert), XtRString, "false"},
 #endif
 {"magnifierSize1", "MagnifierSize", XtRInt, sizeof(int),
-  (Cardinal) &mg_size[0], XtRInt, (caddr_t) &mg_size[0]},
+  offset(mg_size[0]), XtRString, "200"},
 {"magnifierSize2", "MagnifierSize", XtRInt, sizeof(int),
-  (Cardinal) &mg_size[1], XtRInt, (caddr_t) &mg_size[1]},
+  offset(mg_size[1]), XtRString, "350"},
 {"magnifierSize3", "MagnifierSize", XtRInt, sizeof(int),
-  (Cardinal) &mg_size[2], XtRInt, (caddr_t) &mg_size[2]},
+  offset(mg_size[2]), XtRString, "600"},
 {"magnifierSize4", "MagnifierSize", XtRInt, sizeof(int),
-  (Cardinal) &mg_size[3], XtRInt, (caddr_t) &mg_size[3]},
+  offset(mg_size[3]), XtRString, "900"},
 {"magnifierSize5", "MagnifierSize", XtRInt, sizeof(int),
-  (Cardinal) &mg_size[4], XtRInt, (caddr_t) &mg_size[4]},
+  offset(mg_size[4]), XtRString, "1200"},
+#ifdef	GREY
+{"grey", "Grey", XtRBoolean, sizeof (Boolean),
+ offset(use_grey), XtRString, "true"},
+#endif
 };
+#undef	offset
 
 static	Arg	temp_args1[] = {
 	{XtNiconX,	(XtArgVal) 0},
@@ -1997,14 +2280,21 @@ static	Arg	temp_args1[] = {
 
 static	Arg	temp_args2 = {XtNborderWidth,	(XtArgVal) &bwidth};
 
+static	Pixmap	icon_pm;
+
 static	Arg	temp_args3[] = {
-	{XtNwidth,	(XtArgVal) 0},
-	{XtNheight,	(XtArgVal) 0},
-	{XtNiconPixmap,	(XtArgVal) 0},
-	{XtNinput,	(XtArgVal) True},
-	{XtNtitle,	(XtArgVal) 0},
+	{XtNiconPixmap,	(XtArgVal) &icon_pm},
 };
 
+static	Arg	temp_args4[] = {
+	{XtNtitle,	(XtArgVal) 0},
+	{XtNinput,	(XtArgVal) True},
+};
+
+static	Arg	set_wh_args[] = {
+	{XtNwidth,	(XtArgVal) 0},
+	{XtNheight,	(XtArgVal) 0},
+};
 #else	/* !TOOLKIT */
 
 static	char	*display;
@@ -2044,8 +2334,8 @@ string_to_pixel(strp)		/* adapted from the toolkit */
 #endif	/* X10 */
 
 static	struct option {
-	char	*name;
-	char	*resource;
+	_Xconst	char	*name;
+	_Xconst	char	*resource;
 	enum	{FalseArg, TrueArg, StickyArg, SepArg} argclass;
 	enum	{BooleanArg, StringArg, NumberArg, FloatArg} argtype;
 	int	classcount;
@@ -2058,8 +2348,10 @@ static	struct option {
 {"-s",		"shrinkFactor", SepArg, NumberArg, 1,	(caddr_t) &shrink_factor},
 {"-S",		NULL,		SepArg, NumberArg, 2,	(caddr_t) &density},
 {"-density",	"densityPercent", SepArg, NumberArg, 1,	(caddr_t) &density},
+#ifdef	GREY
+{"-gamma",	"gamma",	SepArg,	FloatArg, 1,	(caddr_t) &gamma},
+#endif
 {"-p",		"pixelsPerInch", SepArg, NumberArg, 1,	(caddr_t) &pixels_per_inch},
-{"-ar",		"aspectRatio", SepArg, NumberArg, 1,	(caddr_t) &aspect_ratio_option},
 {"-margins",	"Margin",	SepArg,	StringArg, 3,	(caddr_t) &margins},
 {"-sidemargin",	"sideMargin",	SepArg,	StringArg, 1,	(caddr_t) &sidemargin},
 {"-topmargin",	"topMargin",	SepArg,	StringArg, 1,	(caddr_t) &topmargin},
@@ -2102,6 +2394,8 @@ static	struct option {
 {"+copy",	"copy",		FalseArg, BooleanArg, 1,(caddr_t) &copy},
 {"-thorough",	NULL,		TrueArg, BooleanArg, 2,	(caddr_t) &thorough},
 {"+thorough",	"thorough",	FalseArg, BooleanArg, 1,(caddr_t) &thorough},
+{"-version",	NULL,		TrueArg, BooleanArg, 2,	(caddr_t)&version_flag},
+{"+version",	"version",	FalseArg, BooleanArg, 1,(caddr_t)&version_flag},
 #endif	/* X10 */
 {"-mgs",	NULL,		SepArg, NumberArg, 2,	(caddr_t) &mg_size[0]},
 {"-mgs1",	"magnifierSize1",SepArg, NumberArg, 1,	(caddr_t) &mg_size[0]},
@@ -2110,6 +2404,10 @@ static	struct option {
 #ifndef X10
 {"-mgs4",	"magnifierSize4",SepArg, NumberArg, 1,	(caddr_t) &mg_size[3]},
 {"-mgs5",	"magnifierSize5",SepArg, NumberArg, 1,	(caddr_t) &mg_size[4]},
+#endif
+#ifdef	GREY
+{"-nogrey",	NULL,		FalseArg, BooleanArg, 2,(caddr_t) &use_grey},
+{"+nogrey",	"grey",		TrueArg, BooleanArg, 1,	(caddr_t) &use_grey},
 #endif
 };
 
@@ -2173,10 +2471,13 @@ parse_options(argc, argv)
 		    continue;
 		}
 	    }
+		/* flag it for subsequent processing */
+	    candidate->resource = (char *) candidate;
+		/* store the value */
 	    addr = candidate->address;
 	    switch (candidate->argclass) {
-		case FalseArg:	*((Boolean *) addr) = False; break;
-		case TrueArg:	*((Boolean *) addr) = True; break;
+		case FalseArg:	*((Boolean *) addr) = False; continue;
+		case TrueArg:	*((Boolean *) addr) = True; continue;
 		case StickyArg:	optstring = *arg + strlen(candidate->name);
 		    break;
 		case SepArg:
@@ -2188,10 +2489,9 @@ parse_options(argc, argv)
 	    switch (candidate->argtype) {
 		case StringArg:	*((char **) addr) = optstring; break;
 		case NumberArg:	*((int *) addr) = atoi(optstring); break;
-		case FloatArg: *((double *) addr) = atof(optstring); break;
+		case FloatArg:  *((float *) addr) = atof(optstring); break;
+		default:  ;
 	    }
-		/* flag it for subsequent processing */
-	    candidate->resource = (char *) candidate;
 	}
 	/*
 	 * Step 2.  Propagate classes for command line arguments.  Backwards.
@@ -2213,6 +2513,10 @@ parse_options(argc, argv)
 				break;
 			    case NumberArg:
 				*((int *) candidate->address) = *((int *) addr);
+				break;
+			    case FloatArg:
+				*((float *) candidate->address) =
+				    *((float *) addr);
 				break;
 			}
 			candidate->resource = NULL;
@@ -2243,22 +2547,26 @@ parse_options(argc, argv)
 		    lastopt = opt + opt->classcount;
 		    for (candidate = opt; candidate < lastopt; ++candidate)
 			if (candidate->resource != NULL) switch (opt->argtype) {
+			    case BooleanArg:
+				*((Boolean *) candidate->address) =
+				    (strcmp(optstring, "on") == 0);
+				break;
 			    case StringArg:
 				*((char **) candidate->address) = optstring;
 				break;
 			    case NumberArg:
 				*((int *) candidate->address) = atoi(optstring);
 				break;
-			    case BooleanArg:
-				*((Boolean *) candidate->address) =
-				    (strcmp(optstring, "on") == 0);
+			    case FloatArg:
+				*((float *) candidate->address) =
+				    atof(optstring);
 			}
 		}
 }
 
 #endif	/* TOOLKIT */
 
-static	char	*paper_types[] = {
+static	_Xconst	char	*paper_types[] = {
 	"us",		"8.5x11",
 	"usr",		"11x8.5",
 	"legal",	"8.5x14",
@@ -2321,13 +2629,13 @@ static	char	*paper_types[] = {
 
 static	Boolean
 set_paper_type() {
-	char	*arg;
+	_Xconst	char	*arg, *arg1;
 	char	temp[21];
-	char	**p;
+	_Xconst	char	**p;
 	char	*q;
 
-	if (strlen(paper) > sizeof(temp) - 1) return False;
-	arg = paper;
+	if (strlen(RESOURCE(paper)) > sizeof(temp) - 1) return False;
+	arg = RESOURCE(paper);
 	q = temp;
 	for (;;) {	/* convert to lower case */
 	    char c = *arg++;
@@ -2342,10 +2650,10 @@ set_paper_type() {
 		arg = p[1];
 		break;
 	    }
-	q = index(arg, 'x');
-	if (q == NULL) return False;
-	unshrunk_paper_w = atopix_x(arg);
-	unshrunk_paper_h = atopix_y(q + 1);
+	arg1 = index(arg, 'x');
+	if (arg1 == NULL) return False;
+	unshrunk_paper_w = atopix(arg);
+	unshrunk_paper_h = atopix(arg1 + 1);
 	return (unshrunk_paper_w != 0 && unshrunk_paper_h != 0);
 }
 
@@ -2353,16 +2661,13 @@ set_paper_type() {
  *	main program
  */
 
+int
 main(argc, argv)
 	int argc;
 	char **argv;
 {
 
-#ifdef	TOOLKIT
-#ifdef	BUTTONS
-	int		xtra_wid;
-#endif
-#else	/* !TOOLKIT */
+#ifndef	TOOLKIT
 #ifndef X10
 	XSizeHints	size_hints;
 	XWMHints	wmhints;
@@ -2398,15 +2703,24 @@ main(argc, argv)
 		else dvi_name = *argv;
 	}
 
-	XtGetApplicationResources(top_level, (caddr_t) NULL, resources,
-		XtNumber(resources), NULL, 0);
+	XtGetApplicationResources(top_level, (XtPointer) &resource,
+	    application_resources, XtNumber(application_resources), NULL, 0);
 	DISP = XtDisplay(top_level);
 	SCRN = XtScreen(top_level);
+	shrink_factor = resource._shrink_factor;
+	density = resource.density;
+	pixels_per_inch = resource.pixels_per_inch;
+	alt_font = resource.alt_font;
+	list_fonts = resource.list_fonts;
+	hush_spec = resource.hush_spec;
+	hush_chars = resource.hush_chars;
+#ifdef	GREY
+	use_grey = resource.use_grey;
+#endif
 
 #else	/* !TOOLKIT */
 
 	parse_options(argc, argv);
-
 #ifndef X10
 	if (fore_color) fore_Pixel = string_to_pixel(&fore_color);
 	if (back_color) back_Pixel = string_to_pixel(&back_color);
@@ -2417,27 +2731,29 @@ main(argc, argv)
 
 #endif	/* TOOLKIT */
 
-	aspect_ratio= aspect_ratio_option / 1000.0;
 	if (shrink_factor <= 0 || density <= 0 || pixels_per_inch <= 0 ||
-		aspect_ratio <= 0.0 || dvi_name == NULL) usage();
+		dvi_name == NULL) usage();
 	if (shrink_factor != 1) bak_shrink = shrink_factor;
 	mane.shrinkfactor = shrink_factor;
-	specialConv_x = pixels_per_inch / 1000.0;
-	specialConv_y = pixels_per_inch * aspect_ratio / 1000.0;
-	if (debug_arg != NULL)
-	    debug = isdigit(*debug_arg) ? atoi(debug_arg) : DBG_ALL;
-	if (sidemargin) home_x = atopix_x(sidemargin);
-	if (topmargin) home_y = atopix_y(topmargin);
-	offset_x = xoffset ? atopix_x(xoffset) : pixels_per_inch;
-	offset_y = yoffset ? atopix_y(yoffset) : (int)(pixels_per_inch * aspect_ratio);
-	if (!set_paper_type()) oops("Don't recognize paper type %s", paper);
+	if (RESOURCE(debug_arg) != NULL)
+	    debug = isdigit(*RESOURCE(debug_arg)) ? atoi(RESOURCE(debug_arg))
+		: DBG_ALL;
+	if (RESOURCE(sidemargin)) home_x = atopix(RESOURCE(sidemargin));
+	if (RESOURCE(topmargin)) home_y = atopix(RESOURCE(topmargin));
+	offset_x = RESOURCE(xoffset) ? atopix(RESOURCE(xoffset))
+	    : pixels_per_inch;
+	offset_y = RESOURCE(yoffset) ? atopix(RESOURCE(yoffset))
+	    : pixels_per_inch;
+	if (!set_paper_type()) oops("Don't recognize paper type %s",
+	    RESOURCE(paper));
 
-	init_pxl_open();
+	init_font_open();
 	open_dvi_file();
 	if (curr_page) {
 		current_page = (*curr_page ? atoi(curr_page) : total_pages) - 1;
 		if (current_page < 0 || current_page >= total_pages) usage();
 	}
+	if (RESOURCE(version_flag)) Puts((_Xconst char *) &version);
 
 #ifndef X10
 
@@ -2445,31 +2761,62 @@ main(argc, argv)
 	 *	X11 colors
 	 */
 
-	if (reverse) {
-	    if (!fore_color) fore_Pixel = WhitePixelOfScreen(SCRN);
-	    if (!back_color) back_Pixel = BlackPixelOfScreen(SCRN);
-	    fore_color = back_color = (char *) &fore_color;	/* nonzero */
+	if (RESOURCE(reverse)) {
+	    if (!RESOURCE(fore_color))
+		RESOURCE(fore_Pixel) = WhitePixelOfScreen(SCRN);
+	    if (!RESOURCE(back_color))
+		RESOURCE(back_Pixel) = BlackPixelOfScreen(SCRN);
+	    /* Set them nonzero */
+	    RESOURCE(fore_color) = RESOURCE(back_color) = (char *) &version;
 	} else {
-	    if (!fore_color) fore_Pixel = BlackPixelOfScreen(SCRN);
-	    if (!back_color) back_Pixel = WhitePixelOfScreen(SCRN);
+	    if (!RESOURCE(fore_color))
+		RESOURCE(fore_Pixel) = BlackPixelOfScreen(SCRN);
+	    if (!RESOURCE(back_color))
+		RESOURCE(back_Pixel) = WhitePixelOfScreen(SCRN);
 	}
-	if (!brdr_color) brdr_Pixel = fore_Pixel;
+
+#ifdef	GREY
+	if (DefaultDepthOfScreen(SCRN) == 1)
+	    use_grey = False;
+#endif
+
+#ifdef	TOOLKIT
+	if (!resource.copy_arg)
+#else
+	if (copy == 2)
+#endif
+#ifdef	GREY
+	    RESOURCE(copy) = (!RESOURCE(thorough) && !use_grey
+		&& DefaultDepthOfScreen(SCRN) > 1);
+#else
+	    RESOURCE(copy) = (!RESOURCE(thorough)
+		&& DefaultDepthOfScreen(SCRN) > 1);
+#endif
+
+#ifdef	GREY
+	if (use_grey)
+	    init_pix(True);
+	else
+#endif
 	{
 	    XGCValues	values;
-	    Pixel	set_bits = (Pixel) (fore_Pixel & ~back_Pixel);
-	    Pixel	clr_bits = (Pixel) (back_Pixel & ~fore_Pixel);
+	    Pixel	set_bits = (Pixel)
+				(RESOURCE(fore_Pixel) & ~RESOURCE(back_Pixel));
+	    Pixel	clr_bits = (Pixel)
+				(RESOURCE(back_Pixel) & ~RESOURCE(fore_Pixel));
+
 #define	MakeGC(fcn, fg, bg)	(values.function = fcn, values.foreground=fg,\
 		values.background=bg,\
 		XCreateGC(DISP, RootWindowOfScreen(SCRN),\
 			GCFunction|GCForeground|GCBackground, &values))
 
-	    if (copy == 2) copy = (PlanesOfScreen(SCRN) > 1);
-	    if (copy || (set_bits && clr_bits))
-		ruleGC = MakeGC(GXcopy, fore_Pixel, back_Pixel);
-	    if (copy) foreGC = ruleGC;
-	    else if (!thorough && ruleGC) {
+	    if (RESOURCE(copy) || (set_bits && clr_bits))
+		ruleGC = MakeGC(GXcopy,
+		    RESOURCE(fore_Pixel), RESOURCE(back_Pixel));
+	    if (RESOURCE(copy)) foreGC = ruleGC;
+	    else if (!RESOURCE(thorough) && ruleGC) {
 		foreGC = ruleGC;
-		puts("Note:  overstrike characters may be incorrect.");
+		Puts("Note:  overstrike characters may be incorrect.");
 	    }
 	    else {
 		if (set_bits) foreGC = MakeGC(GXor, set_bits, 0);
@@ -2478,10 +2825,18 @@ main(argc, argv)
 			MakeGC(GXandInverted, clr_bits, 0);
 		if (!ruleGC) ruleGC = foreGC;
 	    }
-	    highGC = ruleGC;
-	    if (high_color)
-		highGC = MakeGC(GXcopy, hl_Pixel, back_Pixel);
 	}
+
+	{
+	    XGCValues	values;
+
+	    highGC = ruleGC;
+	    if (RESOURCE(high_color))
+		highGC = MakeGC(GXcopy,
+		    RESOURCE(hl_Pixel), RESOURCE(back_Pixel));
+	}
+
+	if (!RESOURCE(brdr_color)) RESOURCE(brdr_Pixel) = RESOURCE(fore_Pixel);
 
 #ifndef	VMS
 	ready_cursor = XCreateFontCursor(DISP, XC_cross);
@@ -2491,21 +2846,23 @@ main(argc, argv)
 	XSetFont(DISP, foreGC, DECWCursorFont);
 	redraw_cursor = XCreateGlyphCursor(DISP, DECWCursorFont, DECWCursorFont,
 		decw$c_wait_cursor, decw$c_wait_cursor + 1,
-		&fore_color, &back_color);
+		&RESOURCE(fore_color), &RESOURCE(back_color));
 	MagnifyPixmap = XCreateBitmapFromData (DISP, RootWindowOfScreen(SCRN),
 		mag_glass_bits, mag_glass_width, mag_glass_height);
 	ready_cursor = XCreatePixmapCursor(DISP, MagnifyPixmap, MagnifyPixmap,
-		&back_color, &fore_color, mag_glass_x_hot, mag_glass_y_hot);
+		&RESOURCE(back_color), &RESOURCE(fore_color),
+		mag_glass_x_hot, mag_glass_y_hot);
 #endif	/* VMS */
 
-	if (!curs_color)
-	    cr_Pixel = high_color ? hl_Pixel : fore_Pixel;
+	if (!RESOURCE(curs_color))
+	    RESOURCE(cr_Pixel) = RESOURCE(high_color) ? RESOURCE(hl_Pixel)
+		: RESOURCE(fore_Pixel);
 	{
 	    XColor bg_Color, cr_Color;
 
-	    bg_Color.pixel = back_Pixel;
+	    bg_Color.pixel = RESOURCE(back_Pixel);
 	    XQueryColor(DISP, DefaultColormapOfScreen(SCRN), &bg_Color);
-	    cr_Color.pixel = cr_Pixel;
+	    cr_Color.pixel = RESOURCE(cr_Pixel);
 	    XQueryColor(DISP, DefaultColormapOfScreen(SCRN), &cr_Color);
 	    XRecolorCursor(DISP, ready_cursor, &cr_Color, &bg_Color);
 	    XRecolorCursor(DISP, redraw_cursor, &cr_Color, &bg_Color);
@@ -2518,59 +2875,99 @@ main(argc, argv)
 	 */
 
 		/* The following code is lifted from Xterm */
-	if (icon_geometry != NULL) {
+	if (resource.icon_geometry != NULL) {
 	    int scr, junk;
 
 	    for(scr = 0;	/* yyuucchh */
 		SCRN != ScreenOfDisplay(DISP, scr);
 		scr++);
 
-	    XGeometry(DISP, scr, icon_geometry, "", 0, 0, 0, 0, 0,
+	    XGeometry(DISP, scr, resource.icon_geometry, "", 0, 0, 0, 0, 0,
 			(int *) &temp_args1[0].value,
 			(int *) &temp_args1[1].value, &junk, &junk);
 	    XtSetValues(top_level, temp_args1, XtNumber(temp_args1));
 	}
-		/* Set default window size and icon */
-	XtGetValues(top_level, &temp_args2, 1);	/* get border width */
-	screen_w = WidthOfScreen(SCRN) - 2*bwidth;
-	screen_h = HeightOfScreen(SCRN) - 2*bwidth;
-#ifdef	BUTTONS
-	xtra_wid = expert ? 0 : XTRA_WID;
-#else
-#define	xtra_wid	0
-#endif
-	temp_args3[0].value = (XtArgVal) (page_w + xtra_wid < screen_w ?
-					  page_w + xtra_wid : screen_w);
-	temp_args3[1].value = (XtArgVal) (page_h<screen_h ? page_h : screen_h);
-	temp_args3[2].value = (XtArgVal) (XCreateBitmapFromData(DISP,
+		/* Set icon pixmap */
+	XtGetValues(top_level, temp_args3, XtNumber(temp_args3));
+	if (icon_pm == (Pixmap) 0) {
+	    temp_args3[0].value = (XtArgVal) (XCreateBitmapFromData(DISP,
 				RootWindowOfScreen(SCRN),
 				xdvi_bits, xdvi_width, xdvi_height));
-	temp_args3[4].value = (XtArgVal) dvi_name;
-	XtSetValues(top_level, temp_args3, XtNumber(temp_args3));
+	    XtSetValues(top_level, temp_args3, XtNumber(temp_args3));
+	}
+	temp_args4[0].value = (XtArgVal) dvi_name;
+	XtSetValues(top_level, temp_args4, XtNumber(temp_args4));
 
 #ifdef	BUTTONS
 	form_widget = XtCreateManagedWidget("form", formWidgetClass,
 		top_level, form_args, XtNumber(form_args));
 
-	vport_args[0].value = temp_args3[0].value - xtra_wid;
-	vport_args[1].value = temp_args3[1].value;
+	line_args[0].value = (XtArgVal) resource.high_color
+	    ? resource.hl_Pixel : resource.fore_Pixel;
+#else	/* !BUTTONS */
+#define	form_widget	top_level	/* for calls to XtAddEventHandler */
+#endif	/* BUTTONS */
 	vport_widget = XtCreateManagedWidget("vport", viewportWidgetClass,
 		form_widget, vport_args, XtNumber(vport_args));
-
-	line_args[0].value = (XtArgVal) high_color ? hl_Pixel : fore_Pixel;
-	if (!expert) create_buttons(temp_args3[1].value);
-#else	/* !BUTTONS */
-	vport_widget = XtCreateManagedWidget("vport", viewportWidgetClass,
-		top_level, vport_args, XtNumber(vport_args));
-#define	form_widget	vport_widget	/* for calls to XtAddEventHandler */
-#endif	/* BUTTONS */
 	clip_widget = XtNameToWidget(vport_widget, "clip");
 	draw_args[0].value = (XtArgVal) page_w;
 	draw_args[1].value = (XtArgVal) page_h;
-	draw_widget = XtCreateManagedWidget("drawing", widgetClass,
+#ifdef	GREY
+	draw_args[2].value = (XtArgVal) resource.back_Pixel;
+#endif
+	draw_widget = XtCreateManagedWidget("drawing", drawWidgetClass,
 		vport_widget, draw_args, XtNumber(draw_args));
-	if (fore_color) XtSetValues(draw_widget, &fore_args, 1);
-	if (back_color) {
+	{	/* set default window size */
+#ifdef	BUTTONS
+	    int xtra_wid = resource.expert ? 0 : XTRA_WID;
+#else
+#define	xtra_wid	0
+#endif
+	    XtWidgetGeometry constraints;
+	    XtWidgetGeometry reply;
+
+	    XtGetValues(top_level, &temp_args2, 1);	/* get border width */
+	    screen_w = WidthOfScreen(SCRN) - 2 * bwidth - xtra_wid;
+	    screen_h = HeightOfScreen(SCRN) - 2 * bwidth;
+	    constraints.request_mode = reply.request_mode = 0;
+	    constraints.width = page_w;
+	    if (page_w > screen_w) {
+		constraints.request_mode = CWWidth;
+		constraints.width = screen_w;
+	    }
+	    constraints.height = page_h;
+	    if (page_h > screen_h) {
+		constraints.request_mode = CWHeight;
+		constraints.height = screen_h;
+	    }
+	    if (constraints.request_mode != 0
+		    && constraints.request_mode != (CWWidth | CWHeight))
+		(void) XtQueryGeometry(vport_widget, &constraints, &reply);
+	    if (!(reply.request_mode & CWWidth))
+		reply.width = constraints.width;
+	    set_wh_args[0].value = (XtArgVal) ((reply.width < screen_w
+				? reply.width : screen_w) + xtra_wid);
+	    if (!(reply.request_mode & CWHeight))
+		reply.height = constraints.height;
+	    set_wh_args[1].value = (XtArgVal) (reply.height < screen_h
+					? reply.height : screen_h);
+	    XtSetValues(top_level, set_wh_args, XtNumber(set_wh_args));
+#ifdef	BUTTONS
+	    set_wh_args[0].value -= xtra_wid;
+	    XtSetValues(vport_widget, set_wh_args, XtNumber(set_wh_args));
+	    if (!resource.expert) create_buttons(set_wh_args[1].value);
+#endif	/* BUTTONS */
+	}
+	if (resource.fore_color) {
+	    static Arg fore_args = {XtNforeground, (XtArgVal) 0};
+
+	    fore_args.value = resource.fore_Pixel;
+	    XtSetValues(draw_widget, &fore_args, 1);
+	}
+	if (resource.back_color) {
+	    static Arg back_args = {XtNbackground, (XtArgVal) 0};
+
+	    back_args.value = resource.back_Pixel;
 	    XtSetValues(draw_widget, &back_args, 1);
 	    XtSetValues(clip_widget, &back_args, 1);
 	}
@@ -2588,7 +2985,14 @@ main(argc, argv)
 		(caddr_t) NULL);
 	XtRealizeWidget(top_level);
 
-	curr.win = mane.win = (caddr_t) XtWindow(draw_widget);
+	currwin.win = mane.win = XtWindow(draw_widget);
+
+	{
+	    XWindowAttributes attrs;
+
+	    XGetWindowAttributes(DISP, WINDOW(mane), &attrs);
+	    backing_store = attrs.backing_store;
+	}
 
 #else	/* !TOOLKIT */
 
@@ -2655,13 +3059,13 @@ main(argc, argv)
 
 #endif	/* TOOLKIT */
 
-	XRebindKeysym(DISP, XK_Home, NULL, 0, (ubyte *) "^", 1);
-	XRebindKeysym(DISP, XK_Left, NULL, 0, (ubyte *) "l", 1);
-	XRebindKeysym(DISP, XK_Up, NULL, 0, (ubyte *) "u", 1);
-	XRebindKeysym(DISP, XK_Right, NULL, 0, (ubyte *) "r", 1);
-	XRebindKeysym(DISP, XK_Down, NULL, 0, (ubyte *) "d", 1);
-	XRebindKeysym(DISP, XK_Prior, NULL, 0, (ubyte *) "b", 1);
-	XRebindKeysym(DISP, XK_Next, NULL, 0, (ubyte *) "f", 1);
+	XRebindKeysym(DISP, XK_Home, NULL, 0, (_Xconst ubyte *) "^", 1);
+	XRebindKeysym(DISP, XK_Left, NULL, 0, (_Xconst ubyte *) "l", 1);
+	XRebindKeysym(DISP, XK_Up, NULL, 0, (_Xconst ubyte *) "u", 1);
+	XRebindKeysym(DISP, XK_Right, NULL, 0, (_Xconst ubyte *) "r", 1);
+	XRebindKeysym(DISP, XK_Down, NULL, 0, (_Xconst ubyte *) "d", 1);
+	XRebindKeysym(DISP, XK_Prior, NULL, 0, (_Xconst ubyte *) "b", 1);
+	XRebindKeysym(DISP, XK_Next, NULL, 0, (_Xconst ubyte *) "f", 1);
 
 	image = XCreateImage(DISP, DefaultVisualOfScreen(SCRN), 1, XYBitmap, 0,
 			     (char *)NULL, 0, 0, BITS_PER_BMUNIT, 0);
@@ -2751,5 +3155,5 @@ main(argc, argv)
 #endif	/* X10 */
 
 	do_pages();
-	/* NOTREACHED */
+	return 0;	/* do_pages() returns if DBG_BATCH is specified */
 }

@@ -1,9 +1,6 @@
-#include <stdio.h>
-#include "xdvi.h"
-
 /***
  ***	PXL font reading routines.
- ***	Public routines are read_index and read_char.
+ ***	Public routines are read_PXL_index and read_PXL_char.
  ***/
 
 #ifndef	MSBITFIRST
@@ -43,26 +40,74 @@ static	unsigned char	_reverse_byte[0x100] = {
 };
 #endif	/* MSBITFIRST */
 
-static	void	read_index(), read_char();
+static	void
+read_PXL_char(fontp, ch)
+	register struct font *fontp;
+	ubyte	ch;
+{
+	register struct bitmap *bitmap;
+	register BMUNIT *ptr;
+	register FILE *fp = fontp->file;
+	register int i, j;
+#ifndef	BMLONG
+	register int padding_length;
+#endif
 
-read_font_index_proc	read_PXL_index	= read_index;
+	bitmap = &fontp->glyph[ch].bitmap;
+		/* in file, bitmap rows are multiples of 32 bits wide */
+	alloc_bitmap(bitmap);
+	ptr = (BMUNIT *) bitmap->bits;
+#ifndef	BMLONG
+	padding_length = 3 - (bitmap->bytes_wide + 3) % 4;
+#endif
+	for (i = bitmap->h; i > 0; --i) {
+	    for (j = bitmap->bytes_wide; j > 0; j -= BYTES_PER_BMUNIT) {
+#ifndef	MSBITFIRST
+		*ptr = _reverse_byte[one(fp)];
+#if	BYTES_PER_BMUNIT > 1
+		*ptr |= (BMUNIT) _reverse_byte[one(fp)] << 8;
+#endif
+#ifdef	BMLONG
+		*ptr |= (BMUNIT) _reverse_byte[one(fp)] << 16;
+		*ptr |= (BMUNIT) _reverse_byte[one(fp)] << 24;
+#endif
+#else	/* MSBITFIRST */
+		*ptr = 0;
+#ifdef	BMLONG
+		*ptr |= (BMUNIT) one(fp) << 24;
+		*ptr |= (BMUNIT) one(fp) << 16;
+#endif
+#if	BYTES_PER_BMUNIT > 1
+		*ptr |= (BMUNIT) one(fp) << 8;
+#endif
+		*ptr |= (BMUNIT) one(fp);
+#endif	/* MSBITFIRST */
+		++ptr;
+	    }
+#ifndef	BMLONG
+	    for (j = padding_length; j > 0; --j) (void) one(fp);
+#endif
+	}
+}
 
-static void
-read_index (fontp)
+void
+read_PXL_index(fontp)
 	register struct font *fontp;
 {
-	register struct glyph *g;
 	register FILE *fp	= fontp->file;
-	long font_dir_ptr;
+	register struct glyph *g;
+	long	font_dir_ptr;
+	long	trailer_ptr;
 
 	if (debug & DBG_PK)
 	    Printf("Reading PXL file %s\n", fontp->filename);
-	fontp->read_char = read_char;
+	fontp->read_char = read_PXL_char;
 	/* seek to trailer info */
 	Fseek(fp, (long) -4, 2);
 	while (four(fp) != 1001)
 	    Fseek(fp, (long) -5, 1);
 	Fseek(fp, (long) -5 * 4, 1);
+	trailer_ptr = ftell(fp);
 	(void) four(fp);	/* checksum */
 	(void) four(fp);	/* magnify */
 	(void) four(fp);	/* design size */
@@ -70,14 +115,20 @@ read_index (fontp)
 	(void) four(fp);	/* pxl id word */
 	/* seek to font directory */
 	Fseek(fp, font_dir_ptr, 0);
-	for (g = fontp->glyph; g < fontp->glyph + 128; ++g) {
-		g->bitmap.bits = NULL;
-		g->bitmap2.bits = NULL;
-		g->bitmap.w = two(fp);
-		g->bitmap.h = two(fp);
-		g->x = stwo(fp);
-		g->y = stwo(fp);
-		g->addr = four(fp) * 4;
+	maxchar = (trailer_ptr - font_dir_ptr) / 16 - 1;
+	fontp->glyph = (struct glyph *)
+		xmalloc((maxchar + 1) * sizeof(struct glyph), "glyph array");
+	for (g = fontp->glyph; g <= fontp->glyph + maxchar; ++g) {
+	    g->bitmap.bits = NULL;
+	    g->bitmap2.bits = NULL;
+#ifdef	GREY
+	    g->pixmap2 = NULL;
+#endif
+	    g->bitmap.w = two(fp);
+	    g->bitmap.h = two(fp);
+	    g->x = stwo(fp);
+	    g->y = stwo(fp);
+	    g->addr = four(fp) * 4;
 		/*
 		**  The TFM-width word is kind of funny in the units
 		**  it is expressed in.  It works this way:
@@ -107,61 +158,9 @@ read_index (fontp)
 		**
 		*/
 
-		g->dvi_adv =
-		    ((double) fontp->scale * four(fp)) / (1 << 20);
-		if (debug & DBG_PK)
-		    Printf("size=%dx%d, dvi_adv=%d\n", g->bitmap.w, g->bitmap.h,
-			g->dvi_adv);
-	}
-	maxchar = 127;
-}
-
-static void
-read_char(fontp, ch)
-	register struct font *fontp;
-	ubyte ch;
-{
-	register struct bitmap *bitmap;
-	register BMUNIT *ptr;
-	register FILE *fp = fontp->file;
-	register int i, j;
-#ifndef	BMLONG
-	register int padding_length;
-#endif
-
-	bitmap = &fontp->glyph[ch].bitmap;
-		/* in file, bitmap rows are multiples of 32 bits wide */
-	alloc_bitmap(bitmap);
-	ptr = (BMUNIT *) bitmap->bits;
-#ifndef	BMLONG
-	padding_length = 3 - (bitmap->bytes_wide + 3) % 4;
-#endif
-	for (i = bitmap->h; i > 0; --i) {
-	    for (j = bitmap->bytes_wide; j > 0; j -= BYTES_PER_BMUNIT) {
-#ifndef	MSBITFIRST
-		*ptr = _reverse_byte[one(fp)];
-#if	BYTES_PER_BMUNIT > 1
-		*ptr |= _reverse_byte[one(fp)] << 8;
-#endif
-#ifdef	BMLONG
-		*ptr |= _reverse_byte[one(fp)] << 16;
-		*ptr |= _reverse_byte[one(fp)] << 24;
-#endif
-#else	/* MSBITFIRST */
-		*ptr = 0;
-#ifdef	BMLONG
-		*ptr |= one(fp) << 24;
-		*ptr |= one(fp) << 16;
-#endif
-#if	BYTES_PER_BMUNIT > 1
-		*ptr |= one(fp) << 8;
-#endif
-		*ptr |= one(fp);
-#endif	/* MSBITFIRST */
-		++ptr;
-	    }
-#ifndef	BMLONG
-	    for (j = padding_length; j > 0; --j) (void) one(fp);
-#endif
+	    g->dvi_adv = fontp->dimconv * four(fp);
+	    if (debug & DBG_PK)
+		Printf("size=%dx%d, dvi_adv=%d\n", g->bitmap.w, g->bitmap.h,
+		    g->dvi_adv);
 	}
 }

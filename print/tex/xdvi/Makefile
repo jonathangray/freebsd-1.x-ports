@@ -2,8 +2,8 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and </tmp/IIf.005754>
-# $Header: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile,v 1.1 1993/08/09 11:01:05 alm Exp $
+# Makefile generated from "Imake.tmpl" and <Imakefile>
+# $XFree86: mit/config/Imake.tmpl,v 1.17 1993/06/03 15:26:36 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,14 +19,22 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $Header: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile,v 1.1 1993/08/09 11:01:05 alm Exp $
+# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
-
+  
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $Header: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile,v 1.1 1993/08/09 11:01:05 alm Exp $
+# $XFree86: mit/config/x386.cf,v 1.90 1993/06/04 16:02:50 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
+
+# -------------------------------------------------------------------------
+# XFree86 version definition
+# $XFree86: mit/config/xf86_vers.def,v 1.5 1993/06/01 09:12:47 dawes Exp $
+
+# -------------------------------------------------------------------------
+# XFree86 version: 1300
+# -------------------------------------------------------------------------
 
 # operating system:  		386BSD
 
@@ -34,7 +42,7 @@
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $Header: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile,v 1.1 1993/08/09 11:01:05 alm Exp $
+# $XFree86: mit/config/site.def,v 1.65 1993/06/04 16:02:47 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -46,6 +54,8 @@
   BOOTSTRAPCFLAGS =
                CC = 		gcc
                AS = as
+
+             YACC = yacc
 
          COMPRESS = compress
               CPP = 		/usr/libexec/cpp $(STD_CPP_DEFINES)
@@ -73,6 +83,7 @@
       STD_DEFINES =
  EXTRA_LOAD_FLAGS =
   EXTRA_LIBRARIES =
+     OS_LIBRARIES =
              TAGS = ctags
 
     PROTO_DEFINES =
@@ -100,7 +111,7 @@
            CFLAGS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(ALLDEFINES)
         LINTFLAGS = $(LINTOPTS) -DLINT $(ALLDEFINES)
 
-           LDLIBS = $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
+           LDLIBS = $(OS_LIBRARIES) $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
 
         LDOPTIONS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(LOCAL_LDFLAGS) -L$(USRLIBDIR)
 
@@ -118,9 +129,11 @@
      ICONFIGFILES = $(IRULESRC)/Imake.tmpl $(IRULESRC)/Imake.rules 			$(IRULESRC)/Project.tmpl $(IRULESRC)/site.def 			$(IRULESRC)/$(MACROFILE) $(EXTRA_ICONFIGFILES)
 
 # -------------------------------------------------------------------------
-# $Header: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile,v 1.1 1993/08/09 11:01:05 alm Exp $
 # X Window System Build Parameters
-# $XConsortium: Project.tmpl,v 1.138 91/09/10 09:02:12 rws Exp $
+# $XFree86: mit/config/Project.tmpl,v 1.13 1993/03/27 03:32:45 dawes Exp $
+# $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
+
+_percentC_ = %C
 
 # -------------------------------------------------------------------------
 # X Window System make variables; this need to be coordinated with rules
@@ -143,7 +156,7 @@
            XDMDIR = $(LIBDIR)/xdm
            TWMDIR = $(LIBDIR)/twm
           MANPATH = 	/usr/X386/man
-    MANSOURCEPATH = 	$(MANPATH)/cat
+    MANSOURCEPATH = 	$(MANPATH)/man
         MANSUFFIX = 1
      LIBMANSUFFIX = 3
            MANDIR = 	$(MANSOURCEPATH)1
@@ -196,6 +209,7 @@
     FONTSERVERSRC = $(FONTSRC)/server
      EXTENSIONSRC = $(TOP)/extensions
          XILIBSRC = $(EXTENSIONSRC)/lib/xinput
+        PEXLIBSRC = $(EXTENSIONSRC)/lib/PEXlib
       PHIGSLIBSRC = $(EXTENSIONSRC)/lib/PEX
 
   DEPEXTENSIONLIB = $(USRLIBDIR)/libXext.a
@@ -224,6 +238,9 @@
         DEPXILIB = $(USRLIBDIR)/libXi.a
            XILIB = 			 -lXi
 
+       DEPPEXLIB = $(USRLIBDIR)/libPEX5.a
+          PEXLIB = 			 -lPEX5
+
         DEPPHIGSLIB = $(USRLIBDIR)/libphigs.a
            PHIGSLIB = 			 -lphigs
 
@@ -236,6 +253,7 @@
         LINTXTOOL = $(LINTLIBDIR)/llib-lXt.ln
           LINTXAW = $(LINTLIBDIR)/llib-lXaw.ln
            LINTXI = $(LINTLIBDIR)/llib-lXi.ln
+          LINTPEX = $(LINTLIBDIR)/llib-lPEX5.ln
         LINTPHIGS = $(LINTLIBDIR)/llib-lphigs.ln
 
           DEPLIBS = $(DEPXAWLIB) $(DEPXMULIB) $(DEPXTOOLLIB) $(DEPXLIB)
@@ -246,49 +264,26 @@
 
 # -------------------------------------------------------------------------
 # Imake rules for building libraries, programs, scripts, and data files
-# $Header: /a/cvs/386BSD/ports/print/tex/xdvi/Makefile,v 1.1 1993/08/09 11:01:05 alm Exp $
+# $XFree86: mit/config/Imake.rules,v 1.9 1993/03/23 12:56:27 dawes Exp $
 # rules:  $XConsortium: Imake.rules,v 1.123 91/09/16 20:12:16 rws Exp $
 
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-#Default font sizes for 240 dpi fonts
-#magsteps 0:half:1:2:3:4:5
-#DEFAULT_FONT_SIZES=240:262.907:288:345.6:414.72:497.664:597.197
-#
-#this is for 300dpi devices
-#DEFAULT_FONT_SIZES=300:328.634:360:432:518:622.08:746.4960
-#
-#these fonts should exist on most systems
-#DEFAULT_FONT_SIZES=72:75:180:240:300:360:400
-#
-#But we use the generic style
-DEFAULT_FONT_SIZES=$(RESRES_386BSD)
-DEFAULT_RESOLUTION=$(DEFRES_386BSD)
-DEFAULT_ASPECT_RATIO=$(DEFAR_386BSD)
-DEFAULT_FONT_PATH=.:$(PK_386BSD)
-DEFAULT_SUBDIR_PATH=$(FONTLIB_386BSD)
+DEFAULT_FONT_PATH=/usr/local/lib/TeX/fonts/pk
+DEFAULT_VF_PATH=
+DEFAULT_FONT_SIZES=300:328.6:360:432:518.4:622:746.4
+DEFS=-DUSE_PK -DMSBITFIRST -DBMSHORT -DBUTTONS \
+	-DMAKEPK -DMAKEPKCMD=\"/usr/local/bin/MakeTeXPK\"
 
-#Country specific definitions
-.ifdef GERMAN_386BSD
-.if $(GERMAN_386BSD) != 0
-LANG_DEFS=-DA4
-.endif
-.endif
-DEFS=-DMSBITFIRST -DBMSHORT -DBUTTONS -DSEARCH_SUBDIRECTORIES $(LANG_DEFS)
-
-FONTFORMATS_C=gf.c pk.c pxl.c
-FONTFORMATS_O=gf.o pk.o pxl.o
-
-CC=$(CC_386BSD)
 DEPLIBS=$(DEPXAWLIB) $(DEPXMULIB) $(DEPXTOOLLIB) $(DEPXLIB)
 LOCAL_LIBRARIES=$(XAWLIB) $(XMULIB) $(XTOOLLIB) $(XLIB)
 MATHLIB=-lm
 SYS_LIBRARIES=$(MATHLIB)
 LINTLIBS=$(LINTXAW) $(LINTXMU) $(LINTXTOOL) $(LINTEXTENSIONLIB) $(LINTXLIB) -lm
-SRCS=xdvi.c dvi_init.c dvi_draw.c $(FONTFORMATS_C) pxl_open.c tpic.c
-OBJS=xdvi.o dvi_init.o dvi_draw.o $(FONTFORMATS_O) pxl_open.o tpic.o
-DEFINES=$(DEFS) -DDEFAULT_FONT_PATH=\"$(DEFAULT_FONT_PATH)\"   -DDEFAULT_FONT_SIZES=\"$(DEFAULT_FONT_SIZES)\"   -DDEFAULT_RESOLUTION=$(DEFAULT_RESOLUTION)   -DDEFAULT_ASPECT_RATIO=$(DEFAULT_ASPECT_RATIO)   -DDEFAULT_SUBDIR_PATH=\"$(DEFAULT_SUBDIR_PATH)\"
+SRCS=xdvi.c dvi_init.c dvi_draw.c fontfmts.c vf.c util.c font_open.c tpic.c
+OBJS=xdvi.o dvi_init.o dvi_draw.o fontfmts.o vf.o util.o font_open.o tpic.o
+DEFINES=$(DEFS) -DDEFAULT_FONT_PATH=\"$(DEFAULT_FONT_PATH)\"   -DDEFAULT_VF_PATH=\"$(DEFAULT_VF_PATH)\"   -DDEFAULT_FONT_SIZES=\"$(DEFAULT_FONT_SIZES)\"   -DDEFAULT_SUBDIR_PATH=\"$(DEFAULT_SUBDIR_PATH)\"
 
  PROGRAM = xdvi
 
@@ -306,10 +301,8 @@ install:: xdvi
 install.man:: xdvi.man
 	@if [ -d $(DESTDIR)$(MANDIR) ]; then set +x; \
 	else (set -x; $(MKDIRHIER) $(DESTDIR)$(MANDIR)); fi
-	$(RM) $(DESTDIR)$(MANDIR)/xdvi.0
-	cat xdvi.man | eqn | tbl | nroff -man >/tmp/xdvi.man
-	$(INSTALL) -c $(INSTMANFLAGS) /tmp/xdvi.man $(DESTDIR)$(MANDIR)/xdvi.0
-	$(RM) /tmp/xdvi.man
+	$(RM) $(DESTDIR)$(MANDIR)/xdvi.$(MANSUFFIX)*
+	$(INSTALL) -c $(INSTMANFLAGS) xdvi.man $(DESTDIR)$(MANDIR)/xdvi.$(MANSUFFIX)
 
 depend::
 	$(DEPEND) $(DEPENDFLAGS) -s "# DO NOT DELETE" -- $(ALLDEFINES) -- $(SRCS)
@@ -324,7 +317,7 @@ clean::
 
 xdvi.man: xdvi_man.sed mksedscript
 	chmod u+x mksedscript
-	./mksedscript $(DEFAULT_FONT_PATH) $(DEFAULT_FONT_SIZES) $(DEFS) 		> sedscript
+	./mksedscript $(DEFAULT_FONT_PATH) $(DEFAULT_FONT_SIZES) ""$(DEFAULT_VF_PATH) $(DEFS) > sedscript
 
 	sed -f sedscript < xdvi_man.sed > xdvi.man
 

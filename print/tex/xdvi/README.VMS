@@ -8,10 +8,10 @@ SYNOPSIS
 
    XDVI [+[page]] [-s shrink] [-density density] [-p pixels] [-l] [-rv]
         [-bw width] [-fg color] [-bg color] [-hl color] [-bd color] [-cr color]
-        [-margins dimen] [-sidemargin dimen] [-topmargin dimen]
-        [-offsets dimen] [-xoffset dimen] [-yoffset dimen] [-keep]
-        [-hushspecials] [-hushchars] [-hush] [-paper papertype] [-mgs[n] size]
-        [-altfont font] [-thorough] [-copy] [-geometry geometry]
+        [-margins dimen] [-sidemargin dimen] [-topmargin dimen] [-version]
+        [-offsets dimen] [-xoffset dimen] [-yoffset dimen] [-keep] [-nogrey]
+        [-gamma g] [-hushspecials] [-hushchars] [-hush] [-paper papertype]
+        [-mgs[n] size] [-altfont font] [-thorough] [-copy] [-geometry geometry]
         [-icongeometry geometry] [-iconic] [-display display] dvi_file
 
 DESCRIPTION
@@ -107,6 +107,8 @@ OPTIONS
    -topmargin <dimen>    (.topMargin)  Specifies the top and bottom margins (see
                          above).
 
+   -version              Print information on the version of XDVI.
+
    -offsets <dimen>      (.Offset)  Specifies the size of both the horizontal
                          and vertical offsets of the output on the page.  This
                          should be a decimal number optionally followed by "cm",
@@ -127,6 +129,20 @@ OPTIONS
                          should not move to the home position when moving to a
                          new page.  See also the `k' keystroke.
 
+   -nogrey               (.grey)  Turns off the use of greyscale anti-aliasing
+                         when printing shrunken bitmaps.  In this case, the
+                         logic of the corresponding resource is the reverse:
+                         -nogrey corresponds to grey:off; +nogrey to grey:on.
+                         See also the 'G' keystroke.
+
+   -gamma <gamma>        (.gamma)  Controls the interpolation of colors in the
+                         greyscale anti-aliasing color palette.  The default
+                         value is 1.0.  For 0 < gamma < 1, the fonts will be
+                         lighter (more like the background), and for gamma > 1,
+                         the fonts will be darker (more like the foreground).
+                         Negative values behave the same way, but use a slightly
+                         different algorithm.
+
    -hushspecials         (.hushSpecials)  Causes XDVI to suppress warnings about
                          \special strings which it cannot process.
 
@@ -134,7 +150,7 @@ OPTIONS
                          about references to characters which are not defined in
                          the font.
 
-   -hush                 (.Hush)  Causes XDVI to suppress all suppressable
+   -hush                 (.Hush)  Causes XDVI to suppress all suppressible
                          warnings.
 
    -paper <papertype>    (.paper)  Specifies the size of the printed page.  This
@@ -172,7 +188,10 @@ OPTIONS
    -copy                 (.copy)  Always use the copy operation when writing
                          characters to the display.  This option may be
                          necessary for correct operation on a color display, but
-                         overstrike characters will be incorrect.
+                         overstrike characters will be incorrect.  If greyscale
+                         anti-aliasing is in use, the copy operation will
+                         disable the use of colorplanes and make overstrikes
+                         come out incorrectly.
 
    -geometry <geometry>  (*geometry)  Specifies the initial geometry of the
                          window.
@@ -231,7 +250,7 @@ KEYSTROKES
         synonym for this keystroke.
 
    r    Moves right two thirds of a window-full.  The <Right Arrow> key is a
-        sysnonym for this keystroke.
+        synonym for this keystroke.
 
    c    Moves the page so that the point currently beneath the cursor is moved
         to the middle of the window.  It also (gasp!) warps the cursor to the
@@ -257,6 +276,10 @@ KEYSTROKES
         well.  The `k' keystroke toggles a `keep-position' flag which, when set,
         will keep the same position when moving between pages.  Also `0k' and
         `1k' clear and set this flag, respectively.  See also the -keep option.
+
+   G   This key toggles the use of greyscale anti-aliasing for displaying
+       shrunken bitmaps.  In addition, the key sequences `0G' and `1G' clear and
+       set this flag, respectively.  See also the -nogrey option.
 
 MOUSE ACTIONS
 -------------
@@ -299,18 +322,44 @@ LOGICAL NAMES
    (within a certain range), and if this fails, then it will use the font
    specified as the alternate font (cf. -altfont).
 
-   For compatibilty with some versions of TeX, you may also use the logical name
-   "TEXFONTS" in place of "XDVIFONTS", although in that case the string should
-   not include any "%" specifiers.
+   For compatibility with some versions of TeX, you may also use the logical
+   name "TEXFONTS" in place of "XDVIFONTS", although in that case the string
+   should not include any "%" specifiers.  The reason for recognizing "TEXFONTS"
+   is that certain versions of TeX also support the convention regarding an
+   extra slash in the font path; therefore, users who create their own fonts can
+   put both their .TFM and raster files in the same directory and do
 
-   The logical name "XDVISIZES" must be set to indicate which sizes of fonts are
-   available.  It should consists of a list of numbers separated by slashes.  If
+        $ DEFINE TEXFONTS "/MFDIR"
+
+   or
+
+        $ DEFINE TEXFONTS "MFDIR/"
+
+   in order to get both TeX and XDVI to search their directory in addition to
+   the system standard directories.  The "XDVIFONTS" logical name overrides the
+   "TEXFONTS" logical name, so that on those sites where "TEXFONTS" must be set
+   explicitly, and therefore this feature is not useful, the "XDVIFONTS" logical
+   name be set to an empty string to cause XDVI to ignore "TEXFONTS".
+
+   XDVI also recognizes the "PKFONTS" logical name, which is checked after
+   "XDVIFONTS" but before "TEXFONTS".
+
+   The logical name "XDVISIZES" may be set to indicate which sizes of fonts are
+   available.  It should consist of a list of numbers separated by slashes.  If
    the list begins with a slash, the system default sizes are used, as well.
    Sizes are expressed in dots per inch; decimals may be used for "pxl" files:
    for example, a 300 dots per inch file magnified by half a step comes out to
    1643 dots per five inches, which should be encoded as 328.6.  The current
    default set of sizes is 300/328.6/360/432/518.4/622/746.4.  XDVI will also
    try the actual size of the font before trying any of the given sizes.
+
+   Virtual fonts are also supported, although XDVI does not have any built-in
+   fonts to which they can refer.  The search path for .VF files can be
+   specified with the "XDVIVFS" logical name in a similar manner to that for the
+   "XDVIFONTS" logical name.  XDVI will also check the "VFFONTS" logical name if
+   the "XDVIFONTS" logical name is not defined.  Virtual fonts are searched for
+   immediately after looking for the font as a normal font in the exact size
+   specified.
 
 FILES
 -----
@@ -362,10 +411,10 @@ INSTALLATION
          $ LIBRARY /INSERT HELPLIB.HLB XDVI.HLP
 
    4) Modify the command file you use to set up the TEX commands so that it
-      defines the foreign symbol XDVI, and the logical names XDVIFONTS and
-      XDVISIZES.  For more information on the expected contents of the logical
-      names, see the LOGICAL NAMES section of this document.  The following
-      lines are what I use locally:
+      defines the foreign symbol XDVI, and the logical names "XDVIFONTS",
+      "XDVIVFS", and "XDVISIZES".  For more information on the expected contents
+      of the logical names, see the LOGICAL NAMES section of this document.  The
+      following lines are what I use locally:
 
       $ PROC      = F$ENVIRONMENT ("PROCEDURE")
       $ TEXDIR    = F$PARSE (PROC, , , "DEVICE", "NO_CONCEAL") + -
@@ -390,6 +439,7 @@ INSTALLATION
       $!
       $ XDVI :== "$TEX_EXE:XDVI"
       $ DEFINE XDVIFONTS "TEX_PIXELS:[DPI%d]%f.%p"
+      $ DEFINE XDVIVFS   XDVIFONTS
       $ DEFINE XDVISIZES -
               "300/328.6/360/432/518.4/600/622/746.4/895.8/1075/1200/1290/1548"
       $ EXIT
@@ -407,7 +457,7 @@ INSTALLATION
                     Iowa City, IA 52242
 
                     Phone: (319) 335-1960
-                    Email: allendorf@iowasp.physics.uiowa.edu
+                    Email: scott-allendorf@uiowa.edu
 
 AUTHORS
 -------
