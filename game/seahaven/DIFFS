@@ -1,0 +1,301 @@
+This is not the original version posted to comp.sources.x volume 11.
+It's been modified to compile on Linux by some unkown person.
+I've changed the Imakefile and took a malloc.h out of one of the .C files.
+
+For future reference here are the diffs against the original comp.sources.x
+version:
+
+*** Imakefile	Thu Feb  3 23:32:42 1994
+--- ../seahaven/Imakefile	Fri Feb  4 00:09:34 1994
+***************
+*** 1,12 ****
+  OBJS = main.o util.o card.o cardbitmaps.o stack.o score.o auto.o 
+  SRCS = main.C util.C card.C cardbitmaps.C stack.C score.C auto.C 
+! LDLIBS = $(XLIB)
+  
+  /* Make C++ work correctly.  This works for AT&T cfront; it will need to be */
+  /* tweaked to work with g++. */
+! CPLUSPLUS = g++
+  CC = $(CPLUSPLUS)		/* So that linking works right */
+! INCLUDES = -I/usr/include/CC	/* So that make depend works right */
+  .SUFFIXES: $(.SUFFIXES) .C
+  .C.o: $*.C
+  	$(CPLUSPLUS) -c $(CFLAGS) $*.C
+--- 1,12 ----
+  OBJS = main.o util.o card.o cardbitmaps.o stack.o score.o auto.o 
+  SRCS = main.C util.C card.C cardbitmaps.C stack.C score.C auto.C 
+! LDLIBS = $(XLIB) -lg++
+  
+  /* Make C++ work correctly.  This works for AT&T cfront; it will need to be */
+  /* tweaked to work with g++. */
+! CPLUSPLUS = gcc 
+  CC = $(CPLUSPLUS)		/* So that linking works right */
+! INCLUDES = -I/usr/local/include/CC	/* So that make depend works right */
+  .SUFFIXES: $(.SUFFIXES) .C
+  .C.o: $*.C
+  	$(CPLUSPLUS) -c $(CFLAGS) $*.C
+*** seahaven.h	Thu Feb  3 23:31:08 1994
+--- ../seahaven/seahaven.h	Tue Nov 10 15:55:59 1992
+***************
+*** 8,16 ****
+  
+  #include <X11/Xlib.h>
+  
+! #ifndef NULL
+! #define	NULL 0
+! #endif NULL
+  
+  #ifdef MAIN
+  #define global
+--- 8,16 ----
+  
+  #include <X11/Xlib.h>
+  
+! //#ifndef NULL
+! //#define	NULL 0
+! //#endif NULL
+  
+  #ifdef MAIN
+  #define global
+***************
+*** 26,32 ****
+    public:
+      CardRec(int suit, int value, unsigned long fore, unsigned long back,
+  	    char *bitmap);
+! //    Window getWindow();
+      Stack getStack();
+      int getSuit();
+      int getValue();
+--- 26,32 ----
+    public:
+      CardRec(int suit, int value, unsigned long fore, unsigned long back,
+  	    char *bitmap);
+!     Window getWindow();
+      Stack getStack();
+      int getSuit();
+      int getValue();
+*** auto.C	Thu Feb  3 23:56:15 1994
+--- ../seahaven/auto.C	Fri Nov 20 11:47:51 1992
+***************
+*** 1,16 ****
+- #include <stream.h>
+  
+  
+  #include <strings.h>
+  #include <stdlib.h>
+  
+  #include <sys/types.h>
+  #include <sys/time.h>
+- 
+  #include <fcntl.h>
+! //#include <osfcn.h>
+! 
+! //#include <stdlib.h>		// for getenv()
+  
+  
+  #include "auto.h"
+--- 1,14 ----
+  
++ #include <stream.h>
++ #include <fstream.h>
+  
+  #include <strings.h>
+  #include <stdlib.h>
+  
+  #include <sys/types.h>
+  #include <sys/time.h>
+  #include <fcntl.h>
+! #include <stdio.h>
+  
+  
+  #include "auto.h"
+***************
+*** 149,155 ****
+  }
+  
+  HashTable::~HashTable() {
+!     delete[size] ht;
+  }
+  
+  HashList::~HashList() {
+--- 147,153 ----
+  }
+  
+  HashTable::~HashTable() {
+!     delete[] ht;
+  }
+  
+  HashList::~HashList() {
+***************
+*** 276,292 ****
+  static char *suitName = "HDCS";
+  
+  void Card::Print(ostream &os) const {
+!     if (EmptyP()) os << "--";
+!     else os << chr(rankName[rank()]) << chr(suitName[suit()]);
+  }
+  
+  Card::Card(char* st) {
+      char *c;
+      c = index(suitName, st[1]);
+!     if (! c) Error("Bad suit ", chr(st[1]), " in Card string constructor.");
+      thisSuit = Suit(c-suitName);
+      c = index(rankName, st[0]);
+!     if (! c) Error("Bad rank ", chr(st[0]), " in Card string constructor.");
+      thisRank = Rank(c - rankName);
+      empty = 0;
+  }
+--- 274,294 ----
+  static char *suitName = "HDCS";
+  
+  void Card::Print(ostream &os) const {
+!     if (EmptyP())
+! 	os << "--";
+!     else
+! 	os << char(rankName[rank()]) << char(suitName[suit()]);
+  }
+  
+  Card::Card(char* st) {
+      char *c;
+      c = index(suitName, st[1]);
+!     if (! c)
+! 	Error("Bad suit ", st+1, " in Card string constructor.");
+      thisSuit = Suit(c-suitName);
+      c = index(rankName, st[0]);
+!     if (! c)
+! 	Error("Bad rank ", st, " in Card string constructor.");
+      thisRank = Rank(c - rankName);
+      empty = 0;
+  }
+***************
+*** 345,351 ****
+  #ifdef AUTO
+  SolutionLog solutionhead = NULL;
+  
+! /* overload LogSolution(); */
+  
+  static void LogOneSolution(Card card, int dest) {
+      SolutionLog temp = new SolutionLogRec;
+--- 347,353 ----
+  #ifdef AUTO
+  SolutionLog solutionhead = NULL;
+  
+! //overload LogSolution();
+  
+  static void LogOneSolution(Card card, int dest) {
+      SolutionLog temp = new SolutionLogRec;
+***************
+*** 522,528 ****
+    public:
+      MoveCard(Card& f, Dest& d, MoveCardToMemberFunction mf)
+  	: (d), from(f), mcmf(mf) { }
+!     void MoveCard::DoIt() { dest.MoveTo(from); }
+  //    void MoveCard::DoIt() { dest.*mcmf(from); }
+  };
+  
+--- 524,530 ----
+    public:
+      MoveCard(Card& f, Dest& d, MoveCardToMemberFunction mf)
+  	: (d), from(f), mcmf(mf) { }
+!     void DoIt() { dest.MoveTo(from); }
+  //    void MoveCard::DoIt() { dest.*mcmf(from); }
+  };
+  
+***************
+*** 946,952 ****
+  
+      sprintf(savefile, "%s/.seahavensave", getenv("HOME"));
+  
+!     istream in = fopen(savefile, O_RDONLY);
+      Tableaux t(in);
+  
+      solutionhead = NULL;
+--- 948,954 ----
+  
+      sprintf(savefile, "%s/.seahavensave", getenv("HOME"));
+  
+!     ifstream in(savefile);
+      Tableaux t(in);
+  
+      solutionhead = NULL;
+*** card.C	Thu Feb  3 23:31:08 1994
+--- ../seahaven/card.C	Fri Nov 20 12:07:37 1992
+***************
+*** 21,27 ****
+  
+  static void RegisterWindow(Card card, Window window) {
+      int i;
+!     if (windowcard == 0 || window > windowcard[numwindowcard - 1].window) {
+  	windowcard[numwindowcard].window = window;
+  	windowcard[numwindowcard].card = card;
+  	numwindowcard++;
+--- 21,27 ----
+  
+  static void RegisterWindow(Card card, Window window) {
+      int i;
+!     if (numwindowcard == 0 || window > windowcard[numwindowcard - 1].window) {
+  	windowcard[numwindowcard].window = window;
+  	windowcard[numwindowcard].card = card;
+  	numwindowcard++;
+*** stack.C	Thu Feb  3 23:33:46 1994
+--- ../seahaven/stack.C	Fri Feb  4 00:04:02 1994
+***************
+*** 10,16 ****
+  
+  #include <sys/time.h>		// For time()
+  #include <math.h>		// For random()
+! /* #include <malloc.h> */
+  #include <X11/cursorfont.h>
+  
+  Stack playstack[NUMPLAYSTACK];
+--- 10,16 ----
+  
+  #include <sys/time.h>		// For time()
+  #include <math.h>		// For random()
+! #include <stdlib.h>
+  #include <X11/cursorfont.h>
+  
+  Stack playstack[NUMPLAYSTACK];
+***************
+*** 467,481 ****
+  
+  
+  void DoAutoPlay() {
+!     static Cursor waitcursor = NULL;
+!     if (waitcursor == NULL) waitcursor = XCreateFontCursor(dpy, XC_watch);
+      XDefineCursor(dpy, toplevel, waitcursor);
+-     score->lostGame();
+      DoRestart();
+      XFlush(dpy);
+      inautoplay = True;
+      int solvable = AutoPlay();
+      if (solvable) {
+  	score->setMessage("Solvable.");
+  	while (solutionhead) {
+  	    SolutionLog temp = solutionhead;
+--- 467,481 ----
+  
+  
+  void DoAutoPlay() {
+!     static Cursor waitcursor = (Cursor) NULL;
+!     if (waitcursor == (Cursor) NULL) waitcursor = XCreateFontCursor(dpy, XC_watch);
+      XDefineCursor(dpy, toplevel, waitcursor);
+      DoRestart();
+      XFlush(dpy);
+      inautoplay = True;
+      int solvable = AutoPlay();
+      if (solvable) {
++     score->lostGame();
+  	score->setMessage("Solvable.");
+  	while (solutionhead) {
+  	    SolutionLog temp = solutionhead;
+***************
+*** 504,509 ****
+--- 504,510 ----
+  	    XFlush(dpy);	// For debugging.
+  	}
+      } else {
++       score->wonGame();
+  	score->setMessage("Unsolvable.");
+      }
+      inautoplay = False;
