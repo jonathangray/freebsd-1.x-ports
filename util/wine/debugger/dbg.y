@@ -148,7 +148,7 @@ void
 wine_debug(int signal, int * regs)
 {
 	int i;
-#ifdef YYDEBUG
+#if YYDEBUG
 	yydebug = 0;
 #endif
 	static int dummy_regs[32];
