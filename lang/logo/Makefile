@@ -40,7 +40,7 @@ logolib:
 	chmod +x makelib
 	./makelib
 
-pkg:	install pkg/+PLIST pkg/+DESC pkg/+ONELINE
+package:	install pkg/+PLIST pkg/+DESC pkg/+ONELINE
 	pkg_create -f pkg/+PLIST -d pkg/+DESC -c pkg/+ONELINE logo_bin
 
 install: logo
