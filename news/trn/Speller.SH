@@ -4,7 +4,7 @@ esac
 echo "Extracting Speller (with variable substitutions)"
 $spitshell >Speller <<!GROK!THIS!
 $startsh
-# $Id: Speller.SH,v 1.5 1993/12/01 06:37:50 nate Exp $
+# $Id: Speller.SH,v 1.6 1994/02/22 01:43:01 nate Exp $
 #	Speller - a script to disassemble a posting; use ispell to spell-
 #	check the body along with the Subject, Keywords, and Summary lines;
 #	and put it all back together again.

@@ -15,7 +15,7 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef\(.*\)/\*!/\*#define\1\*//\*!'
  * that running config.h.SH again will wipe out any changes you've made.
  * For a more permanent change edit config.sh and rerun config.h.SH.
  *
- * \$Id: config.h.SH,v 1.5 1993/12/01 06:37:59 nate Exp $
+ * \$Id: config.h.SH,v 1.6 1994/02/22 01:44:50 nate Exp $
  */
 
 /* Configuration time: $cf_time

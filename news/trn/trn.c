@@ -33,7 +33,7 @@
  */
 
 #include "patchlevel.h"
-static char rnid[] = "@(#)$Id: trn.c,v 1.4 1993/12/01 06:38:48 nate Exp $";
+static char rnid[] = "@(#)$Id: trn.c,v 1.5 1994/02/22 01:52:36 nate Exp $";
 static char patchlevel[] = PATCHLEVEL;
 
 #include "INTERN.h"

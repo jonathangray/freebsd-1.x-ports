@@ -1,4 +1,4 @@
-/* $Id: cache.c,v 1.5 1993/12/01 06:37:55 nate Exp $
+/* $Id: cache.c,v 1.6 1994/02/22 01:44:33 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

@@ -19,7 +19,7 @@ Wayne Davison  <davison@borland.com>
 !GROK!THIS!
 $eunicefix newsnews
 #
-# $Id: newsnews.SH,v 1.4 1993/12/01 06:38:16 nate Exp $
+# $Id: newsnews.SH,v 1.5 1994/02/22 01:47:52 nate Exp $
 #
 # This software is Copyright 1991 by Stan Barber. 
 #

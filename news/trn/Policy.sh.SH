@@ -12,7 +12,7 @@ $startsh
 #  gets its values from config.sh, which is generally produced by
 #  running Configure.
 # 
-#  \$Id: Policy.sh.SH,v 1.1 1993/12/01 06:37:48 nate Exp $
+#  \$Id: Policy.sh.SH,v 1.2 1994/02/22 01:42:46 nate Exp $
 
 # Configuration time: $cf_time
 # Configured by: $cf_by

@@ -3,7 +3,7 @@ case $CONFIG in
 esac
 echo "Extracting Makefile (with variable substitutions)"
 $cat >Makefile <<!GROK!THIS!
-# $Id: Makefile.SH,v 1.5 1993/12/01 06:37:44 nate Exp $
+# $Id: Makefile.SH,v 1.6 1994/02/22 01:42:23 nate Exp $
 #
 # This software is Copyright 1991 by Stan Barber. 
 #

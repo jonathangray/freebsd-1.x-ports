@@ -1,4 +1,4 @@
-/* $Id: ngdata.c,v 1.4 1993/12/01 06:38:19 nate Exp $
+/* $Id: ngdata.c,v 1.5 1994/02/22 01:48:09 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -106,6 +106,7 @@ access_ng()
 #endif /* !USE_NNTP */
 
     dmcount = 0;
+    in_ng = TRUE;			/* tell the world we are here */
 
     build_cache();
     return TRUE;

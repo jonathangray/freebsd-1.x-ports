@@ -1,4 +1,4 @@
-/* $Id: ng.c,v 1.4 1993/12/01 06:38:18 nate Exp $
+/* $Id: ng.c,v 1.5 1994/02/22 01:47:57 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -129,7 +129,6 @@ char *start_command;			/* command to fake up first */
 
     /* FROM HERE ON, RETURN THRU CLEANUP OR WE ARE SCREWED */
 
-    in_ng = TRUE;			/* tell the world we are here */
     forcelast = TRUE;			/* if 0 unread, do not bomb out */
     recent_artp = curr_artp = Nullart;
     recent_art = curr_art = lastart+1;

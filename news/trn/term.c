@@ -1,4 +1,4 @@
-/* $Id: term.c,v 1.5 1993/12/01 06:38:42 nate Exp $
+/* $Id: term.c,v 1.6 1994/02/22 01:52:11 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

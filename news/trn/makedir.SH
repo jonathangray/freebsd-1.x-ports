@@ -4,11 +4,12 @@ esac
 echo "Extracting makedir (with variable substitutions)"
 $spitshell >makedir <<!GROK!THIS!
 $startsh
-# $Id: makedir.SH,v 1.3 1993/11/17 23:03:13 nate Exp $
+# $Id: makedir.SH,v 1.4 1994/02/22 01:47:17 nate Exp $
 # 
 # $Log: makedir.SH,v $
-# Revision 1.3  1993/11/17 23:03:13  nate
-# Update trn 3.2 to trn 3.3
+# Revision 1.4  1994/02/22 01:47:17  nate
+# Upgraded trn to version 3.4.1.  No modifications are necessary as it
+# will compile straight out of the box after running 'Configure'.
 #
 # Revision 2.11  90/09/17  17:03:55  hokey
 # 2.11 alpha baseline

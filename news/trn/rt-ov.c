@@ -1,4 +1,4 @@
-/* $Id: rt-ov.c,v 1.5 1993/12/01 06:38:30 nate Exp $
+/* $Id: rt-ov.c,v 1.6 1994/02/22 01:50:42 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -39,7 +39,7 @@ ov_init()
     if (*ser_line == NNTP_CLASS_OK) {
 	do {
 	    nntp_gets(ser_line, sizeof ser_line);
-	} while (NNTP_LIST_END(ser_line));
+	} while (!NNTP_LIST_END(ser_line));
     }
 #endif
     return TRUE;

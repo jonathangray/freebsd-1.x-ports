@@ -1,4 +1,4 @@
-/* $Id: autosub.c,v 1.3 1993/11/17 23:02:38 nate Exp $
+/* $Id: autosub.c,v 1.4 1994/02/22 01:44:04 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

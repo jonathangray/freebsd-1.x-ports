@@ -1,4 +1,4 @@
-/* $Id: artio.h,v 1.3 1993/11/17 23:02:29 nate Exp $
+/* $Id: artio.h,v 1.4 1994/02/22 01:43:45 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

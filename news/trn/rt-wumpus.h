@@ -1,4 +1,4 @@
-/* $Id: rt-wumpus.h,v 1.3 1993/11/17 23:03:58 nate Exp $
+/* $Id: rt-wumpus.h,v 1.4 1994/02/22 01:51:31 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software

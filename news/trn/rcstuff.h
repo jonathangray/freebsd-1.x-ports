@@ -1,4 +1,4 @@
-/* $Id: rcstuff.h,v 1.3 1993/11/17 23:03:43 nate Exp $
+/* $Id: rcstuff.h,v 1.4 1994/02/22 01:50:14 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

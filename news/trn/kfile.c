@@ -1,4 +1,4 @@
-/* $Id: kfile.c,v 1.5 1993/12/01 06:38:15 nate Exp $
+/* $Id: kfile.c,v 1.6 1994/02/22 01:46:53 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

@@ -1,4 +1,4 @@
-/* $Id: rt-util.c,v 1.4 1993/12/01 06:38:38 nate Exp $
+/* $Id: rt-util.c,v 1.5 1994/02/22 01:51:18 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software

@@ -1,4 +1,4 @@
-/* $Id: sw.c,v 1.5 1993/12/01 06:38:41 nate Exp $
+/* $Id: sw.c,v 1.6 1994/02/22 01:52:03 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

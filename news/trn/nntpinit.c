@@ -1,4 +1,4 @@
-/* $Id: nntpinit.c,v 1.4 1993/12/01 06:38:26 nate Exp $
+/* $Id: nntpinit.c,v 1.5 1994/02/22 01:49:18 nate Exp $
 */
 /* This software is Copyright 1992 by Stan Barber. 
  *
@@ -94,6 +94,10 @@ char *server;
 	** If understood, use that reply. */
 	nntp_command("MODE READER");
 	nntp_gets(line2, sizeof line2);
+#if defined(DEBUG) && defined(FLUSH)
+	if (debug & DEB_NNTP)
+	    printf("<%s\n", line2) FLUSH;
+#endif
 	if (atoi(line2) != NNTP_BAD_COMMAND_VAL)
 	    strcpy(ser_line, line2);
     }

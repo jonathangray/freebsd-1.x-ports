@@ -1,4 +1,4 @@
-/* $Id: getactive.c,v 1.4 1993/12/01 06:38:05 nate Exp $
+/* $Id: getactive.c,v 1.5 1994/02/22 01:45:58 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -83,6 +83,42 @@ char *argv[];
 #endif
     nntp_close(TRUE);
     return 0;
+}
+
+/* return ptr to little string in big string, NULL if not found */
+
+char *
+instr(big, little, case_matters)
+char *big, *little;
+bool_int case_matters;
+{
+    register char *t, *s, *x;
+
+    for (t = big; *t; t++) {
+	for (x=t,s=little; *s; x++,s++) {
+	    if (!*x)
+		return Nullch;
+	    if (case_matters == TRUE) {
+		if(*s != *x)
+		    break;
+	    } else {
+		register char c,d;
+		if (isupper(*s)) 
+		    c = tolower(*s);
+		else
+		    c = *s;
+		if (isupper(*x)) 
+		    d = tolower(*x);
+		else
+		    d = *x;
+		if ( c != d )
+		    break;
+	   }
+	}
+	if (!*s)
+	    return t;
+    }
+    return Nullch;
 }
 
 void

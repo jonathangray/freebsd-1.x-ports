@@ -1,4 +1,4 @@
-/* $Id: intrp.c,v 1.4 1993/12/01 06:38:12 nate Exp $
+/* $Id: intrp.c,v 1.5 1994/02/22 01:46:43 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -145,7 +145,8 @@ char *tcbuf;
     /* host name that goes in postings (%H) */
 
     phostname = PHOSTNAME;
-    if (*phostname == '/') {
+    if (*phostname == '/' || *phostname == '~') {
+	phostname = filexp(phostname);
 	if ((tmpfp = fopen(phostname,"r")) == NULL) {
 	    printf("Warning: Couldn't open %s to determine hostname!\n",
 		   phostname); 

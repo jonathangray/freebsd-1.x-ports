@@ -1,4 +1,4 @@
-/* $Id: search.c,v 1.3 1993/11/17 23:04:01 nate Exp $
+/* $Id: search.c,v 1.4 1994/02/22 01:51:49 nate Exp $
  */
 
 /* string search routines */

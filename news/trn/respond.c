@@ -1,4 +1,4 @@
-/* $Id: respond.c,v 1.4 1993/11/17 23:03:44 nate Exp $
+/* $Id: respond.c,v 1.5 1994/02/22 01:50:20 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

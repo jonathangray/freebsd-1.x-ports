@@ -1,4 +1,4 @@
-/* $Id: util.h,v 1.3 1993/11/17 23:04:13 nate Exp $
+/* $Id: util.h,v 1.4 1994/02/22 01:52:48 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

@@ -1,4 +1,4 @@
-/* $Id: ndir.c,v 1.3 1993/11/17 23:03:15 nate Exp $
+/* $Id: ndir.c,v 1.4 1994/02/22 01:47:25 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

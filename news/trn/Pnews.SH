@@ -4,7 +4,7 @@ esac
 echo "Extracting Pnews (with variable substitutions)"
 $spitshell >Pnews <<!GROK!THIS!
 $startsh
-# $Id: Pnews.SH,v 1.5 1993/12/01 06:37:47 nate Exp $
+# $Id: Pnews.SH,v 1.6 1994/02/22 01:42:34 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #

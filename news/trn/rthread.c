@@ -1,4 +1,4 @@
-/* $Id: rthread.c,v 1.5 1993/12/01 06:38:39 nate Exp $
+/* $Id: rthread.c,v 1.6 1994/02/22 01:51:39 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -241,14 +241,14 @@ bool_int sel_flag, rereading;
 		sp = sp->next;
 	if (!sp)
 	    goto num_inc;
+	if (sel_mode == SM_THREAD && sp->thread)
+	    sp = sp->thread->subj;
 	do {
 	    if (ap)
 		ap = next_art(ap);
 	    else
 		ap = first_art(sp);
 	    while (!ap) {
-		if (sel_mode == SM_THREAD && sp->thread)
-		    sp = sp->thread->subj;
 		while ((sp = sp->next) != Nullsubj
 		    && (sp->flags & subj_mask) != subj_mask)
 		    ;
@@ -335,14 +335,14 @@ bool_int sel_flag, rereading;
 		sp = sp->prev;
 	if (!sp)
 	    goto num_dec;
+	if (sel_mode == SM_THREAD && sp->thread)
+	    sp = sp->thread->subj;
 	do {
 	    if (ap)
 		ap = prev_art(ap);
 	    else
 		ap = last_art(sp);
 	    while (!ap) {
-		if (sel_mode == SM_THREAD && sp->thread)
-		    sp = sp->thread->subj;
 		while ((sp = sp->prev) != Nullsubj
 		    && (sp->flags & subj_mask) != subj_mask)
 		    ;

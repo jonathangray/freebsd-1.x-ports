@@ -1,4 +1,4 @@
-/* $Id: hash.c,v 1.4 1993/12/01 06:38:06 nate Exp $
+/* $Id: hash.c,v 1.5 1994/02/22 01:46:04 nate Exp $
 */
 /* This file is an altered version of a set of hash routines by
 ** Geoffrey Collyer.  See the end of the file for his copyright.

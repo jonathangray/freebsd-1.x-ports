@@ -1,4 +1,4 @@
-/* $Id: nghash.c,v 1.4 1993/12/01 06:38:20 nate Exp $
+/* $Id: nghash.c,v 1.5 1994/02/22 01:48:19 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber.
  *

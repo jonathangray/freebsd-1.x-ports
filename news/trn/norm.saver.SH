@@ -4,7 +4,7 @@ esac
 echo "Extracting norm.saver (with variable substitutions)"
 $spitshell >norm.saver <<!GROK!THIS!
 $startsh
-# $Id: norm.saver.SH,v 1.3 1993/11/17 23:03:34 nate Exp $
+# $Id: norm.saver.SH,v 1.4 1994/02/22 01:49:24 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #

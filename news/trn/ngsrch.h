@@ -1,4 +1,4 @@
-/* $Id: ngsrch.h,v 1.3 1993/11/17 23:03:27 nate Exp $
+/* $Id: ngsrch.h,v 1.4 1994/02/22 01:48:34 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *

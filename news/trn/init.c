@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.5 1993/12/01 06:38:11 nate Exp $
+/* $Id: init.c,v 1.6 1994/02/22 01:46:33 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
