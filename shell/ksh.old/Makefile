@@ -59,8 +59,8 @@ cleandir:	clean
 
 pkg:	pkg_src pkg_bin
 
-pkg_src: +DESC_S +ONELINE_S +PLIST_S
-	pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S ksh_src
+pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S ksh_src
 
-pkg_bin: +DESC_B +ONELINE_B +PLIST_B +INST_B +DINST_B
-	pkg_create -c +ONELINE_B -d +DESC_B -f +PLIST_B -i +INST_B -k +DINST_B ksh_bin
+pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B pkg/+INST_B pkg/+DINST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B -i pkg/+INST_B -k pkg/+DINST_B ksh_bin
