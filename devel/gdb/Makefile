@@ -1,16 +1,16 @@
 # This file was generated automatically by configure.  Do not edit.
 VPATH = .
 links = 
-host_alias = i386--386bsd
+host_alias = i386--netbsd
 host_cpu = i386
 host_vendor = 
-host_os = bsd
-host_canonical = i386--bsd
-target_alias = i386--386bsd
+host_os = netbsd
+host_canonical = i386--netbsd
+target_alias = i386--netbsd
 target_cpu = i386
 target_vendor = 
-target_os = bsd
-target_canonical = i386--bsd
+target_os = netbsd
+target_canonical = i386--netbsd
 #
 # Makefile for directory with subdirs to build.
 #   Copyright (C) 1990, 1991, 1992, 1993 Free Software Foundation
@@ -32,12 +32,12 @@ target_canonical = i386--bsd
 
 srcdir = .
 
-prefix = /usr/gnu
+prefix = /usr/local
 
 exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 libdir = $(exec_prefix)/lib
-tooldir = $(exec_prefix)/i386--386bsd
+tooldir = $(exec_prefix)/i386--netbsd
 
 program_transform_name = 
 
@@ -942,6 +942,14 @@ gdb.tar.gz: setup-dirs-gdb
 	(cd gdb; $(MAKE) -f Makefile.in make-proto-gdb.dir BISON="byacc")
 	(cd gdb; $(MAKE) -f Makefile.in make-proto-testsuite.dir)
 	$(MAKE) $(MFLAGS) -f Makefile.in make-gdb.tar.gz
+
+pkg:	pkg_src pkg_bin
+
+pkg_src: pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
+	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S gdb_src
+
+pkg_bin: pkg/+DESC_B pkg/+ONELINE_B pkg/+PLIST_B
+	pkg_create -c pkg/+ONELINE_B -d pkg/+DESC_B -f pkg/+PLIST_B gdb_bin
 
 make-gdb.tar.gz: $(DEVO_SUPPORT) $(GDB_SUPPORT_DIRS) gdb texinfo/texinfo.tex
 	rm -rf proto-toplev; mkdir proto-toplev
