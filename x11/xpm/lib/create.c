@@ -14,7 +14,9 @@
 #include "sys$library:ctype.h"
 #else
 #include <ctype.h>
+#ifndef __FreeBSD__
 #include <values.h>
+#endif
 #endif
 
 LFUNC(xpmVisualType, int, (Visual *visual));
