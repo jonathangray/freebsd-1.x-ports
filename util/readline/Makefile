@@ -11,8 +11,8 @@
 
 # Destination installation directory.  The libraries are copied to DESTDIR
 # when you do a `make install', and the header files to INCDIR/readline/*.h.
-DESTDIR = /usr/local/lib
-INCDIR = /usr/local/include
+DESTDIR = /usr/gnu/lib
+INCDIR = /usr/gnu/include
 
 # Define TYPES as -DVOID_SIGHANDLER if your operating system uses
 # a return type of "void" for signal handlers.
@@ -31,7 +31,7 @@ TYPES = -DVOID_SIGHANDLER
 # the vi line editing mode and features.
 READLINE_DEFINES = $(TYPES) -DVI_MODE
 
-DEBUG_FLAGS = -g
+DEBUG_FLAGS = -O2
 LDFLAGS = $(DEBUG_FLAGS) 
 CFLAGS = $(DEBUG_FLAGS) $(USG) -I.
 
@@ -125,3 +125,6 @@ $(DESTDIR)/libreadline.a: libreadline.a
 	-mv $(DESTDIR)/libreadline.a $(DESTDIR)/libreadline.old
 	cp libreadline.a $(DESTDIR)/libreadline.a
 	if [ -f $(RANLIB) ]; then $(RANLIB) -t $(DESTDIR)/libreadline.a; fi
+
+package: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST readline_bin
