@@ -22,7 +22,8 @@ install: $(PROGS)
 	-mkdir -p /usr/local/bin
 	install -s $(PROGS) /usr/local/bin
 	-mkdir -p /usr/local/lib/sml/smlnj-lib
-	install -c smlnj-lib-0.2/* /usr/local/lib/sml/smlnj-lib
+	(cd smlnj-lib-0.2; \
+	    install -c `echo * | sed -e s/CVS//` /usr/local/lib/sml/smlnj-lib)
 	-mkdir -p /usr/local/man/man1
 	install -c doc/man1/sml.1 /usr/local/man/man1
 	-mkdir -p /usr/gnu/lib/emacs/site-lisp
