@@ -1597,10 +1597,10 @@ ttopen(ttname,lcl,modem,timo) char *ttname; int *lcl, modem, timo; {
 	}
 #endif /* BSD44 */
 #endif /* ATTSV */
-#ifndef SCO3R2
+#ifndef NOCOTFMC /* = NO Close(Open()) To Force Mode Change */
 /* Reportedly lets uugetty grab the device in SCO UNIX 3.2 / XENIX 2.3 */
 	close( priv_opn(ttname, O_RDWR) ); /* Magic to force change. */
-#endif /* SCO3R2 */
+#endif /* NOCOTFMC */
     }
 #endif /* O_NDELAY */
 
@@ -2301,7 +2301,7 @@ ttres() {                               /* Restore the tty to normal. */
 
 /*  T T R P I D  --  Read pid from lockfile "name" (used by ttlock) */
 
-int
+static int
 ttrpid(name) char *name; {
     int x, fd, pid;
 

@@ -1073,7 +1073,7 @@ dooutput(s) char *s; {
 #define obfls() ((xxout(obuf,obn)<0)?-1:obini())
 #define oboc(c) ((*obp++=(char)(c)),(((++obn)>=OBSIZE)?obfls():0))
 
-    int x, y, quote;			/* Workers */
+    int x, xx, y, quote;		/* Workers */
     int obn;				/* Buffer offset (high water mark) */
     char obuf[OBSIZE];			/* Output character buffer, on stack */
     char *obp;				/* Pointer to output buffer */
@@ -1108,14 +1108,17 @@ dooutput(s) char *s; {
 		continue;		/* and not the l or L */
 #endif /* CK_LBRK */
 	    } else {			/* if \ not followed by b or B */
-		if (oboc(dopar(CMDQ)) < 0) /* Output the backslash. */
+		/* Note: Atari ST compiler won't allow macro call in "if ()" */
+		xx = oboc(dopar(CMDQ));	/* Output the backslash. */
+		if (xx < 0)
 		  goto outerr;
 		quote = 0;		/* Turn off quote flag */
 	    }
 	} else				/* No quote */
 	  quote = 0;			/* Turn off quote flag */
 
-	if (oboc(dopar((char)x)) < 0)	/* Output this character */
+	xx = oboc(dopar((char)x));	/* Output this character */
+	if (xx < 0)
 	  goto outerr;
 	if (seslog && duplex)		/* Log the character if log is on */
 	  if (zchout(ZSFILE,(char)x) < 0) /* and connection is half duplex */
@@ -1129,7 +1132,8 @@ dooutput(s) char *s; {
 		    )
 #endif /* TNCODE */
 		) {
-		if (oboc(dopar('\012')) < 0) /* Send LF too (CR => CRLF) */
+		xx = oboc(dopar('\012'));
+		if (xx < 0)		/* Send LF too (CR => CRLF) */
 		  goto outerr;
 		if (seslog && duplex)	     /* Log the LF if appropriate */
 		  if (zchout(ZSFILE,'\012') < 0)
@@ -1816,15 +1820,6 @@ shofea() {
   Print compile-time (-D) options, as well as C preprocessor
   predefined symbols that might affect us...
 */
-#ifndef _M_UNIX
-/*
-  SCO ODT 2.0 = UNIX 3.2v4 has __TIMESTAMP__, but it contains a hard newline,
-  and so causes compilation to fail.  The symbol _M_UNIX is defined for this
-  version but not earlier.
-*/
-#ifdef __TIMESTAMP__			/* SCO, at least */
-    printf("\nCompiled: %s, options\n", __TIMESTAMP__);
-#else /* !__TIMESTAMP__ */
 #ifdef __DATE__				/* GNU and other ANSI */
 #ifdef __TIME__
     printf("\nCompiled %s %s, options:\n", __DATE__, __TIME__);
@@ -1834,8 +1829,6 @@ shofea() {
 #else /* !__DATE__ */
     printf("\nCompiler options:\n");
 #endif /* __DATE__ */
-#endif /* __TIMESTAMP__ */
-#endif /* _M_UNIX */
 
 #ifdef DEBUG
 #ifdef IFDEBUG
@@ -2166,6 +2159,9 @@ shofea() {
 #ifdef VAX
     prtopt(" VAX");
 #endif
+#ifdef __ALPHA
+    prtopt(" __ALPHA");
+#endif
 #ifdef sun
     prtopt(" sun");
 #endif
@@ -2216,6 +2212,24 @@ shofea() {
 #endif
 #ifdef _M_UNIX				/* SCO UNIX 3.2v4 = ODT 2.0 */
     prtopt(" _M_UNIX");
+#endif
+#ifdef M_I586
+    prtopt(" M_I586");
+#endif
+#ifdef _M_I586
+    prtopt(" _M_I586");
+#endif
+#ifdef i586
+    prtopt(" i586");
+#endif
+#ifdef M_I486
+    prtopt(" M_I486");
+#endif
+#ifdef _M_I486
+    prtopt(" _M_I486");
+#endif
+#ifdef i486
+    prtopt(" i486");
 #endif
 #ifdef M_I386
     prtopt(" M_I386");
@@ -2337,6 +2351,9 @@ shofea() {
 #ifdef __STDC__
     prtopt(" __STDC__");
 #endif
+#ifdef __DECC
+    prtopt(" __DECC");
+#endif
 #ifdef __GNUC__				/* gcc in ansi mode */
     prtopt(" __GNUC__");
 #endif
@@ -2394,7 +2411,7 @@ shofea() {
 #endif /* NOFRILLS */
 
 #ifdef VMS
-int
+VOID
 sholbl() {
     printf("VMS Labeled File Features:\n");
     printf(" acl %s (ACL info %s)\n",

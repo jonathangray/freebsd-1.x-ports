@@ -78,8 +78,8 @@
 #define HERALD " Apple Macintosh AUX"
 #endif /* AUX */
 
-#ifdef BSD44
-#define HERLAD " 4.4 BSD"
+#if defined(BSD44) && !defined(__386BSD__)
+#define HERALD " 4.4 BSD"
 #endif /* BSD44 */
 
 #ifdef ENCORE
@@ -153,6 +153,10 @@
 #ifdef DELL_SVR4
 #define HERALD " Dell System V R4"
 #endif /* DELL_SVR4 */
+
+#ifdef UNIXWARE
+#define HERALD " Univel UnixWare"
+#endif /* UNIXWARE */
 
 #ifdef ICL_SVR4
 #define HERALD " ICL System V R4 DRS N/X"

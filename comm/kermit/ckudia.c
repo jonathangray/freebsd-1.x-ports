@@ -521,7 +521,11 @@ MDMINF DF200 =		/* information for "DEC DF200-series" modem */
     "",			/* wake_prompt */
     "",			/* dmode_str */
     NULL,		/* dmode_prompt */
+#ifdef COMMENT
     "%s!",		/* dial_str */
+#else
+    "   d %s\015",
+#endif /* COMMENT */
     0,			/* dial_rate */
     0,			/* esc_time */
     "",			/* esc_str */

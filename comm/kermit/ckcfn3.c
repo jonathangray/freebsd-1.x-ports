@@ -20,7 +20,7 @@
 #include "ckcker.h"
 #include "ckcxla.h"
 
-extern int unkcs, wmax, wcur, discard, bctu, bctl, local, fdispla, what;
+extern int unkcs, wmax, wcur, discard, bctu, bctl, local, fdispla, what, xflg;
 extern CHAR *data;
 extern char filnam[];
 #ifndef NOFRILLS
@@ -855,7 +855,7 @@ gattr(s, yy) CHAR *s; struct zattr *yy; { /* Read incoming attribute packet */
 		    *ftbuf != 'A' && *ftbuf != 'B' /* Unknown type? */
 #ifdef VMS
 /* or (VMS) our FILE TYPE is LABELED and the incoming file is text... */
-		    || binary == XYFT_L && *ftbuf == 'A'
+		    || (binary == XYFT_L && *ftbuf == 'A' && !xflg)
 #endif /* VMS */		    
 		    ) {
 		    discard = 1;	/* Reject the file */
@@ -1171,7 +1171,7 @@ opena(f,zz) char *f; struct zattr *zz; {
     }
     if (zz->type.val[0] == 'A') {	/* Check received attributes */
 #ifdef VMS
-	if (binary == XYFT_L)		/* Refuse to receive a file in */
+	if (!xflg && (binary == XYFT_L)) /* Refuse to receive a file in */
 	  return(0);			/* labeled mode if sent as text. */
 #endif /* VMS */
 	bsave = binary;			/* ASCII.  Save global file type */
@@ -1331,6 +1331,8 @@ openi(name) char *name; {
 
 /*  O P E N O  --  Open a new file for output.  */
 
+static int isopen = 0;
+
 int
 openo(name,zz,fcb) char *name; struct zattr *zz; struct filinfo *fcb; {
     char *name2;
@@ -1354,10 +1356,12 @@ openo(name,zz,fcb) char *name; struct zattr *zz; struct filinfo *fcb; {
     }
 
     if (zopeno(ZOFILE,name,zz,fcb) == 0) { /* Try to open the file */
+	isopen = 0;
 	debug(F110,"openo failed",name,0);
 	tlog(F110,"Failure to open",name,0L);
 	return(0);
     } else {
+	isopen = 1;
 	debug(F110,"openo ok, name",name,0);
 	return(1);
     }
@@ -1437,8 +1441,9 @@ clsof(disp) int disp; {
 	screen(SCR_ST,ST_ERR,0l,"");
     } else if (disp) {			/* Interrupted or refused */
 	if (keep == 0) {		/* If not keeping incomplete files */
-	    if (*filnam && (what & W_RECV)) /* and we're receiving! */
-	      zdelet(filnam);		    /* then delete it */
+	    if (isopen &&		/* and the file is actually open */
+		*filnam && (what & W_RECV)) /* and we're receiving!!! */
+	      zdelet(filnam);		    /* THEN delete it */
 	    debug(F100,"Discarded","",0);
 	    tlog(F100,"Discarded","",0L);
 	    screen(SCR_ST,ST_DISC,0l,"");
@@ -1453,6 +1458,7 @@ clsof(disp) int disp; {
 	fstats();
 	screen(SCR_ST,ST_OK,0l,"");
     }
+    isopen = 0;
     return(x);				/* Send back zclose() return code. */
 }
 

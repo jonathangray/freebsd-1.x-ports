@@ -143,12 +143,17 @@ extern int pclose(FILE *);
 #else
 
 #ifdef SVORPOSIX
+#ifndef TIMESTAMP
 #define TIMESTAMP
+#endif /* TIMESTAMP */
 #include <time.h>
 
 /* void tzset(); (the "void" type upsets some compilers) */
 #ifndef ultrix
+#ifndef CONVEX9
+/* ConvexOS 9.0, supposedly POSIX, has extern char *timezone(int,int) */
 extern long timezone;
+#endif /* CONVEX9 */
 #endif /* ultrix */
 #endif /* SVORPOSIX */
 #endif /* BSD4 */
@@ -2095,11 +2100,16 @@ zstime(f,yy,x) char *f; struct zattr *yy; int x; {
 	    tm += timezone;
 #else
 #ifndef BSD44				/* For now... */
+#ifndef CONVEX9
+/*
+  How to accomplish this for these systems is still a mystery.
+*/
 #ifdef ultrix
 	    tm += (long) timezone;
 #else
 	    tm += timezone;
 #endif /* ultrix */
+#endif /* CONVEX9 */
 #endif /* BSD44 */
 #endif /* ANYBSD */
 	    tm += n * 60L;
@@ -2998,11 +3008,24 @@ zshcmd(s) char *s; {
 	char *defshell = "/bin/sh";	/* Default */
 
 	if (priv_can()) exit(1);	/* Turn off privs. */
+#ifdef COMMENT
+/* Old way always used /etc/passwd shell */
 	p = getpwuid(real_uid());	/* Get login data */
 	if (p == (struct passwd *) NULL || !*(p->pw_shell))
 	  shpath = defshell;
 	else
 	  shpath = p->pw_shell;
+#else
+/* New way lets user override with SHELL variable, but does not rely on it. */
+/* This allows user to specify a different shell. */
+	shpath = getenv("SHELL");	/* What shell? */
+	if (shpath == NULL) {
+	    p = getpwuid( real_uid() );	/* Get login data */
+	    if (p == (struct passwd *)NULL || !*(p->pw_shell))
+	      shpath = defshell;
+	    else shpath = p->pw_shell;
+        }
+#endif /* COMMENT */
 #endif /* aegis */
 	shptr = shname = shpath;
 	while (*shptr != '\0')

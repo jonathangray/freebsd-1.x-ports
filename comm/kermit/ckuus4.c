@@ -2545,7 +2545,10 @@ nvlook(s) char *s; {
 	    return(vvbuf);
 	} else return("");
 #else
-	return(tfnam[tlevel] ? tfnam[tlevel] : "");
+	if (tlevel < 0)
+	  return("");
+	else
+	  return(tfnam[tlevel] ? tfnam[tlevel] : "");
 #endif
 
       case VN_MAC:			/* Current macro name */

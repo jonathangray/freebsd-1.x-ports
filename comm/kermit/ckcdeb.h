@@ -314,6 +314,13 @@
 #endif /* BSD44ORPOSIX */
 #endif /* POSIX */
 
+#ifdef __DECC				/* For DEC Alpha AXP VMS or OSF/1 */
+#ifdef __ALPHA
+#define CK_ANSIC			/* Even with /stand=vaxc, need ansi */
+#define SIG_V				/* and signal type is VOID */
+#endif	/* __ALPHA */
+#endif	/* __DECC */
+
 #ifdef apollo				/* May be ANSI-C, check further */
 #ifdef __STDCPP__
 #define CK_ANSIC			/* Yes, this is real ANSI-C */
@@ -1019,6 +1026,18 @@ struct filinfo {
   -DCKTYP_H=xxx on the command line to specify the header file where your
   system defines these types.
 */
+#ifdef __ALPHA
+#ifdef MULTINET
+#define CK_TGV_AXP
+#endif /* MULTINET */
+#endif /* __ALPHA */
+
+#ifdef CK_TGV_AXP			/* Alpha AXP, VMS, MultiNet */
+#ifndef __TYPES_LOADED
+#define __TYPES_LOADED			/* Work around bug in .h files */
+#endif /* __TYPES_LOADED */
+#include <sys/types.h>
+#else					/* !CK_TGV_AXP */
 #ifdef OSK				/* OS-9 */
 #include <types.h>
 #else					/* General case, not OS-9 */
@@ -1054,7 +1073,8 @@ struct filinfo {
 #endif /* COHERENT */
 #endif /* CKTYP_H */
 
-#endif /* OSK */			/* End of types.h section */
+#endif /* OSK */
+#endif /* CK_TGV_AXP */			/* End of types.h section */
 
 /*
   Data type for pids.  If your system uses a different type, put something

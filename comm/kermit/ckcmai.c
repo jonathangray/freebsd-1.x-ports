@@ -770,16 +770,26 @@ extern jmp_buf cmjbuf;
 int
 ckcmai(argc,argv) int argc; char **argv;
 #else
-#ifdef MAC
+#ifdef MAC				/* Macintosh */
 int
 main (void)
 #else
-#ifdef VMSGCC
+#ifdef VMSGCC				/* (Open)VMS with GCC compiler */
 int
 main(argc,argv) int argc; char **argv;
 #else
+#ifdef __DECC				/* Alpha AXP with DEC C compiler */
+#ifdef __ALPHA
+int
+main(argc,argv) int argc; char **argv;
+#else					/* DEC C compiler, not Alpha AXP */
 VOID
 main(argc,argv) int argc; char **argv;
+#endif	/* __ALPHA */
+#else					/* All others */
+VOID
+main(argc,argv) int argc; char **argv;
+#endif /* __DECC */
 #endif /* VMSGCC */
 #endif /* MAC */
 #endif /* aegis */

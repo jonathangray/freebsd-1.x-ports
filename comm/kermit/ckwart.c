@@ -452,7 +452,15 @@ warray(fp,nam,cont,siz,typ) FILE *fp; char *nam; int cont[],siz; char *typ; {
     fprintf(fp,"};\n");
 }
 
+#ifdef __DECC
+#ifdef __ALPHA
+int
+#else
 VOID
+#endif /* __ALPHA */
+#else
+VOID
+#endif /* __DECC */
 main(argc,argv) int argc; char *argv[]; {
     trans head;
     int state,c;

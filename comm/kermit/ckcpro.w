@@ -744,7 +744,7 @@ E {					/* Got Error packet, in any state */
     RESUME;
 }
 
-q { QUIT; }				/* Ctrl-C interrupt during packets. */
+q { success = 0; QUIT; }		/* Ctrl-C interrupt during packets. */
 
 . {					/* Anything not accounted for above */
     errpkt((CHAR *)"Unexpected packet type"); /* Give error message */
