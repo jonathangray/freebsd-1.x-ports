@@ -225,7 +225,7 @@ tilde_expand_word (filename)
 	     the password database. */
 	  if (!temp_home)
 	    {
-	      extern struct passwd *getpwuid ();
+/*	      extern struct passwd *getpwuid ();	*/
 	      struct passwd *entry;
 
 	      entry = getpwuid (getuid ());
