@@ -1,6 +1,6 @@
 #ifndef lint
 static char rcsid[] =
-    "@(#) $Header: /a/cvs/386BSD/ports/x11/xphoon/dtime.c,v 1.1 1994/05/18 14:07:11 asami Exp $";
+    "@(#) $Header: /a/cvs/386BSD/ports/x11/xphoon/dtime.c,v 1.2 1994/05/18 14:11:32 asami Exp $";
 #endif
 
 /* Copyright (C) 1988, 1991 by Jef Poskanzer.
@@ -23,7 +23,11 @@ static char rcsid[] =
 extern int daylight;
 extern long timezone;
 #else /*SYS5*/
+#ifdef __FreeBSD__
+#include <sys/time.h>
+#else /* !__FreeBSD__ */
 #include <sys/timeb.h>
+#endif
 #endif /*SYS5*/
 
 extern long time();
@@ -44,7 +48,12 @@ dlocaltime( clock )
     {
     register struct tm* tm;
 #ifndef SYS5
+#ifdef __FreeBSD__
+    struct timeval tv ;
+    struct timezone tz ;
+#else /* !__FreeBSD__ */
     struct timeb tb;
+#endif
 #endif not SYS5
     static struct tws tw;
 
@@ -64,8 +73,13 @@ dlocaltime( clock )
     if ( tm->tm_isdst )
 	tw.tw_flags |= TW_DST;
 #ifndef  SYS5
+#ifdef __FreeBSD__
+    gettimeofday(&tv, &tz) ;
+    tw.tw_zone = -(tz.tz_minuteswest / 60) ;
+#else /* !__FreeBSD__ */
     ftime( &tb );
     tw.tw_zone = -tb.timezone;
+#endif
 #else   SYS5
     tzset();
     tw.tw_zone = -( timezone / 60 );
