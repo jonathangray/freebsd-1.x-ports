@@ -1,4 +1,4 @@
-# : Makefile.SH,v 5.15 1993/08/03 19:28:39 syd Exp $
+# : Makefile.SH,v 1.1.1.1 1993/08/14 22:36:20 smace Exp $
 #
 #  Makefile for the ELM mail program.
 #
@@ -11,8 +11,12 @@
 #			dsinc!elm
 #
 # $Log: Makefile,v $
-# Revision 1.1  1993/08/14 22:36:23  smace
-# Initial revision
+# Revision 1.2  1993/08/24 23:06:18  smace
+# Mime support not compiled in under default installation: elm get funky
+# when you say metamail exist but it does not...
+#
+# Revision 1.1.1.1  1993/08/14  22:36:20  smace
+# elm: 	elm-2.4pl23beta -- mail reader
 #
 # Revision 5.15  1993/08/03  19:28:39  syd
 # Elm tries to replace the system toupper() and tolower() on current

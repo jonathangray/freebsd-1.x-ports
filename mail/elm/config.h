@@ -91,7 +91,7 @@
 /* CONFIGURE_DATE
  *	This symbol contains the last date that configure was run for elm -v output.
  */
-#define		CONFIGURE_DATE	"Wed Aug 11 17:33:25 PDT 1993"
+#define		CONFIGURE_DATE	"Tue Aug 24 16:02:23 PDT 1993"
 
 /* ASCII_CTYPE:
  *	This symbol, if defined, indicates that the ctype functions and
@@ -272,7 +272,7 @@
  *	This symbol, if defined, indicates that the MIME mail
  *	extension utilities are available
  */
-#define	MIME	/**/
+/*#undef	MIME	/**/
 
 /* MMDF:
  *	This symbol, if defined, indicates that mailboxes are in
