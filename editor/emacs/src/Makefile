@@ -1,6 +1,11 @@
 srcdir=/usr/ports/editor/emacs/src
+vpath %.c $(srcdir)
+vpath %.h $(srcdir)
+vpath %.y $(srcdir)
+vpath %.l $(srcdir)
+vpath %.s $(srcdir)
+vpath %.in $(srcdir)
 VPATH=/usr/ports/editor/emacs/src
-CC=gcc
 CPP=gcc -E
 CFLAGS=-g -O 
 C_SWITCH_SYSTEM=
