@@ -61,13 +61,13 @@ char *argv[];
 	fclose(stdout);
 	exit(0);
     }
-    fclose(stdout);
+    close(1);
+    close(2);
     gethostname(host, 128);
     pid = getpid();
     port = atoi(argv[2]);
     if ((fd = doConnect(argv[1], port)) < 0 )
     {
-	fprintf(stderr, "Couldn't open connection to %s:%d", argv[1], port);
 	exit(1);
     }
     if ((info = doConnect(host, atoi(argv[4]))) < 0 )
@@ -100,6 +100,7 @@ char *argv[];
     {
 	sprintf(host, "%d DCC Get: %s from %s Error on transfer.\n", pid,
 		argv[3], argv[5]);
+	unlink(argv[3]);
     }
     else 
     {

@@ -104,10 +104,11 @@ char *argv[];
     int fd, info, g;
     int port;
     char host[128];
-    
     char buffer[4096];
     int l, tl = 0, i, pid;
-    
+    struct timeval timeout;
+    fd_set rdset;
+
     time_t st;
     
 
@@ -140,22 +141,38 @@ char *argv[];
 	exit(1);
     }
     st = time((time_t *) 0);
-
-    while ((l = read(g, buffer, 4096)) > 0)
+    
+    while ((l = read(g, buffer, 1024)) > 0)
     {
+	tl += l;
 	if (write(fd, buffer, l) != l) 
 	{
 	    l = -1;
 	    break;
 	}
-	
-	tl += l;
-	if (read(fd, (char *) &i, sizeof(int)) != sizeof(int))
+	do
 	{
-	    l = -1;
-	    break;
+	    FD_ZERO(&rdset);
+	    FD_SET(fd, &rdset);
+	    timeout.tv_sec = 10;
+	    timeout.tv_usec = 0;
+	    if (select(fd + 1, &rdset, NULL, NULL, &timeout) != 1) 
+	    {
+		l = -1;
+		break;
+	    }
+	    else
+	    {
+	        if (read(fd, (char *) &i, sizeof(int)) != sizeof(int)) 
+		{
+		    l = -1;
+		    break;
+		}
+		
+	    }
 	}
-	i = ntohl(i);
+	while (ntohl(i) != tl);
+	
     }
     shutdown(fd, 2);
     close(fd);

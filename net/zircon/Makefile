@@ -20,23 +20,30 @@ LIBDIR = /usr/local/lib/zircon
 # directory to put zircon executable script
 BINDIR = /usr/local/bin
 
+CC=cc
+SHELL=/bin/sh
+
 #--------------------------------------------------
 #
 # you shouldn't modify anything below here
 #
 #--------------------------------------------------
 
-version = 1.09
+version = 1.14
 srcs = zircon
 objs = dccget.o dccsend.o
 libs = lib
 aux = zircon.ad rc
-others = README CHANGES COPYRIGHT DOTzirconrc MANUAL Makefile \
+others = FAQ README CHANGES COPYRIGHT DOTzirconrc MANUAL Makefile \
 	 dccget.c dccsend.c
-bitmaps = 
+bitmaps = bitmaps
 distrib = $(srcs) $(libs) $(bitmaps) $(aux) $(others)
 
 #LIBS =  -lsocket -linet -lnsl -lseq 
+#
+# Solaris....
+#LIBS= -lsocket -lnsl -lelf -lucb
+
 
 all: zircon dccget dccsend
 
@@ -57,27 +64,35 @@ dccsend:	dccsend.o
 tclIndex:
 	cd lib ;  echo 'auto_mkindex . *.tcl ; exit' | $(WISH)
 
-install: zircon tclIndex dccget dccsend $(libs) $(aux) Makefile
+install: zircon tclIndex dccget dccsend $(libs) $(bitmaps) $(aux) Makefile
 	@if [ -d $(BINDIR) ]; then set +x; \
 	else (set -x; mkdir $(BINDIR)); fi
 	cp zircon $(BINDIR)
 	@if [ -d $(LIBDIR) ]; then set +x; \
 	else (set -x; mkdir $(LIBDIR)); fi
-	cp -r dccget dccsend $(libs) $(LIBDIR)
+	cp -r dccget dccsend $(libs) $(bitmaps) $(LIBDIR)
 	@if [ ! -f $(LIBDIR)/rc ]; then cp rc $(LIBDIR); \
 	echo Remember to configure $(LIBDIR)/rc; fi
 	@if [ ! -f $(LIBDIR)/zircon.ad ]; then cp zircon.ad $(LIBDIR); fi
 	chmod a+r $(LIBDIR) $(LIBDIR)/* $(LIBDIR)/*/*
-	chmod a+x $(LIBDIR) $(LIBDIR)/dccget $(LIBDIR)/dccsend $(LIBDIR)/lib
+	chmod a+x $(LIBDIR) $(LIBDIR)/dccget $(LIBDIR)/dccsend
+	chmod a+x $(LIBDIR)/lib $(LIBDIR)/bitmaps
 
 clean:
-	rm -fr $(objs) dccsend dccget core errs zircon-$(version)
+	rm -fr $(objs) core errs zircon-$(version) dccsend dccget
 
 tar:	tclIndex
-	rm -f zircon*.tar.[zZ]*
+	rm -f zircon*.tar.gz
 	mkdir zircon-$(version)
 	cp -R $(distrib) zircon-$(version)
 	tar chvf zircon-$(version).tar zircon-$(version)
 	@gzip -9vf zircon-$(version).tar
 	rm -rf zircon-$(version)
 
+pkg:	pkg_src pkg_bin
+
+pkg_src: +DESC_S +ONELINE_S +PLIST_S +REQ_S
+	pkg_create -c +ONELINE_S -d +DESC_S -f +PLIST_S -r +REQ_S zircon_src
+
+pkg_bin: +DESC_B +ONELINE_B +PLIST_B +REQ_B
+	pkg_create -c +ONELINE_B -d +DESC_B -f +PLIST_B -r +REQ_B zircon_bin
