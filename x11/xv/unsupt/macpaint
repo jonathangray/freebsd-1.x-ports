@@ -1,0 +1,296 @@
+::::::::::::::
+inbox/10
+::::::::::::::
+Return-Path: markm@sequent.com
+Posted-Date: Thu, 24 Oct 91 11:42:09 -0700
+Received-Date: Thu, 24 Oct 91 14:43:16 EDT
+Received: from time1.sequent.com by gateway.sequent.com (5.61/1.34)
+	id AA07639; Thu, 24 Oct 91 11:44:04 -0700
+Received: by time1.sequent.com (5.61/1.34)
+	id AA10311; Thu, 24 Oct 91 11:42:09 -0700
+Date: Thu, 24 Oct 91 11:42:09 -0700
+From: Mark Ed Majhor <markm@sequent.com>
+Message-Id: <9110241842.AA10311@time1.sequent.com>
+To: bradley@grip.cis.upenn.edu
+Subject: Re: Hi (I am an xv user) (here is xvmac.c)
+
+John - thanks for the jpeg contact.  I have his reader already and it
+works fine.  Here is the mac stuff.  I did this for xloadimage also
+and just converted it for xv.  The code originally came out of FBM
+by patrick naughton.
+-------------------  cut here -------- cut here ---------   cut here ---
+
+/*
+ * I don't need to tell you how to add this (here is the xv.c lines).
+
+#define MAC (NEXT NUMBER)
+
+  else if (magicno[0] == 0x0) filetype = MAC;
+
+  case MAC:  i = LoadMAC(filename,ncols); break;
+
+*/
+
+/*
+ * xvmac.c:
+ *
+ * adapted from code by Patrick Naughton (naughton@sun.soe.clarkson.edu)
+ *
+ * xvmac.c
+ * Mark Majhor
+ * February 1991
+ *
+ * routines for reading MAC files
+ *
+ * LoadMAC(fname) - loads a mac image file
+ */
+# include <stdio.h>
+# include <math.h>
+# include <ctype.h>
+# include "xv.h"
+# include "mac.h"
+
+# define NEXTBYTE (*ptr++)
+
+/****
+ **
+ ** local variables
+ **
+ ****/
+
+static int  mac_img_width;		/* image width */
+static int  mac_img_height;		/* image height */
+static int  mac_img_depth;		/* image depth */
+static int  mac_img_planes;		/* image planes */
+static int  mac_img_BPL;		/* image bytes per line */
+static byte *ptr;			/* raw data ptr */
+
+/****
+ **
+ ** global variables
+ **
+ ****/
+
+byte *RawMAC;				/* raw data file heap */
+
+/*
+ * open MAC image in the input stream; returns MACIN_SUCCESS if
+ * successful. (might also return various MACIN_ERR codes.)
+ */
+static int mac_read_header(s)
+FILE *s;
+{
+  int c, i, len, mhsum = 0;
+
+  /*
+   * the mac paint files that came with xmac had an extra
+   * 128 byte header on the front, with a image name in it.
+   * true mac paint images don't seem to have this extra
+   * header.  The following code tries to figure out what
+   * type the image is and read the right amount of file
+   * header (512 or 640 bytes).
+   */
+  /*
+   * if mhsum = 0 this is probably a
+   * a g3 fax file.
+   */
+  for (i = 0; i < 10; i++) mhsum += RawMAC[i];
+
+  if ((RawMAC[0] != MAC_MAGIC) /* || (mhsum == 0) */)
+    return MACIN_ERR_BAD_SD;
+
+  /* 
+   * Get image name  (if available)
+   * if byte 1 of header is not 0
+   * then it is the length of a image
+   * name string.  Also the remaining
+   * header length is MAC_HDR_LEN (512) +
+   * ADD_HDR_LEN (128).
+   */
+
+  /*
+   * ptr now points to the beginning
+   * of the raw data in RawMac.
+   */
+  if (RawMAC[1] != 0)		/* if name header */
+    ptr = &RawMAC[MAC_HDR_LEN + ADD_HDR_LEN];
+  else
+    ptr = &RawMAC[MAC_HDR_LEN];
+
+  /* Now set relevant values */
+  mac_img_width  = BYTES_LINE * 8;
+  mac_img_height = MAX_LINES;
+  mac_img_depth  = 1;		/* always monochrome */
+  mac_img_planes = 1;		/* always 1 */
+  mac_img_BPL    = BYTES_LINE;
+
+  /* mac B/W bitmaps have a two entry colormap */
+  r[0] = g[0] = b[0] = 0;     /* 0 = black */
+  r[1] = g[1] = b[1] = 255;   /* 1 = white */
+
+  return MACIN_SUCCESS;
+}
+
+/*
+ * these are the routines added for interfacing to xloadimage
+ */
+
+LoadMAC(fname, nc)
+     char *fname;
+     int  nc;
+{ 
+  FILE *fp;
+  byte *picptr, ch;
+  register int scanLine, mask;
+  register unsigned int i, j, k;
+  register unsigned int x, y, c;
+  long filesize;
+  int maxpixels;
+  int value;
+
+  fp = fopen(fname, "r");
+  if (!fp)
+    return(MacError("Couldn't open file"));
+
+  /* figure out the filesize (for informational purposes only) */
+  fseek(fp, 0L, 2);
+  filesize = ftell(fp);
+  fseek(fp, 0L, 0);
+
+  /*
+   * the +256's are so we can read truncated image
+   * files without fear of segmentation violation
+   */
+  if (!(ptr = RawMAC = (byte *) malloc(filesize+256)))
+    return(MacError("not enough memory to read mac file") );
+
+  /*
+   * read in the entire file
+   */
+  if (fread(ptr, filesize, 1, fp) != 1) 
+    return(MacError("MAC data read failed") );
+  
+  if (mac_read_header(fp) != MACIN_SUCCESS)  /* read image header */
+    return (MacError("Couldn't read MAC Header"));
+
+  /* load up the stuff XV expects us to load up */
+  SetISTR(ISTR_FORMAT, "MAC image  (%ld bytes)", filesize);
+
+  pWIDE = mac_img_width;
+  pHIGH = mac_img_height;
+  maxpixels = pWIDE * pHIGH;
+
+  pic = picptr = (byte *) calloc(maxpixels, sizeof(byte));
+  if (!pic)
+    return (MacError("not enough memory for 'pic'"));
+
+  scanLine = 0; k = 0;
+
+  while (scanLine < mac_img_height) {
+
+    ch = (byte) NEXTBYTE; /* fgetc(fp);	* Count byte */
+    i = (unsigned int) ch;
+    if (ch < 0x80) {	/* Unpack next (I+1) chars as is */
+      for (j = 0; j <= i; j++) {
+	if (scanLine < mac_img_height) {
+          value = (byte) NEXTBYTE; /*fgetc(fp);*/ k++;
+          for (x = 0; x < 8; x++) {
+            mask = 0x80 >> (x & 7);
+            *(picptr++) = (value & mask) ? BLACK : WHITE;
+          }
+	  if (!(k %= BYTES_LINE)) {
+	    scanLine++;
+	  }
+	}
+      }
+    } else {	/* Repeat next char (2's comp I) times */
+      ch = NEXTBYTE; /*fgetc(fp);*/
+      for (j = 0; j <= 256 - i; j++) {
+	if (scanLine < mac_img_height) {
+          value = (byte) ch; k++;
+          for (x = 0; x < 8; x++) {
+            mask = 0x80 >> (x & 7);
+            *(picptr++) = (value & mask) ? BLACK : WHITE;
+          }
+	  if (!(k %= BYTES_LINE)) {
+	    scanLine++;
+	  }
+        }
+      }
+    }
+  }
+  if (fp != stdin)
+    fclose(fp);
+  if (RawMAC != NULL)
+    free(RawMAC);
+  return 0;
+}
+
+/*****************************/
+static int MacError(st)
+     char *st;
+{
+  fprintf(stderr,"LoadMAC() - %s\n",st);
+  
+  if (pic != NULL) free(pic);
+  if (RawMAC != NULL) free(RawMAC);
+
+  return -1;
+}
+::::::::::::::
+inbox/11
+::::::::::::::
+Return-Path: markm@sequent.com
+Posted-Date: Thu, 24 Oct 91 14:49:16 -0700
+Received-Date: Thu, 24 Oct 91 17:50:21 EDT
+Received: from time1.sequent.com by gateway.sequent.com (5.61/1.34)
+	id AA13012; Thu, 24 Oct 91 14:51:09 -0700
+Received: by time1.sequent.com (5.61/1.34)
+	id AA22604; Thu, 24 Oct 91 14:49:16 -0700
+Date: Thu, 24 Oct 91 14:49:16 -0700
+From: Mark Ed Majhor <markm@sequent.com>
+Message-Id: <9110242149.AA22604@time1.sequent.com>
+To: bradley@grip.cis.upenn.edu
+Subject: Re: Hi (I am an xv user) (whoops - here is xvmac.c include file)
+
+/****************************************************************
+ * mac.h:
+ *
+ * adapted from code by Patrick Naughton (naughton@sun.soe.clarkson.edu)
+ *
+ * macin.h
+ * Mark Majhor
+ * August 1990
+ *
+ * routines for reading MAC files
+ *
+ ****************************************************************/
+
+# define MAC_MAGIC	0x0
+# define BLACK		0
+# define WHITE		1
+
+typedef unsigned char BYTE;	/* 8 bits unsigned		*/
+
+/*
+ * macin return codes
+ */
+#define MACIN_SUCCESS       0   /* success */
+
+#define MACIN_ERR_BAD_SD   -1   /* bad screen descriptor */
+#define MACIN_ERR_BAD_SIG  -2   /* bad signature */
+#define MACIN_ERR_EOD      -3   /* unexpected end of raster data */
+#define MACIN_ERR_EOF      -4   /* unexpected end of input stream */
+#define MACIN_ERR_FAO      -5   /* file already open */
+#define MACIN_ERR_IAO      -6   /* image already open */
+#define MACIN_ERR_NFO      -7   /* no file open */
+#define MACIN_ERR_NIO      -8   /* no image open */
+
+static int macin_open_image();
+static int macin_close_file();
+static int macin_fatal();
+
+#define	MAC_HDR_LEN	512
+#define ADD_HDR_LEN	128
+#define	MAX_LINES	720
+#define	BYTES_LINE	72

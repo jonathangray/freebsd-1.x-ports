@@ -1,0 +1,81 @@
+***************
+*** 2
+- static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tiff/Attic/tif_lzw.c.rej.dist,v 1.1 1993/08/18 21:10:31 smace Exp $";
+--- 2 -----
++ static char rcsid[] = "$Header: /a/cvs/386BSD/ports/x11/tiff/Attic/tif_lzw.c.rej.dist,v 1.1 1993/08/18 21:10:31 smace Exp $";
+***************
+*** 0
+--- 443,450 -----
++ static void
++ DECLARE1(codeLoop, TIFF*, tif)
++ {
++ 	TIFFError(tif->tif_name,
++ 	    "LZWDecode: Bogus encoding, loop in the code table; scanline %d",
++ 	    tif->tif_row);
++ }
++ 
+***************
+*** 451
+- 	int code, nbits, nextbits;
+--- 459 -----
++ 	int code, nbits, nextbits, len;
+***************
+*** 474,479
+- 			} while (--residue > occ);
+- 			tp = op + occ;
+- 			do {
+- 				*--tp = codep->value;
+- 				codep = codep->next;
+- 			} while (--occ);
+--- 482,489 -----
++ 			} while (--residue > occ && codep);
++ 			if (codep) {
++ 				tp = op + occ;
++ 				do {
++ 					*--tp = codep->value;
++ 					codep = codep->next;
++ 				} while (--occ && codep);
++ 			}
+***************
+*** 493
+- 		} while (--residue);
+--- 503 -----
++ 		} while (--residue && codep);
+***************
+*** 555,561
+- 				} while (codep->length > occ);
+- 				sp->dec_restart = occ;
+- 				tp = op + occ;
+- 				do  {
+- 					*--tp = codep->value;
+- 					codep = codep->next;
+- 				}  while (--occ);
+--- 565,575 -----
++ 				} while (codep && codep->length > occ);
++ 				if (codep) {
++ 					sp->dec_restart = occ;
++ 					tp = op + occ;
++ 					do  {
++ 						*--tp = codep->value;
++ 						codep = codep->next;
++ 					}  while (--occ && codep);
++ 					if (codep)
++ 						codeLoop(tif);
++ 				}
+***************
+*** 564,565
+- 			op += codep->length, occ -= codep->length;
+- 			tp = op;
+--- 578,579 -----
++ 			len = codep->length;
++ 			tp = op + len;
+***************
+*** 572
+- 			} while (codep);
+--- 586,591 -----
++ 			} while (codep && tp > op);
++ 			if (codep) {
++ 			    codeLoop(tif);
++ 			    break;
++ 			}
++ 			op += len, occ -= len;

@@ -1,0 +1,148 @@
+*** ../tiff/Makefile	Tue Sep  8 21:21:36 1992
+--- Makefile	Sat Feb 13 03:23:47 1993
+***************
+*** 1,4 ****
+! #	$Header: /a/cvs/386BSD/ports/x11/tiff/DIFF,v 1.1 1993/08/18 21:10:31 smace Exp $
+  #
+  # Tag Image File Format Library
+  #
+--- 1,4 ----
+! #	$Header: /a/cvs/386BSD/ports/x11/tiff/DIFF,v 1.1 1993/08/18 21:10:31 smace Exp $
+  #
+  # Tag Image File Format Library
+  #
+***************
+*** 26,80 ****
+  #
+  DESTDIR=.
+  #
+! AR = ar
+! 
+! # on SGI machines don't have ranlib.  comment out the first line, uncomment
+! # the second
+! RANLIB = ranlib
+! # RANLIB = touch
+! 
+  NULL=
+  
+  IPATH=	-I.
+- #
+- # Library-wide configuration defines:
+- #    MMAP_SUPPORT	add support for memory mapping read-only files
+- #    COLORIMETRY_SUPPORT add support for 6.0 colorimetry tags
+- #    JPEG_SUPPORT	add support for 6.0 JPEG tags & JPEG algorithms
+- #    YCBCR_SUPPORT	add support for 6.0 YCbCr tags
+- #    CMYK_SUPPORT	add support for 6.0 CMYK tags
+- #
+- # Compression configuration defines:
+- #    CCITT_SUPPORT	add support for CCITT Group 3 & 4 algorithms
+- #    PACKBITS_SUPPORT	add support for Macintosh PackBits algorithm
+- #    LZW_SUPPORT	add support for LZW algorithm
+- #    THUNDER_SUPPORT	add support for ThunderScan 4-bit RLE algorithm
+- #    NEXT_SUPPORT	add support for NeXT 2-bit RLE algorithm
+- #    JPEG_SUPPORT	add support for JPEG DCT algorithm
+- #
+- # Note that if you change the library-wide configuration, you'll
+- # need to manual force a full rebuild.  Changing the configuration
+- # of which compression algorithms are included in the library is
+- # automatically handled (i.e. tif_compress.o has a dependency on
+- # the Makefile).
+- #
+- CONF_COMPRESSION=\
+- 	-DPACKBITS_SUPPORT \
+- 	-DLZW_SUPPORT \
+- 	-DCCITT_SUPPORT \
+- 	-DTHUNDER_SUPPORT  \
+- 	-DNEXT_SUPPORT  \
+- 	${NULL}
+  CONF_LIBRARY=\
+! 	-DUSE_VARARGS=1\
+! 	-DUSE_PROTOTYPES=0\
+! 	-DHAVE_IEEEFP=1 \
+! 	-DCOLORIMETRY_SUPPORT \
+! 	-DYCBCR_SUPPORT \
+  	${NULL}
+! 
+! CDEBUGFLAGS = -O
+! CFLAGS=	$(CDEBUGFLAGS) -Dunix ${IPATH} ${CONF_LIBRARY}
+  #
+  INCS=	tiff.h tiffio.h
+  SRCS=	tif_fax3.c \
+--- 26,43 ----
+  #
+  DESTDIR=.
+  #
+! AR=	/bin/ar
+! RANLIB=	/usr/bin/ranlib
+  NULL=
+  
+  IPATH=	-I.
+  CONF_LIBRARY=\
+! 	-DUSE_VARARGS=1 \
+! 	-DUSE_PROTOTYPES=0 \
+! 	-DUSE_CONST=0 \
+  	${NULL}
+! COPTS=	-g
+! CFLAGS=	${COPTS} ${IPATH} ${CONF_LIBRARY}
+  #
+  INCS=	tiff.h tiffio.h
+  SRCS=	tif_fax3.c \
+***************
+*** 82,88 ****
+  	tif_aux.c \
+  	tif_ccittrle.c \
+  	tif_close.c \
+- 	tif_compat.c \
+  	tif_compress.c \
+  	tif_dir.c \
+  	tif_dirinfo.c \
+--- 45,50 ----
+***************
+*** 103,108 ****
+--- 65,71 ----
+  	tif_strip.c \
+  	tif_thunder.c \
+  	tif_tile.c \
++ 	tif_unix.c \
+  	tif_version.c \
+  	tif_warning.c \
+  	tif_write.c \
+***************
+*** 112,118 ****
+  	tif_aux.o \
+  	tif_ccittrle.o \
+  	tif_close.o \
+- 	tif_compat.o \
+  	tif_compress.o \
+  	tif_dir.o \
+  	tif_dirinfo.o \
+--- 75,80 ----
+***************
+*** 133,138 ****
+--- 95,101 ----
+  	tif_swab.o \
+  	tif_thunder.o \
+  	tif_tile.o \
++ 	tif_unix.o \
+  	tif_version.o \
+  	tif_warning.o \
+  	tif_write.o \
+***************
+*** 145,153 ****
+  	${AR} rc libtiff.a $?
+  	${RANLIB} libtiff.a
+  
+! ${OBJS}: tiffio.h tiff.h tiffcompat.h tiffioP.h
+! tif_compress.o: tif_compress.c Makefile
+! 	${CC} -c ${CFLAGS} ${CONF_COMPRESSION} tif_compress.c
+  tif_fax3.o: tif_fax3.c g3states.h t4.h tif_fax3.h
+  
+  g3states.h: mkg3states.c t4.h
+--- 108,114 ----
+  	${AR} rc libtiff.a $?
+  	${RANLIB} libtiff.a
+  
+! ${OBJS}: tiffio.h tiff.h tiffcomp.h tiffiop.h tiffconf.h
+  tif_fax3.o: tif_fax3.c g3states.h t4.h tif_fax3.h
+  
+  g3states.h: mkg3states.c t4.h

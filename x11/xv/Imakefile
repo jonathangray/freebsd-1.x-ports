@@ -1,0 +1,294 @@
+/* if, for whatever reason, you're unable to get the JPEG library to compile
+ * on your machine, *COMMENT OUT* the following line
+ */
+#define HaveJpeg
+
+
+/* if, for whatever reason, you're unable to get the TIFF library to compile
+ * on your machine, *COMMENT OUT* the following line
+ */
+#define HaveTiff
+
+
+/* if, for whatever reason, you're unable to get the PDS/VICAR support
+ * to compile (xvpds.c, and vdcomp.c), *COMMENT OUT* the following line
+ */
+PDS = -DHAVE_PDS
+
+
+/* By default, backing_store is turned on (WhenMapped) for several XV windows.
+ * This is generally a good performance improvement, however, it has been known
+ * to crash some servers (most notably X11R3 running on an HP), so this is left
+ * as something that you could turn off, if necessary.
+ */
+BACKING_STORE = -DBACKING_STORE
+
+
+/*
+ * if you are running on a SysV-based machine, such as HP, Silicon Graphics,
+ * etc, uncomment the following line to get you *most* of the way there.
+ */
+/* UNIX = -DSVR4 */
+
+
+/* If your machine does not have the 'setitimer()' call, but does
+ * have the 'usleep()' call, uncomment the following line:
+ */
+/* TIMERS = -DUSLEEP */
+/*
+ * alternately, if your machine does not have EITHER the 'setitimer()' or
+ * the 'usleep()' call, uncomment the following line:
+ *
+ * Note: SCO ODT 1.1 (UNIX 3.2v2) does not have itimers, ODT 2.0 (UNIX 3.2v4) 
+ * does.  Uncomment this accordingly.
+ */
+/* TIMERS = -DNOTIMER */
+
+
+/* PostScript file input support:
+ *
+ * if you have the 'ghostscript' package installed (version 2.5 or later),
+ * you can use it let XV display postscript files.  Note: to do so, you're
+ * 'gs' *must* be built with 'pbmraw','pgmraw', and 'ppmraw' support, which
+ * is *NOT* turned on by default when you build gs.  It's easy.  See the gs
+ * distribution for how-to information.  (currently, it's just a matter of
+ * adding 'pbmraw.dev pgmraw.dev ppmraw.dev' to the DEVICE_DEVS line in the
+ * ghostscript Makefile, and typing make).  Also note that if your version
+ * of gs supports 'pnmraw' you should add that support as well, and change
+ * the GS_DEV line below to 'pnmraw' for optimum performance.  (Currently,
+ * this device isn't in ghostscript, but it should be appearing in a new
+ * version.
+ *
+ * if you wish to use gs, uncomment the following lines, and make sure that
+ * GS_PATH specifies the complete path to your gs executable.  GS_LIB should
+ * be set if there's some other gs libs that should be searched, but aren't
+ * by default.  (In which case you should probably just fix your 'gs' so it
+ * looks in the right places without being told...)
+ * Note that it is necessary to put a backslash in front of the " chars
+ */
+/* GS_PATH=-DGS_PATH=\"/pkg/bin/gs\" */
+/* GS_LIB=-DGS_LIB=\"\"              */
+/* GS_DEV=-DGS_DEV=\"pbmraw\"        */
+
+
+/* if you are running under DXWM, I pity you.  XV doesn't work correctly
+ * under DXWM.  You should probably be running MWM.  However, if such is
+ * not a valid option for you, try uncommenting the following line.  The
+ * behavior won't be 'right', but it will be less 'wrong'.
+ */
+/* DXWM = -DDXWM */
+
+
+/* if your system doesn't have u_long, u_short ... typedefined  
+ * uncomment the following line:
+ */
+/* BSDTYPES = -DBSDTYPES */
+
+
+/* if your system *doesn't* have a /usr/include/dirent.h, (ie, isn't POSIX
+ * compliant, then you may have to uncomment the following line to use the
+ * 'old-style' directory-handling structures
+ */
+/* NODIRENT = -DNODIRENT */
+
+
+/* If your machine doesn't have the 'random()' function, and only
+ * has 'rand()', uncomment the following line:
+ */
+/* RAND= -DNO_RANDOM */
+
+
+/* IF YOUR MACHINE DOESN'T HAVE 'vprintf()' OR 'vsprintf()'
+ *   see vprintf.c for more information, if needed.
+ */
+#if defined(VaxArchitecture) && !defined(UltrixArchitecture)
+VPRINTF=	-DNEED_VPRINTF -DINTSPRINTF -DLONGINT -DNOVOID
+#else 
+#  if defined(RtArchitecture) && !defined(AIXArchitecture)
+VPRINTF=	-DNEED_VPRINTF -DINTSPRINTF -DLONGINT -DNOSTDHDRS -U__STDC__
+#  else
+#    if defined(SequentArchitecture)
+VPRINTF= -DNEED_VPRINTF -DLONGINT -DNOSTDHDRS
+#    endif
+#  endif
+#endif
+
+
+
+/* If you are using an HP running HPUX 7.0, uncomment the following line
+ */
+/* HPUX7 = -DSVR4 +Ns4000 -DHPUX7 */
+
+
+/* If you are using an SGI machine, uncomment the following line
+ */
+/* SGI = -Dsgi */
+
+
+
+
+
+
+/* This marks the end of the configuration parameters */
+
+
+
+
+
+#ifdef HaveJpeg
+JPEG = -DHAVE_JPEG
+JPEGDIR = jpeg
+LIBJPEG = $(JPEGDIR)/libjpeg.a
+JPEGINCLUDE = -I$(JPEGDIR)
+#endif
+
+#ifdef HaveTiff
+TIFF = -DHAVE_TIFF
+TIFFDIR = tiff
+LIBTIFF = $(TIFFDIR)/libtiff.a
+TIFFINCLUDE = -I$(TIFFDIR)
+#endif
+
+#if defined(SCOArchitecture)
+SCO= -DPOSIX -DNO_RANDOM 
+SYS_LIBRARIES=        $(XLIB) $(LIBJPEG) $(LIBTIFF) -lm -lc -lx 
+#else
+SYS_LIBRARIES=        $(XLIB) $(LIBJPEG) $(LIBTIFF) -lm
+#endif
+
+
+DEFINES= $(SCO) $(UNIX) $(NODIRENT) $(VPRINTF) $(TIMERS) \
+	$(HPUX7) $(JPEG) $(DXWM) $(RAND) $(GS_PATH) $(GS_LIB) $(GS_DEV) \
+	$(TIFF) $(PDS) $(BACKING_STORE) $(BSDTYPES) $(SGI)
+
+INCLUDES = $(JPEGINCLUDE) $(TIFFINCLUDE)
+
+BITMAPS = bitmaps/grasp bitmaps/penn bitmaps/down bitmaps/down1 \
+	  bitmaps/up bitmaps/up1 bitmaps/scrlgray bitmaps/gray50 \
+	  bitmaps/gray25 bitmaps/i_fifo bitmaps/i_chr bitmaps/i_dir \
+	  bitmaps/i_blk bitmaps/i_lnk bitmaps/i_sock bitmaps/i_reg \
+	  bitmaps/i_exe bitmaps/rb_frame bitmaps/rb_frame1 bitmaps/rb_body \
+	  bitmaps/rb_top bitmaps/rb_dtop bitmaps/rb_bot bitmaps/rb_dbot \
+	  bitmaps/rb_dot bitmaps/uph bitmaps/uph1 bitmaps/downh \
+	  bitmaps/downh1 \
+	  bitmaps/fc_left bitmaps/fc_leftm bitmaps/fc_mid bitmaps/fc_midm \
+	  bitmaps/fc_right bitmaps/fc_rightm bitmaps/fc_left1 \
+	  bitmaps/fc_left1m bitmaps/fc_right1 bitmaps/fc_right1m \
+	  bitmaps/icon bitmaps/dial_cw1 bitmaps/dial_cw2 bitmaps/dial_ccw1 \
+	  bitmaps/dial_ccw2 bitmaps/iconmask bitmaps/gf1_addh \
+	  bitmaps/gf1_delh bitmaps/gf1_line bitmaps/gf1_rst \
+	  bitmaps/gf1_spln bitmaps/gf1_gamma \
+	  bitmaps/h_rotl bitmaps/h_rotr bitmaps/h_sinc bitmaps/h_sdec \
+	  bitmaps/h_flip bitmaps/cb_check \
+	  bitmaps/h_sat bitmaps/h_desat bitmaps/root_weave \
+          bitmaps/cboard50 bitmaps/mb_chk bitmaps/fliph bitmaps/flipv \
+	  bitmaps/p10 bitmaps/m10
+
+
+SRCS1 =	xv.c xvevent.c xvroot.c xvmisc.c xvimage.c xvcolor.c xvsmooth.c \
+	xv24to8.c xvgif.c xvpm.c xvinfo.c xvctrl.c xvscrl.c xvalg.c \
+	xvgifwr.c xvdir.c xvbutt.c xvpbm.c xvxbm.c xvgam.c xvbmp.c \
+	xvdial.c xvgraf.c xvsunras.c xvjpeg.c xvps.c xvpopup.c xvdflt.c \
+	xvtiff.c xvtiffwr.c xvpds.c xvrle.c xviris.c xvgrab.c vprintf.c \
+	xvbrowse.c xvtext.c xvpcx.c
+
+OBJS1 =	xv.o xvevent.o xvroot.o xvmisc.o xvimage.o xvcolor.o xvsmooth.o \
+	xv24to8.o xvgif.o xvpm.o xvinfo.o xvctrl.o xvscrl.o xvalg.o \
+	xvgifwr.o xvdir.o xvbutt.o xvpbm.o xvxbm.o xvgam.o xvbmp.o \
+	xvdial.o xvgraf.o xvsunras.o xvjpeg.o xvps.o xvpopup.o xvdflt.o \
+	xvtiff.o xvtiffwr.o xvpds.o xvrle.o xviris.o xvgrab.o vprintf.o \
+	xvbrowse.o xvtext.o xvpcx.o
+
+SRCS2=	bggen.c
+OBJS2=	bggen.o
+
+SRCS3=	vdcomp.c
+OBJS3=	vdcomp.o
+
+SRCS4=	xcmap.c
+OBJS4=	xcmap.o
+
+PROGRAMS= xv bggen vdcomp xcmap
+
+
+#if defined(HaveJpeg) || defined(HaveTiff)
+#  ifdef HaveJpeg
+#    ifdef HaveTiff
+       SUBDIRS = jpeg tiff
+#    else
+       SUBDIRS = jpeg
+#    endif
+#  else
+     SUBDIRS = tiff
+#  endif
+#  define PassCDebugFlags
+   MakeSubdirs($(SUBDIRS))
+   DependSubdirs($(SUBDIRS))
+#endif
+
+
+all::
+	@echo ""
+	@echo "  Did you remember to 'make depend' first?"
+	@echo ""
+
+all::
+	@echo "  building xv ..."
+	@echo ""
+
+
+#ifdef HaveJpeg
+clean::
+	@echo ""
+	@echo "  cleaning in $(JPEGDIR) ..."
+	@echo ""
+	( cd $(JPEGDIR) ; $(MAKE) clean )
+	@echo ""
+#endif
+
+#ifdef HaveTiff
+clean::
+	@echo "  cleaning in $(TIFFDIR) ..."
+	@echo ""
+	( cd $(TIFFDIR) ; $(MAKE) clean )
+	@echo ""
+#endif
+
+
+/* depend:: bitmaps.h */
+
+
+SRCS = $(SRCS1) $(SRCS2) $(SRCS3) $(SRCS4)
+DependTarget()
+  
+AllTarget($(PROGRAMS))
+
+NormalProgramTarget(xv,$(OBJS1),$(DEPLIBS),$(LOCAL_LIBRARIES),)
+NormalProgramTarget(bggen,$(OBJS2),$(DEPLIBS),$(LOCAL_LIBRARIES),)
+NormalProgramTarget(vdcomp,$(OBJS3),$(DEPLIBS),$(LOCAL_LIBRARIES),)
+NormalProgramTarget(xcmap,$(OBJS4),$(DEPLIBS),$(LOCAL_LIBRARIES),)
+
+ 
+InstallProgram(xv,$(BINDIR))
+InstallProgram(bggen,$(BINDIR))
+InstallProgram(vdcomp,$(BINDIR))
+InstallProgram(xcmap,$(BINDIR))
+ 
+InstallManPageLong(docs/xv,$(MANDIR),xv)
+InstallManPageLong(docs/bggen,$(MANDIR),bggen)
+InstallManPageLong(docs/xcmap,$(MANDIR),xcmap)
+
+/* ComplexProgramTarget_1(xv,,)
+ * ComplexProgramTarget_2(bggen,,)
+ * ComplexProgramTarget_3(vdcomp,,)
+ * 
+ * InstallManPage(docs/xv,$(MANDIR))
+ * InstallManPage(docs/bggen,$(MANDIR))
+ */
+
+tar:
+	tar cf xv.tar Makefile* Imakefile *.c *.h bitmaps docs \
+		 docs unsupt vms $(JPEGDIR) $(TIFFDIR) $(MISC)
+
+bitmaps.h: $(BITMAPS)
+	cat $(BITMAPS) > bitmaps.h

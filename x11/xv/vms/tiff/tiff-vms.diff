@@ -1,0 +1,185 @@
+*** tiffio-orig.h
+--- tiffio.h
+**************
+*** 211,216
+    typedef	int (*TIFFMapFileProc)();
+    typedef	void (*TIFFUnmapFileProc)();
+    
+    extern	char* TIFFGetVersion();
+    
+    extern	void TIFFClose();
+--- 211,219 -----
+    typedef	int (*TIFFMapFileProc)();
+    typedef	void (*TIFFUnmapFileProc)();
+    
++ #ifdef VMS
++ #define noconGetVersion
++ #endif
+    extern	char* TIFFGetVersion();
+    
+    extern	void TIFFClose();
+**************
+*** 217,222
+    extern	TIFF *TIFFOpen();
+    extern	TIFF *TIFFFdOpen();
+    extern	TIFF* TIFFClientOpen();
+    extern	char* TIFFFileName();
+    extern	int TIFFFileno();
+    extern	int TIFFGetMode();
+--- 220,228 -----
+    extern	TIFF *TIFFOpen();
+    extern	TIFF *TIFFFdOpen();
+    extern	TIFF* TIFFClientOpen();
++ #ifdef VMS
++ #define noconFileName 
++ #endif
+    extern	char* TIFFFileName();
+    extern	int TIFFFileno();
+    extern	int TIFFGetMode();
+**************
+*** 271,276
+    extern	void TIFFSwabArrayOfShort();
+    extern	void TIFFSwabArrayOfLong();
+    extern	void TIFFReverseBits();
+    extern	unsigned char* TIFFGetBitRevTable();
+  #endif  /* ! USE_PROTO */
+  
+--- 277,285 -----
+    extern	void TIFFSwabArrayOfShort();
+    extern	void TIFFSwabArrayOfLong();
+    extern	void TIFFReverseBits();
++ #ifdef VMS
++ #define noconGetBitRevTable
++ #endif
+    extern	unsigned char* TIFFGetBitRevTable();
+  #endif  /* ! USE_PROTO */
+  
+*** tif_open-orig.c
+--- tif_open.c
+**************
+*** 310,315
+  /*
+   * Return open file's name.
+   */
+  const char *
+  DECLARE1(TIFFFileName, TIFF*, tif)
+  {
+--- 310,318 -----
+  /*
+   * Return open file's name.
+   */
++ #ifdef noconFileName
++ char *
++ #else
+  const char *
+  #endif
+  DECLARE1(TIFFFileName, TIFF*, tif)
+**************
+*** 311,316
+   * Return open file's name.
+   */
+  const char *
+  DECLARE1(TIFFFileName, TIFF*, tif)
+  {
+  	return (tif->tif_name);
+--- 314,320 -----
+  char *
+  #else
+  const char *
++ #endif
+  DECLARE1(TIFFFileName, TIFF*, tif)
+  {
+  	return (tif->tif_name);
+*** tif_swab-orig.c
+--- tif_swab.c
+**************
+*** 167,172
+      0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff, 
+  };
+  
+  const unsigned char*
+  DECLARE1(TIFFGetBitRevTable, int, reversed)
+  {
+--- 167,175 -----
+      0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff, 
+  };
+  
++ #ifdef noconGetBitRevTable
++ unsigned char*
++ #else
+  const unsigned char*
+  #endif
+  
+**************
+*** 168,173
+  };
+  
+  const unsigned char*
+  DECLARE1(TIFFGetBitRevTable, int, reversed)
+  {
+  	return (reversed ? TIFFBitRevTable : TIFFNoBitRevTable);
+--- 171,178 -----
+  unsigned char*
+  #else
+  const unsigned char*
++ #endif
++ 
+  DECLARE1(TIFFGetBitRevTable, int, reversed)
+  {
+  	return (reversed ? TIFFBitRevTable : TIFFNoBitRevTable);
+*** tif_version-orig.c
+--- tif_version.c
+**************
+*** 29,34
+  Copyright (c) 1991, 1992 Silicon Graphics, Inc.\
+  ";
+  
+  const char*
+  TIFFGetVersion()
+  {
+--- 29,37 -----
+  Copyright (c) 1991, 1992 Silicon Graphics, Inc.\
+  ";
+  
++ #ifdef noconGetVersion
++ char*
++ #else
+  const char*
+  #endif
+  
+**************
+*** 30,35
+  ";
+  
+  const char*
+  TIFFGetVersion()
+  {
+  	return (TIFFVersion);
+--- 33,40 -----
+  char*
+  #else
+  const char*
++ #endif
++ 
+  TIFFGetVersion()
+  {
+  	return (TIFFVersion);
+*** tif_vms-orig.c
+--- tif_vms.c
+**************
+*** 231,237
+  		fd = open(name, m, 0666,
+  		    "deq = 64", "mbc = 32", "fop = tef");
+  	} else
+! 		fd = open(name, m, 0666, "mbc = 32");
+  	if (fd < 0) {
+  		TIFFError(module, "%s: Cannot open", name);
+  		return ((TIFF *)0);
+--- 231,237 -----
+  		fd = open(name, m, 0666,
+  		    "deq = 64", "mbc = 32", "fop = tef");
+  	} else
+! 		fd = open(name, m, 0666, "mbc = 32", "ctx = stm");
+  	if (fd < 0) {
+  		TIFFError(module, "%s: Cannot open", name);
+  		return ((TIFF *)0);

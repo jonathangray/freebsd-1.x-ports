@@ -1,0 +1,523 @@
+(Message /usr/users/bradley/Mail/inbox:16)
+Return-Path: kong@carmel.ccmail.com
+Posted-Date: Wed, 13 Nov 91 17:22:52 PST
+Received-Date: Wed, 13 Nov 91 20:17:28 EST
+Received: from carmel.ccmail.com by blinky.ccmail.com (4.1/SMI-4.1)
+	id AA05996; Wed, 13 Nov 91 17:19:29 PST
+Received: by carmel.ccmail.com (4.1/SMI-4.1)
+	id AA19879; Wed, 13 Nov 91 17:22:52 PST
+Date: Wed, 13 Nov 91 17:22:52 PST
+From: kong@carmel.ccmail.com (Ken Chu)
+Message-Id: <9111140122.AA19879@carmel.ccmail.com>
+To: bradley@grip.cis.upenn.edu
+Subject: PCX support for XV (Was Re: extensions to XV)
+Content-Type: X-sun-attachment
+
+----------
+X-Sun-Data-Type: text
+X-Sun-Data-Description: text
+X-Sun-Data-Name: text
+X-Sun-Content-Lines: 9
+
+John,
+
+Attached are the .c and .h files for adding PCX support to XV.  I didn't include the modified Makefile or xv.[ch] files, because they were only modifed according to your README.  The code is a combination of xloadimage and pcxtoppm.  I have tested it with all the different types of PCX files I could find, but you may want to try some more yourself (something exotic like PCX with 2 bits/pixel).
+
+I look forward to hearing about the new release of XV.
+
+Ken
+
+P.S. If you are not using Sun's Mail Tool V3, the attached files may be troublesome to extract.  If that is the case, let me know and I'll mail them to you separately.
+----------
+X-Sun-Data-Type: h-file
+X-Sun-Data-Description: h-file
+X-Sun-Data-Name: pcx.h
+X-Sun-Content-Lines: 37
+
+#ifndef pcx_h
+#define pcx_h
+
+/*
+ * defines for the PCX header and magic numbers
+ */
+
+typedef struct {						/*header for PCX bitmap files*/
+    unsigned char	signature;			/*PCX file identifier*/
+    unsigned char	version;			/*version compatibility level*/
+    unsigned char	encoding;			/*encoding method*/
+    unsigned char	bitsperpix;			/*bits per pixel, or depth*/
+    unsigned short	Xleft;				/*X position of left edge*/
+    unsigned short	Ytop;				/*Y position of top edge*/
+    unsigned short	Xright;				/*X position of right edge*/
+    unsigned short	Ybottom;			/*Y position of bottom edge*/
+    unsigned short	Xscreensize;		/*X screen res of source image*/
+    unsigned short	Yscreensize;		/*Y screen res of source image*/
+    unsigned char	PCXpalette[16][3];	/*PCX color map*/
+    unsigned char	reserved1;			/*should be 0, 1 if std res fax*/
+    unsigned char	planes;				/*bit planes in image*/
+    unsigned short	linesize;			/*byte delta between scanlines */
+    unsigned short	paletteinfo;		/*0 == undef
+										  1 == color
+										  2 == grayscale*/
+    unsigned char reserved2[58];		/*fill to struct size of 128*/
+} PCX_HEADER;
+
+#define PCX_HEADERSIZE		128
+
+#define PCX_LAST_VER		5			/* last acceptable version number */
+#define PCX_RLL				1			/* PCX RLL encoding method */
+
+#define PCX_MAGIC			0x0a		/* first byte of a PCX image */
+#define PCX_256COLORS_MAGIC	0x0c		/* first byte of a PCX 256 color map */
+
+#endif /* pcx_h */
+----------
+X-Sun-Data-Type: c-file
+X-Sun-Data-Description: c-file
+X-Sun-Data-Name: xvpcx.c
+X-Sun-Content-Lines: 444
+
+/*
+ * xvpcx.c - load routine for 'pcx' format pictures.
+ *
+ * by Ken Chu (kong@carmel.ccmail.com), as derived from pbmplus and xloadimage.
+ *    November 11, 1991.
+ *
+ * LoadPCX(fname, numcols)  -  loads a PCX image file.
+ *	numcols is not used as PCX doesn't support 24-bit colors.
+ *
+ * Assumes the input byte stream is in Intel's byte order.
+ *
+ */
+/*
+ *    Permission to use, copy, modify, and distribute this software and its
+ *    documentation for any purpose and without fee is hereby granted, provided
+ *    that the above copyright notice appear in all copies and that both that
+ *    copyright notice and this permission notice appear in supporting
+ *    documentation.  This software is provided "as is" without express or
+ *    implied warranty.
+ */
+/*
+ * Copyright 1989, 1990 by the University of Pennsylvania
+ *
+ * Permission to use, copy, and distribute for non-commercial purposes,
+ * is hereby granted without fee, providing that the above copyright
+ * notice appear in all copies and that both the copyright notice and this
+ * permission notice appear in supporting documentation.
+ *
+ * The software may be modified for your own purposes, but modified versions
+ * may not be distributed.
+ *
+ * This software is provided "as is" without any express or implied warranty.
+ */
+/*
+ * Copyright 1989, 1990, 1991 Jim Frost
+ *
+ * Permission to use, copy, modify, distribute, and sell this software
+ * and its documentation for any purpose is hereby granted without fee,
+ * provided that the above copyright notice appear in all copies and
+ * that both that copyright notice and this permission notice appear
+ * in supporting documentation.  The author makes no representations
+ * about the suitability of this software for any purpose.  It is
+ * provided "as is" without express or implied warranty.
+ *
+ * THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN
+ * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, INDIRECT OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+ * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
+ * USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+
+#include "xv.h"
+#include "pcx.h"
+
+#define	MAX_DEPTH		8		/* PCX supports up to 8 bits per pixel */
+#define PCX_MAXCOLORS	256		/* maximum number of colors in a PCX file */
+
+
+static	int PCXError( );
+static	int read_pcx_image ( );
+static	int pcx_planes_to_pixels ( );
+static	int pcx_unpack_pixels ( );
+static	void flips( );
+
+
+static	byte *imagebuf = NULL;	/* buffer to hold decoded PCX image */
+
+
+/*******************************************/
+int LoadPCX(fname,nc)
+     char *fname;
+     int   nc;
+/*******************************************/
+{
+    FILE			*fp;
+	byte			*bufptr, *picptr;
+	char			msg[86];
+    int				bytes_p_line, rv = 0;
+	PCX_HEADER		pcxhd;
+    register int	i;
+
+
+	/* check the depth first */
+	if (nc > PCX_MAXCOLORS)
+		return( PCXError(sprintf(msg,"cannot handle picture with more than %d colors.",PCX_MAXCOLORS)) );
+
+    /* open the file */
+    fp = fopen(fname,"r");
+    if (!fp)
+		return( PCXError("unable to open file for read") );
+  
+    /* Read pcx header. */
+    if (fread(&pcxhd, PCX_HEADERSIZE, 1, fp) != 1) {
+		if (fp!=stdin) fclose(fp);
+		return( PCXError("unable to read PCX header") );
+    }
+
+	if ((pcxhd.signature != PCX_MAGIC) || (pcxhd.version > PCX_LAST_VER)) {
+		if (fp!=stdin) fclose(fp);
+		return( PCXError("not a PCX file") );
+	}
+
+	if (pcxhd.encoding != PCX_RLL) {
+		if (fp!=stdin) fclose(fp);
+		return( PCXError("not run-length encoded PCX file") );
+	}
+
+	if (pcxhd.bitsperpix > MAX_DEPTH) {
+		if (fp!=stdin) fclose(fp);
+		return( PCXError(sprintf(msg,"cannot handle picture depth > %d",MAX_DEPTH)) );
+	}
+
+
+	/* Calculate image size */
+
+	flips((byte *) &pcxhd.Xleft);
+	flips((byte *) &pcxhd.Ytop);
+	flips((byte *) &pcxhd.Xright);
+	flips((byte *) &pcxhd.Ybottom);
+
+	flips((byte *) &pcxhd.linesize);
+
+	pWIDE = pcxhd.Xright - pcxhd.Xleft + 1;
+	pHIGH = pcxhd.Ybottom - pcxhd.Ytop + 1;
+
+    SetISTR(ISTR_FORMAT,"PC Paintbrush, %d %s, %d %s per pixel.",
+			pcxhd.planes, (pcxhd.planes==1) ? "plane":"planes",
+			pcxhd.bitsperpix, (pcxhd.bitsperpix==1) ? "bit":"bits");
+
+
+	/*
+	 * Read colormap if less than 8 bits per pixel.
+	 */
+
+	if (pcxhd.bitsperpix < 8) {
+
+		register int all_zeros = 1;
+
+		for (i=0; i < 16; i++) {
+			r[i] = pcxhd.PCXpalette[i][0];
+			g[i] = pcxhd.PCXpalette[i][1];
+			b[i] = pcxhd.PCXpalette[i][2];
+
+			all_zeros = all_zeros && (r[i] == 0) && (g[i] == 0) && (b[i] == 0);
+		}
+
+		/*
+		 * if the color palette contained all zeros, set to white and black
+		 * as default colors.
+		 */
+		if (all_zeros) {
+			r[0] = g[0] = b[0] = 255;	/* white */
+			r[1] = g[1] = b[1] = 0;		/* black */
+		}
+	}
+
+
+    /* allocate memory for decoded image buffer */
+
+    imagebuf = (byte *) malloc(pcxhd.linesize * pHIGH * pcxhd.planes);
+    if (imagebuf == NULL) 
+		FatalError("unable to malloc PCX buffer");
+
+
+	/* Read compressed bitmap. */
+
+	if (rv = read_pcx_image( fp, imagebuf, &pcxhd, pHIGH )) {
+		if (imagebuf) free(imagebuf);
+		if (fp!=stdin) fclose(fp);
+		return rv;
+	}
+
+
+	/*
+	 * Read colormap if 8 bits per pixel.
+	 */
+
+	if (pcxhd.bitsperpix == 8) {
+		register int ch;
+
+		if ((ch = getc(fp)) == PCX_256COLORS_MAGIC) {
+			for (i = 0; i < PCX_MAXCOLORS; i++) {
+				if ((ch = getc(fp)) != EOF) r[i] = ch; else break;
+				if ((ch = getc(fp)) != EOF) g[i] = ch; else break;
+				if ((ch = getc(fp)) != EOF) b[i] = ch; else break;
+			}
+
+			if (i != PCX_MAXCOLORS) {
+				if (imagebuf) free(imagebuf);
+				if (fp!=stdin) fclose(fp);
+				return( PCXError("256-colormap truncated"));
+			}
+
+		} else {
+			if (imagebuf) free(imagebuf);
+			if (fp!=stdin) fclose(fp);
+			return( PCXError("no 256-colormap for 8 bit picture") );
+		}
+	}
+
+	/* we won't be reading anymore data in */
+	if (fp!=stdin) fclose(fp);
+
+
+    /* Allocate memory for picture */
+
+    pic = (byte *) malloc(pWIDE * pHIGH);
+    if (pic == NULL) {
+		if (imagebuf) free(imagebuf);
+		FatalError("unable to malloc PCX picture");
+	}
+
+
+	/* Convert from PCX to one byte per pixel */
+
+	bytes_p_line = pcxhd.linesize * pcxhd.planes;
+
+	for (picptr = pic, bufptr = imagebuf, i = 0;
+		 i < pHIGH;
+		 i++, picptr += pWIDE, bufptr += bytes_p_line) {
+
+		if (pcxhd.planes == 1) {
+			if (rv = pcx_unpack_pixels(picptr, bufptr, &pcxhd))
+				break;
+		} else {
+			if (rv = pcx_planes_to_pixels(picptr, bufptr, &pcxhd))
+				break;
+		}
+	}
+
+	free(imagebuf);
+    return rv;
+}
+
+
+
+
+
+/*
+ *  read_pcx_image
+ *
+ *	Load PCX file into the buffer passed in.
+ *
+ *	Returns 0 if success, -1 if failure.
+ */
+
+static int
+read_pcx_image(fp, buf, phd, height)
+FILE			*fp;
+register byte	*buf;
+PCX_HEADER		*phd;
+unsigned int	height;
+{
+	/*
+	 * Goes like this: Read a byte.  If the two high bits are set,
+	 * then the low 6 bits contain a repeat count, and the byte to
+	 * repeat is the next byte in the file.  If the two high bits are
+	 * not set, then this is the byte.
+	 */
+
+	register int count, nbytes, c;
+
+    nbytes	= phd->linesize * phd->planes * height;
+
+    while (nbytes > 0)
+    {
+		c = getc(fp);
+		if (c == EOF)
+			return( PCXError("unexpected EOF in file") );
+
+		if ((c & 0xc0) != 0xc0) {
+			*buf++ = (byte)c;
+			--nbytes;
+			continue;
+		}
+
+		count = c & 0x3f;
+		if (count > nbytes)
+			(void) PCXError("repeat count spans end of image");
+
+		c = getc(fp);
+		if (c == EOF)
+			return( PCXError("unexpected EOF in file") );
+
+		nbytes -= count;
+		while (--count >= 0)
+			*buf++ = (byte)c;
+	}
+
+	return 0;
+}
+
+
+
+
+
+/*
+ * convert packed pixel format into 1 pixel per byte
+ */
+static int
+pcx_unpack_pixels(pixels, bitplanes, phd)
+register byte *pixels;
+register byte *bitplanes;
+PCX_HEADER	  *phd;
+{
+    register int bits, bytesperline = phd->linesize;
+
+	if (phd->planes != 1)
+		return( PCXError("can't handle packed pixels with more than 1 plane") );
+
+	switch (phd->bitsperpix) {
+	  case 8:
+		while (--bytesperline >= 0)
+			*pixels++ = *bitplanes++;
+		break;
+
+	  case 4:
+		while (--bytesperline >= 0) {
+			bits	  = *bitplanes++;
+			*pixels++ = (bits >> 4) & 0x0f;
+			*pixels++ = (bits     ) & 0x0f;
+		}
+		break;
+
+	  case 2:
+		while (--bytesperline >= 0) {
+			bits	  = *bitplanes++;
+			*pixels++ = (bits >> 6) & 0x03;
+			*pixels++ = (bits >> 4) & 0x03;
+			*pixels++ = (bits >> 2) & 0x03;
+			*pixels++ = (bits     ) & 0x03;
+		}
+		break;
+
+	  case 1:
+			/*
+			 * in this case, 1 == white, 0 == black, so reverse them.
+			 */
+		while (--bytesperline >= 0) {
+			bits	  = *bitplanes++;
+			*pixels++ = ((bits & 0x80) == 0);
+			*pixels++ = ((bits & 0x40) == 0);
+			*pixels++ = ((bits & 0x20) == 0);
+			*pixels++ = ((bits & 0x10) == 0);
+			*pixels++ = ((bits & 0x08) == 0);
+			*pixels++ = ((bits & 0x04) == 0);
+			*pixels++ = ((bits & 0x02) == 0);
+			*pixels++ = ((bits & 0x01) == 0);
+		}
+		break;
+
+	  default:
+		return( PCXError("unsupported number of bits per pixel") );
+		break;
+	}
+
+	return 0;
+}
+
+
+
+/*
+ * convert multi-plane format into 1 pixel per byte
+ */
+static int
+pcx_planes_to_pixels(pixels, bitplanes, phd)
+register byte *pixels;
+register byte *bitplanes;
+PCX_HEADER	  *phd;
+{
+    register int			i, npixels;
+    register byte			*p;
+	register unsigned int	bytesperline = phd->linesize;
+
+    if (phd->planes > 4)
+		return( PCXError("can't handle more than 4 planes") );
+
+    if (phd->bitsperpix != 1)
+		return( PCXError("can't handle more than 1 bit per pixel") );
+
+    /*
+     * clear the pixel buffer
+     */
+    npixels = (bytesperline * 8) / phd->bitsperpix;
+    p = pixels;
+    while (--npixels >= 0)
+		*p++ = 0;
+
+    /*
+     * do the format conversion
+     */
+    for (i = 0; i < phd->planes; i++) {
+
+		register int j, pixbit, bits, mask;
+
+		for (p = pixels, pixbit = (1 << i), j = 0;
+			 j < bytesperline;
+			 j++) {
+
+			bits = *bitplanes++;
+			if (bits & 0x80) *p++ |= pixbit; else p++;
+			if (bits & 0x40) *p++ |= pixbit; else p++;
+			if (bits & 0x20) *p++ |= pixbit; else p++;
+			if (bits & 0x10) *p++ |= pixbit; else p++;
+			if (bits & 0x08) *p++ |= pixbit; else p++;
+			if (bits & 0x04) *p++ |= pixbit; else p++;
+			if (bits & 0x02) *p++ |= pixbit; else p++;
+			if (bits & 0x01) *p++ |= pixbit; else p++;
+		}
+	}
+
+	return 0;
+}
+
+
+
+/*
+ *	PCXError
+ */
+static int
+PCXError(st)
+char *st;
+{
+	/*if (DEBUG)*/
+		fprintf(stderr,"%s: LoadPCX() - %s\n",cmd,st);
+
+	SetISTR(ISTR_WARNING,"%s: LoadPCX() - %s",cmd,st);
+	Warning();
+
+	return -1;
+}
+
+
+
+static void flips(p)
+byte *p;
+{
+	register byte t = p[0]; 
+	p[0] = p[1];
+	p[1] = t;
+}

@@ -1,0 +1,71 @@
+(Message /usr/users/bradley/Mail/inbox:36)
+Return-Path: drtr@ras.phy.cam.ac.uk
+Received-Date: Fri, 7 Aug 92 14:06:17 EDT
+Received: from HALIBUT.CIS.UPENN.EDU by noc2.dccs.upenn.edu
+	id AA12422; Fri, 7 Aug 92 14:06:16 -0400
+Return-Path: <drtr@ras.phy.cam.ac.uk>
+Received: from ras.phy.cam.ac.uk by halibut.cis.upenn.edu
+	id AA00260; Fri, 7 Aug 92 14:06:12 EDT
+Posted-Date: Fri, 7 Aug 92 19:04 BST
+Received: by ras.phy.cam.ac.uk (UK-Smail 3.1.25.1/3)
+  id <m0mGYg8-0002UTC@ras.phy.cam.ac.uk>; Fri, 7 Aug 92 19:04 BST
+Message-Id: <m0mGYg8-0002UTC@ras.phy.cam.ac.uk>
+Date: Fri, 7 Aug 92 19:04 BST
+From: drtr@ras.phy.cam.ac.uk (David Robinson)
+To: bradley@halibut.cis.upenn.edu
+Subject: xv fits patches
+Cc: drtr1@ras.phy.cam.ac.uk
+
+A while ago, (in June) I sent you some patches to xv-2.21 to allow it to read
+and write FITS files. Have you incorporated these into the standard xv release?
+
+I've just found a bug in some of the code I sent you. Specifically, if the
+FITS file is a BITPIX=32 (=signed 4 byte int) file, and 
+max-min > 2^31, then the program will give a garbage image. Here is a patch
+to the file xvfits.c, which fixes the assumption that the difference between
+two ints can be held in an int.
+
+*** xvfits.c.orig	Fri Aug  7 16:50:10 1992
+--- xvfits.c	Fri Aug  7 17:06:16 1992
+***************
+*** 567,581 ****
+      {
+  	register int *buffer=voidbuff;
+  	register int max, min, maxmin_t;
+! 	register float scale;
+  
+  	min = max = buffer[0];
+  	for (i=1; i < n; i++, buffer++) maxmin(*buffer, max, min);
+! 	scale = (max == min) ? 0. : 255./(float)(max-min);
+  
+  /* rescale and convert */
+! 	for (i=0, buffer=voidbuff; i < n; i++)
+! 	    cbuff[i] = (unsigned char)(scale*(float)(buffer[i]-min));
+  
+  /* convert float to unsigned char */
+      } else if (fs->bitpix == -32)
+--- 567,586 ----
+      {
+  	register int *buffer=voidbuff;
+  	register int max, min, maxmin_t;
+! 	register float scale, fmin;
+  
+  	min = max = buffer[0];
+  	for (i=1; i < n; i++, buffer++) maxmin(*buffer, max, min);
+! 	scale = (max == min) ? 1. : 255./((double)max-(double)min);
+! 	fmin = (float)min;
+  
+  /* rescale and convert */
+! 	if (scale < 255./2.1e9) /* is max-min too big for an int ? */
+! 	    for (i=0, buffer=voidbuff; i < n; i++)
+! 		cbuff[i] = (unsigned char)(scale*((float)buffer[i]-fmin));
+! 	else /* use integer subtraction */
+! 	    for (i=0, buffer=voidbuff; i < n; i++)
+! 		cbuff[i] = (unsigned char)(scale*(float)(buffer[i]-min));
+  
+  /* convert float to unsigned char */
+      } else if (fs->bitpix == -32)
+
+--------------------------------- end of patch ----------------------------
+
+David Robinson. (drtr@ras.phy.cam.ac.uk).

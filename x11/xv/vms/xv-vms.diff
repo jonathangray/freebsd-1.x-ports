@@ -1,0 +1,1583 @@
+*** xv.c
+--- vms:xv.c
+**************
+*** 1535,1541
+    tmp = BaseName(fullname);
+    strcpy(basefname, tmp);
+  
+- #ifndef VMS
+    /* chop off trailing '.Z' from friendly displayed basefname, if any */
+    if (strlen(basefname)>2 && strcmp(basefname+strlen(basefname)-2,".Z")==0) 
+      basefname[strlen(basefname)-2]='\0';
+--- 1535,1540 -----
+    tmp = BaseName(fullname);
+    strcpy(basefname, tmp);
+  
+    /* chop off trailing '.Z' from friendly displayed basefname, if any */
+    if (strlen(basefname)>2 && strcmp(basefname+strlen(basefname)-2,".Z")==0) 
+      basefname[strlen(basefname)-2]='\0';
+**************
+*** 1539,1545
+    /* chop off trailing '.Z' from friendly displayed basefname, if any */
+    if (strlen(basefname)>2 && strcmp(basefname+strlen(basefname)-2,".Z")==0) 
+      basefname[strlen(basefname)-2]='\0';
+- #endif
+  
+    if (filenum == LOADPIC && ISPIPE(fullname[0])) {
+      /* if we're reading from a pipe, 'filename' will have the /tmp/xvXXXXXX
+--- 1538,1543 -----
+    /* chop off trailing '.Z' from friendly displayed basefname, if any */
+    if (strlen(basefname)>2 && strcmp(basefname+strlen(basefname)-2,".Z")==0) 
+      basefname[strlen(basefname)-2]='\0';
+  
+    if (filenum == LOADPIC && ISPIPE(fullname[0])) {
+      /* if we're reading from a pipe, 'filename' will have the /tmp/xvXXXXXX
+**************
+*** 1655,1660
+    if (filetype == RFT_COMPRESS) {   /* a compressed file.  uncompress it */
+      char tmpname[128];
+  
+      if (UncompressFile(filename, tmpname)) {
+        filetype = ReadFileType(tmpname);    /* and try again */
+  
+--- 1653,1659 -----
+    if (filetype == RFT_COMPRESS) {   /* a compressed file.  uncompress it */
+      char tmpname[128];
+  
++ #ifndef VMS
+      if (UncompressFile(filename, tmpname)) {
+  #else
+      if (UncompressFile(basefname, tmpname)) {
+**************
+*** 1656,1661
+      char tmpname[128];
+  
+      if (UncompressFile(filename, tmpname)) {
+        filetype = ReadFileType(tmpname);    /* and try again */
+  
+        /* if we made a /tmp file (from stdin, etc.) won't need it any more */
+--- 1655,1663 -----
+  
+  #ifndef VMS
+      if (UncompressFile(filename, tmpname)) {
++ #else
++     if (UncompressFile(basefname, tmpname)) {
++ #endif
+        filetype = ReadFileType(tmpname);    /* and try again */
+  
+        /* if we made a /tmp file (from stdin, etc.) won't need it any more */
+**************
+*** 2284,2290
+       to what it was.  necessary because uncompress doesn't handle files
+       that don't end with '.Z' */
+  
+!   if (strlen(name)>=2 && strcmp(name + strlen(name)-2,".Z")!=0) {
+      strcpy(namez, name);
+      strcat(namez,".Z");
+  
+--- 2286,2293 -----
+       to what it was.  necessary because uncompress doesn't handle files
+       that don't end with '.Z' */
+  
+!   if (strlen(name)>=2 && strcmp(name + strlen(name)-2,".Z" &&
+!       strcmp(name + strlen(name)-2,".z")!=0) {
+      strcpy(namez, name);
+      strcat(namez,".Z");
+  
+**************
+*** 2312,2317
+  #endif
+  
+    SetISTR(ISTR_INFO, "Uncompressing '%s'...", BaseName(fname));
+    if (system(str)) {
+      SetISTR(ISTR_INFO, "Unable to uncompress '%s'.", BaseName(fname));
+      Warning();
+--- 2315,2321 -----
+  #endif
+  
+    SetISTR(ISTR_INFO, "Uncompressing '%s'...", BaseName(fname));
++ #ifndef VMS
+    if (system(str)) {
+  #else
+    if (!system(str)) {
+**************
+*** 2313,2318
+  
+    SetISTR(ISTR_INFO, "Uncompressing '%s'...", BaseName(fname));
+    if (system(str)) {
+      SetISTR(ISTR_INFO, "Unable to uncompress '%s'.", BaseName(fname));
+      Warning();
+      return 0;
+--- 2317,2325 -----
+    SetISTR(ISTR_INFO, "Uncompressing '%s'...", BaseName(fname));
+  #ifndef VMS
+    if (system(str)) {
++ #else
++   if (!system(str)) {
++ #endif
+      SetISTR(ISTR_INFO, "Unable to uncompress '%s'.", BaseName(fname));
+      Warning();
+      return 0;
+**************
+*** 2318,2324
+      return 0;
+    }
+    
+! #if defined(VMS)
+    sprintf(str,"Rename %s %s", fname, uncompname);
+    SetISTR(ISTR_INFO,"Renaming '%s'...", fname);
+    if (!system(str)) {
+--- 2325,2331 -----
+      return 0;
+    }
+    
+! #ifdef VMS
+    sprintf(str,"Rename %s %s", fname, uncompname);
+    SetISTR(ISTR_INFO,"Renaming '%s'...", fname);
+    if (!system(str)) {
+**************
+*** 3114,3119
+  
+      i = unlink(name);
+      if (i) {
+        sprintf(str,"Can't delete file '%s'\n\n  %s.", name, sys_errlist[errno]);
+        ErrPopUp(str, "\nPity");
+        if (name != namelist[delnum]) free(name);
+--- 3121,3127 -----
+  
+      i = unlink(name);
+      if (i) {
++ #ifndef VMS
+        sprintf(str,"Can't delete file '%s'\n\n  %s.", name, sys_errlist[errno]);
+  #else
+        sprintf(str,"Can't delete file '%s'\n\n  %s.", name, strerror(errno,vaxc$errno));
+**************
+*** 3115,3120
+      i = unlink(name);
+      if (i) {
+        sprintf(str,"Can't delete file '%s'\n\n  %s.", name, sys_errlist[errno]);
+        ErrPopUp(str, "\nPity");
+        if (name != namelist[delnum]) free(name);
+        return 0;
+--- 3123,3131 -----
+      if (i) {
+  #ifndef VMS
+        sprintf(str,"Can't delete file '%s'\n\n  %s.", name, sys_errlist[errno]);
++ #else
++       sprintf(str,"Can't delete file '%s'\n\n  %s.", name, strerror(errno,vaxc$errno));
++ #endif
+        ErrPopUp(str, "\nPity");
+        if (name != namelist[delnum]) free(name);
+        return 0;
+*** xv.h
+--- vms:xv.h
+**************
+*** 33,38
+  #define REVDATE   "Version 2.45  Rev: 2/10/93"
+  #define VERSTR    "2.45"
+  
+  #define THUMBDIR ".xvpics"  /* name of thumbnail file subdirectories */
+  
+  /*************************************************/
+--- 33,39 -----
+  #define REVDATE   "Version 2.45  Rev: 2/10/93"
+  #define VERSTR    "2.45"
+  
++ #ifndef VMS
+  #define THUMBDIR ".xvpics"  /* name of thumbnail file subdirectories */
+  #else
+  #define THUMBDIR "xvpics"  /* name of thumbnail file subdirectories */
+**************
+*** 34,39
+  #define VERSTR    "2.45"
+  
+  #define THUMBDIR ".xvpics"  /* name of thumbnail file subdirectories */
+  
+  /*************************************************/
+  /* START OF MACHINE-DEPENDENT CONFIGURATION INFO */
+--- 35,43 -----
+  
+  #ifndef VMS
+  #define THUMBDIR ".xvpics"  /* name of thumbnail file subdirectories */
++ #else
++ #define THUMBDIR "xvpics"  /* name of thumbnail file subdirectories */
++ #endif
+  
+  /*************************************************/
+  /* START OF MACHINE-DEPENDENT CONFIGURATION INFO */
+*** xvbrowse.c
+--- vms:xvbrowse.c
+**************
+*** 1651,1657
+    BFIL     *bf;
+    char      buf[256], *destFolderName;
+  
+- 
+    rv = -1;     /* default return value */
+    if (!br->bfList || !br->bfLen) return rv;
+  
+--- 1651,1656 -----
+    BFIL     *bf;
+    char      buf[256], *destFolderName;
+  
+    rv = -1;     /* default return value */
+    if (!br->bfList || !br->bfLen) return rv;
+  
+**************
+*** 2029,2034
+        }
+        if (DEBUG) fprintf(stderr,"\n\n");
+  
+        dragFiles(br, destBr, br->path, destBr->path, destFolderName, nlist, 
+  		ncnt, cpymode);
+  
+--- 2028,2043 -----
+        }
+        if (DEBUG) fprintf(stderr,"\n\n");
+  
++ 
++ #ifdef VMS
++ /*
++  *   For VMS, our directory file names are identifed by the special filename
++  *   extension, ".DIR".  Unfortunately, this needs to be stripped before
++  *   we ever actually use the name in a copy command... :(     RLD 26-FEB-1993
++  */
++       *rindex ( destFolderName, '.' ) = '\0';
++ #endif
++ 
+        dragFiles(br, destBr, br->path, destBr->path, destFolderName, nlist, 
+  		ncnt, cpymode);
+  
+**************
+*** 2431,2438
+  #else
+        strcpy(tmppath,"/");
+  #endif
+!     }
+! 
+  #ifdef VMS
+      /* End 'tmppath' by changing trailing '/' (of dir name) to a '\0' */
+      *strrchr ( tmppath, '/') = '\0';
+--- 2440,2446 -----
+  #else
+        strcpy(tmppath,"/");
+  #endif
+!      }
+  #ifdef VMS
+       else {
+      /*
+**************
+*** 2434,2441
+      }
+  
+  #ifdef VMS
+!     /* End 'tmppath' by changing trailing '/' (of dir name) to a '\0' */
+!     *strrchr ( tmppath, '/') = '\0';
+  #endif
+  
+      if (chdir(tmppath)) {
+--- 2442,2462 -----
+  #endif
+       }
+  #ifdef VMS
+!      else {
+!     /*
+!      *  The VMS chdir always needs 2 components (device and directory),
+!      *  so convert "/device" to "/device/000000" and convert
+!      *  "/" to "/DEVICE_LIST_ROOT/000000" (device_list_root is special
+!      *  concealed device setup to provide list of available disks).
+!      *
+!      *  End 'tmppath' by changing trailing '/' (of dir name) to a '\0'
+!      */
+!     *rindex ( tmppath, '/') = '\0';
+!     if ( ((br->ndirs-sel) == 2) && (strlen(tmppath) > 1) ) 
+!       strcat ( tmppath, "/000000" ); /* add root dir for device */
+!     else if  ((br->ndirs-sel) == 1 )
+!       strcpy ( tmppath, "/device_list_root/000000" );  /* fake top level */
+!     }
+  #endif
+  
+      if (chdir(tmppath)) {
+**************
+*** 3139,3144
+  
+    dirp = opendir(dir);
+    if (!dirp) {
+      SetISTR(ISTR_WARNING, "%s: %s", dir, sys_errlist[errno]);
+      *lenP = 0;
+      return (char **) NULL;
+--- 3160,3166 -----
+  
+    dirp = opendir(dir);
+    if (!dirp) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", dir, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "%s: %s", dir, strerror(errno,vaxc$errno));
+**************
+*** 3140,3145
+    dirp = opendir(dir);
+    if (!dirp) {
+      SetISTR(ISTR_WARNING, "%s: %s", dir, sys_errlist[errno]);
+      *lenP = 0;
+      return (char **) NULL;
+    }
+--- 3162,3170 -----
+    if (!dirp) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", dir, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "%s: %s", dir, strerror(errno,vaxc$errno));
++ #endif
+      *lenP = 0;
+      return (char **) NULL;
+    }
+**************
+*** 3252,3257
+    int     iwide, ihigh;
+    byte   *icon24, *icon8;
+    char    str[256], str1[256], *readname, uncompname[128];
+  
+  
+    if (!bf || !bf->name || bf->name[0] == '\0') return;   /* shouldnt happen */
+--- 3277,3283 -----
+    int     iwide, ihigh;
+    byte   *icon24, *icon8;
+    char    str[256], str1[256], *readname, uncompname[128];
++   char    basefname[128];   /* just the current fname, no path */
+  
+  
+    if (!bf || !bf->name || bf->name[0] == '\0') return;   /* shouldnt happen */
+**************
+*** 3256,3261
+  
+    if (!bf || !bf->name || bf->name[0] == '\0') return;   /* shouldnt happen */
+    str[0] = '\0';
+    pinfo.pic = (byte *) NULL;
+    pinfo.comment = (char *) NULL;
+    readname = bf->name;
+--- 3282,3288 -----
+  
+    if (!bf || !bf->name || bf->name[0] == '\0') return;   /* shouldnt happen */
+    str[0] = '\0';
++   basefname[0] = '\0';
+    pinfo.pic = (byte *) NULL;
+    pinfo.comment = (char *) NULL;
+    readname = bf->name;
+**************
+*** 3266,3271
+    filetype = ReadFileType(bf->name);
+  
+    if (filetype == RFT_COMPRESS) {
+      if (UncompressFile(bf->name, uncompname)) {
+        filetype = ReadFileType(uncompname);
+        readname = uncompname;
+--- 3293,3299 -----
+    filetype = ReadFileType(bf->name);
+  
+    if (filetype == RFT_COMPRESS) {
++ #ifndef VMS
+      if (UncompressFile(bf->name, uncompname)) {
+  #else
+    /* chop off trailing '.Z' from friendly displayed basefname, if any */
+**************
+*** 3267,3272
+  
+    if (filetype == RFT_COMPRESS) {
+      if (UncompressFile(bf->name, uncompname)) {
+        filetype = ReadFileType(uncompname);
+        readname = uncompname;
+      }
+--- 3295,3306 -----
+    if (filetype == RFT_COMPRESS) {
+  #ifndef VMS
+      if (UncompressFile(bf->name, uncompname)) {
++ #else
++   /* chop off trailing '.Z' from friendly displayed basefname, if any */
++     strcpy (basefname, bf->name);
++     *rindex (basefname, '.') = '\0';
++     if (UncompressFile(basefname, uncompname)) {
++ #endif
+        filetype = ReadFileType(uncompname);
+        readname = uncompname;
+      }
+**************
+*** 3590,3595
+    fp = fopen(thFname, "w");
+    if (!fp) {
+      sprintf(buf, "Can't create thumbnail file '%s':  %s", thFname, 
+  	    sys_errlist[errno]);
+      setBrowStr(br, buf);
+      return;            /* can't write... */
+--- 3624,3630 -----
+    fp = fopen(thFname, "w");
+    if (!fp) {
+      sprintf(buf, "Can't create thumbnail file '%s':  %s", thFname, 
++ #ifndef VMS
+  	    sys_errlist[errno]);
+  #else
+  	    strerror(errno,vaxc$errno));
+**************
+*** 3591,3596
+    if (!fp) {
+      sprintf(buf, "Can't create thumbnail file '%s':  %s", thFname, 
+  	    sys_errlist[errno]);
+      setBrowStr(br, buf);
+      return;            /* can't write... */
+    }
+--- 3626,3634 -----
+      sprintf(buf, "Can't create thumbnail file '%s':  %s", thFname, 
+  #ifndef VMS
+  	    sys_errlist[errno]);
++ #else
++ 	    strerror(errno,vaxc$errno));
++ #endif
+      setBrowStr(br, buf);
+      return;            /* can't write... */
+    }
+**************
+*** 3627,3632
+      fclose(fp);
+      unlink(thFname);  /* delete it */
+      sprintf(buf, "Can't write thumbnail file '%s':  %s", thFname,
+  	    sys_errlist[errno]);
+      setBrowStr(br, buf);
+      return;            /* can't write... */
+--- 3665,3671 -----
+      fclose(fp);
+      unlink(thFname);  /* delete it */
+      sprintf(buf, "Can't write thumbnail file '%s':  %s", thFname,
++ #ifndef VMS
+  	    sys_errlist[errno]);
+  #else
+  	    strerror(errno,vaxc$errno));
+**************
+*** 3628,3633
+      unlink(thFname);  /* delete it */
+      sprintf(buf, "Can't write thumbnail file '%s':  %s", thFname,
+  	    sys_errlist[errno]);
+      setBrowStr(br, buf);
+      return;            /* can't write... */
+    }
+--- 3667,3675 -----
+      sprintf(buf, "Can't write thumbnail file '%s':  %s", thFname,
+  #ifndef VMS
+  	    sys_errlist[errno]);
++ #else
++ 	    strerror(errno,vaxc$errno));
++ #endif
+      setBrowStr(br, buf);
+      return;            /* can't write... */
+    }
+**************
+*** 3875,3880
+    /* try to rename the file */
+    if (rename(origname, buf) < 0) {
+      sprintf(txt, "Error renaming '%s' to '%s':  %s",
+  	    origname, buf, sys_errlist[errno]);
+      ErrPopUp(txt, "\nSo what!");
+      return;
+--- 3917,3923 -----
+    /* try to rename the file */
+    if (rename(origname, buf) < 0) {
+      sprintf(txt, "Error renaming '%s' to '%s':  %s",
++ #ifndef VMS
+  	    origname, buf, sys_errlist[errno]);
+  #else
+  	    origname, buf, strerror(errno,vaxc$errno));
+**************
+*** 3876,3881
+    if (rename(origname, buf) < 0) {
+      sprintf(txt, "Error renaming '%s' to '%s':  %s",
+  	    origname, buf, sys_errlist[errno]);
+      ErrPopUp(txt, "\nSo what!");
+      return;
+    }
+--- 3919,3927 -----
+      sprintf(txt, "Error renaming '%s' to '%s':  %s",
+  #ifndef VMS
+  	    origname, buf, sys_errlist[errno]);
++ #else
++ 	    origname, buf, strerror(errno,vaxc$errno));
++ #endif
+      ErrPopUp(txt, "\nSo what!");
+      return;
+    }
+**************
+*** 3943,3949
+    /* if it doesn't, do the mkdir().  On success, need to do a rescan of
+       cwd, and any other br's pointing at same directory */
+    if (mkdir(buf, 0755) < 0) {
+!     sprintf(txt, "Error creating directory '%s':  %s", buf, sys_errlist[errno]);
+      ErrPopUp(txt, "\nEat me!");
+      return;
+    }
+--- 3989,4000 -----
+    /* if it doesn't, do the mkdir().  On success, need to do a rescan of
+       cwd, and any other br's pointing at same directory */
+    if (mkdir(buf, 0755) < 0) {
+!     sprintf(txt, "Error creating directory '%s':  %s", buf,
+! #ifndef VMS
+!             sys_errlist[errno]);
+! #else
+!             strerror(errno,vaxc$errno));
+! #endif
+      ErrPopUp(txt, "\nEat me!");
+      return;
+    }
+**************
+*** 4119,4124
+  
+    i = unlink(name);
+    if (i) {
+      sprintf(buf, "rm %s: %s", name, sys_errlist[errno]);
+      setBrowStr(br, buf);
+    }
+--- 4170,4176 -----
+  
+    i = unlink(name);
+    if (i) {
++ #ifndef VMS
+      sprintf(buf, "rm %s: %s", name, sys_errlist[errno]);
+  #else
+      sprintf(buf, "rm %s: %s", name, strerror(errno,vaxc$errno));
+**************
+*** 4120,4125
+    i = unlink(name);
+    if (i) {
+      sprintf(buf, "rm %s: %s", name, sys_errlist[errno]);
+      setBrowStr(br, buf);
+    }
+  
+--- 4172,4180 -----
+    if (i) {
+  #ifndef VMS
+      sprintf(buf, "rm %s: %s", name, sys_errlist[errno]);
++ #else
++     sprintf(buf, "rm %s: %s", name, strerror(errno,vaxc$errno));
++ #endif
+      setBrowStr(br, buf);
+    }
+  
+**************
+*** 4185,4190
+        strcat(rmdirPath, name);
+  
+        if (stat(rmdirPath, &st) < 0) {
+  	sprintf(buf, "%s: %s", name, sys_errlist[errno]);
+  	setBrowStr(br, buf);
+  	rmdirPath[oldpathlen] = '\0';
+--- 4240,4246 -----
+        strcat(rmdirPath, name);
+  
+        if (stat(rmdirPath, &st) < 0) {
++ #ifndef VMS
+  	sprintf(buf, "%s: %s", name, sys_errlist[errno]);
+  #else
+  	sprintf(buf, "%s: %s", name, strerror(errno,vaxc$errno));
+**************
+*** 4186,4191
+  
+        if (stat(rmdirPath, &st) < 0) {
+  	sprintf(buf, "%s: %s", name, sys_errlist[errno]);
+  	setBrowStr(br, buf);
+  	rmdirPath[oldpathlen] = '\0';
+  	goto done;
+--- 4242,4250 -----
+        if (stat(rmdirPath, &st) < 0) {
+  #ifndef VMS
+  	sprintf(buf, "%s: %s", name, sys_errlist[errno]);
++ #else
++ 	sprintf(buf, "%s: %s", name, strerror(errno,vaxc$errno));
++ #endif
+  	setBrowStr(br, buf);
+  	rmdirPath[oldpathlen] = '\0';
+  	goto done;
+**************
+*** 4234,4239
+  
+    i = rmdir(rmdirPath);
+    if (i < 0) {
+      sprintf(buf, "rm %s: %s", rmdirPath, sys_errlist[errno]);
+      setBrowStr(br, buf);
+    }
+--- 4293,4299 -----
+  
+    i = rmdir(rmdirPath);
+    if (i < 0) {
++ #ifndef VMS
+      sprintf(buf, "rm %s: %s", rmdirPath, sys_errlist[errno]);
+  #else
+      sprintf(buf, "rm %s: %s", rmdirPath, strerror(errno,vaxc$errno));
+**************
+*** 4235,4240
+    i = rmdir(rmdirPath);
+    if (i < 0) {
+      sprintf(buf, "rm %s: %s", rmdirPath, sys_errlist[errno]);
+      setBrowStr(br, buf);
+    }
+  }
+--- 4295,4303 -----
+    if (i < 0) {
+  #ifndef VMS
+      sprintf(buf, "rm %s: %s", rmdirPath, sys_errlist[errno]);
++ #else
++     sprintf(buf, "rm %s: %s", rmdirPath, strerror(errno,vaxc$errno));
++ #endif
+      setBrowStr(br, buf);
+    }
+  }
+**************
+*** 4429,4434
+      }
+  
+      if (dstdir) {
+        sprintf(buf, "rm -rf %s", dst);
+        if (system(buf)) {     /* okay, so it's cheating... */
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+--- 4492,4498 -----
+      }
+  
+      if (dstdir) {
++ #ifndef VMS     /* we don't delete directories in VMS */
+        sprintf(buf, "rm -rf %s", dst);
+        if (system(buf)) {     /* okay, so it's cheating... */
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+**************
+*** 4434,4439
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+  	return 1;
+        }
+      }
+      else if (unlink(dst)) {
+        SetISTR(ISTR_WARNING, "unlink %s: %s", dst, sys_errlist[errno]);
+--- 4498,4504 -----
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+  	return 1;
+        }
++ #endif /* VMS */
+      }
+      else if (unlink(dst)) {
+  #ifndef VMS
+**************
+*** 4436,4441
+        }
+      }
+      else if (unlink(dst)) {
+        SetISTR(ISTR_WARNING, "unlink %s: %s", dst, sys_errlist[errno]);
+        return 1;
+      }
+--- 4501,4507 -----
+  #endif /* VMS */
+      }
+      else if (unlink(dst)) {
++ #ifndef VMS
+        SetISTR(ISTR_WARNING, "unlink %s: %s", dst, sys_errlist[errno]);
+  #else
+        SetISTR(ISTR_WARNING, "unlink %s: %s", dst, strerror(errno,vaxc$errno));
+**************
+*** 4437,4442
+      }
+      else if (unlink(dst)) {
+        SetISTR(ISTR_WARNING, "unlink %s: %s", dst, sys_errlist[errno]);
+        return 1;
+      }
+    }
+--- 4503,4511 -----
+      else if (unlink(dst)) {
+  #ifndef VMS
+        SetISTR(ISTR_WARNING, "unlink %s: %s", dst, sys_errlist[errno]);
++ #else
++       SetISTR(ISTR_WARNING, "unlink %s: %s", dst, strerror(errno,vaxc$errno));
++ #endif
+        return 1;
+      }
+    }
+**************
+*** 4451,4456
+    i = copyFile(src, dst);
+    if (i == 0) {    /* copied okay, kill the original */
+      if (srcdir) {
+        sprintf(buf, "rm -rf %s", src);
+        if (system(buf)) {     /* okay, so it's cheating... */
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+--- 4520,4526 -----
+    i = copyFile(src, dst);
+    if (i == 0) {    /* copied okay, kill the original */
+      if (srcdir) {
++ #ifndef VMS     /* we don't delete directories in VMS */
+        sprintf(buf, "rm -rf %s", src);
+        if (system(buf)) {     /* okay, so it's cheating... */
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+**************
+*** 4456,4461
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+  	return 1;
+        }
+      }
+      else if (unlink(src)) {
+        SetISTR(ISTR_WARNING, "unlink %s: %s", src, sys_errlist[errno]);
+--- 4526,4532 -----
+  	SetISTR(ISTR_WARNING, "Unable to remove directory %s", dst);
+  	return 1;
+        }
++ #endif /* VMS */
+      }
+      else if (unlink(src)) {
+  #ifndef VMS
+**************
+*** 4458,4463
+        }
+      }
+      else if (unlink(src)) {
+        SetISTR(ISTR_WARNING, "unlink %s: %s", src, sys_errlist[errno]);
+        return 1;
+      }
+--- 4529,4535 -----
+  #endif /* VMS */
+      }
+      else if (unlink(src)) {
++ #ifndef VMS
+        SetISTR(ISTR_WARNING, "unlink %s: %s", src, sys_errlist[errno]);
+  #else
+        SetISTR(ISTR_WARNING, "unlink %s: %s", src, strerror(errno,vaxc$errno));
+**************
+*** 4459,4464
+      }
+      else if (unlink(src)) {
+        SetISTR(ISTR_WARNING, "unlink %s: %s", src, sys_errlist[errno]);
+        return 1;
+      }
+    }
+--- 4531,4539 -----
+      else if (unlink(src)) {
+  #ifndef VMS
+        SetISTR(ISTR_WARNING, "unlink %s: %s", src, sys_errlist[errno]);
++ #else
++       SetISTR(ISTR_WARNING, "unlink %s: %s", src, strerror(errno,vaxc$errno));
++ #endif
+        return 1;
+      }
+    }
+**************
+*** 4612,4617
+    struct stat srcSt, dstSt;
+  
+    if (stat(cpSrcPath, &srcSt)) {   /* src doesn't exist, usefully... */
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+--- 4687,4693 -----
+    struct stat srcSt, dstSt;
+  
+    if (stat(cpSrcPath, &srcSt)) {   /* src doesn't exist, usefully... */
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, strerror(errno,vaxc$errno));
+**************
+*** 4613,4618
+  
+    if (stat(cpSrcPath, &srcSt)) {   /* src doesn't exist, usefully... */
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+    }
+--- 4689,4697 -----
+    if (stat(cpSrcPath, &srcSt)) {   /* src doesn't exist, usefully... */
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+      return;
+    }
+**************
+*** 4637,4642
+  
+    case S_IFDIR:  if (!havedst) {  /* create destination directory */
+                     if (mkdir(cpDstPath, srcSt.st_mode | 0700) < 0) {
+  		     SetISTR(ISTR_WARNING,"%s: %s",cpDstPath,sys_errlist[errno]);
+  		     copyerr++;
+  		     return;
+--- 4716,4722 -----
+  
+    case S_IFDIR:  if (!havedst) {  /* create destination directory */
+                     if (mkdir(cpDstPath, srcSt.st_mode | 0700) < 0) {
++ #ifndef VMS
+  		     SetISTR(ISTR_WARNING,"%s: %s",cpDstPath,sys_errlist[errno]);
+  #else
+  		     SetISTR(ISTR_WARNING,"%s: %s",cpDstPath,strerror(errno,vaxc$errno));
+**************
+*** 4638,4643
+    case S_IFDIR:  if (!havedst) {  /* create destination directory */
+                     if (mkdir(cpDstPath, srcSt.st_mode | 0700) < 0) {
+  		     SetISTR(ISTR_WARNING,"%s: %s",cpDstPath,sys_errlist[errno]);
+  		     copyerr++;
+  		     return;
+  		   }
+--- 4718,4726 -----
+                     if (mkdir(cpDstPath, srcSt.st_mode | 0700) < 0) {
+  #ifndef VMS
+  		     SetISTR(ISTR_WARNING,"%s: %s",cpDstPath,sys_errlist[errno]);
++ #else
++ 		     SetISTR(ISTR_WARNING,"%s: %s",cpDstPath,strerror(errno,vaxc$errno));
++ #endif
+  		     copyerr++;
+  		     return;
+  		   }
+**************
+*** 4721,4726
+      strcat(cpSrcPath, name);
+  
+      if (stat(cpSrcPath, &srcSt) < 0) {
+        SetISTR(ISTR_WARNING,"%s: %s",cpSrcPath,sys_errlist[errno]);
+        copyerr++;
+        cpSrcPath[oldsrclen] = '\0';
+--- 4804,4810 -----
+      strcat(cpSrcPath, name);
+  
+      if (stat(cpSrcPath, &srcSt) < 0) {
++ #ifndef VMS
+        SetISTR(ISTR_WARNING,"%s: %s",cpSrcPath,sys_errlist[errno]);
+  #else
+        SetISTR(ISTR_WARNING,"%s: %s",cpSrcPath,strerror(errno,vaxc$errno));
+**************
+*** 4722,4727
+  
+      if (stat(cpSrcPath, &srcSt) < 0) {
+        SetISTR(ISTR_WARNING,"%s: %s",cpSrcPath,sys_errlist[errno]);
+        copyerr++;
+        cpSrcPath[oldsrclen] = '\0';
+        goto done;
+--- 4806,4814 -----
+      if (stat(cpSrcPath, &srcSt) < 0) {
+  #ifndef VMS
+        SetISTR(ISTR_WARNING,"%s: %s",cpSrcPath,sys_errlist[errno]);
++ #else
++       SetISTR(ISTR_WARNING,"%s: %s",cpSrcPath,strerror(errno,vaxc$errno));
++ #endif
+        copyerr++;
+        cpSrcPath[oldsrclen] = '\0';
+        goto done;
+**************
+*** 4794,4799
+  		     cpSrcPath, cpDstPath);
+  
+    if ((srcFd = open(cpSrcPath, O_RDONLY, 0)) == -1) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+--- 4881,4887 -----
+  		     cpSrcPath, cpDstPath);
+  
+    if ((srcFd = open(cpSrcPath, O_RDONLY, 0)) == -1) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, strerror(errno,vaxc$errno));
+**************
+*** 4795,4800
+  
+    if ((srcFd = open(cpSrcPath, O_RDONLY, 0)) == -1) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+    }
+--- 4883,4891 -----
+    if ((srcFd = open(cpSrcPath, O_RDONLY, 0)) == -1) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+      return;
+    }
+**************
+*** 4815,4820
+  		 (st->st_mode & 0777) & (~userMask));
+  
+    if (dstFd == -1) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+--- 4906,4912 -----
+  		 (st->st_mode & 0777) & (~userMask));
+  
+    if (dstFd == -1) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, strerror(errno,vaxc$errno));
+**************
+*** 4816,4821
+  
+    if (dstFd == -1) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+    }
+--- 4908,4916 -----
+    if (dstFd == -1) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+      return;
+    }
+**************
+*** 4826,4831
+    while ((rcount = read(srcFd, buf, 8192)) > 0) {
+      wcount = write(dstFd, buf, rcount);
+      if (rcount != wcount || wcount == -1) {
+        SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+        copyerr++;
+        break;
+--- 4921,4927 -----
+    while ((rcount = read(srcFd, buf, 8192)) > 0) {
+      wcount = write(dstFd, buf, rcount);
+      if (rcount != wcount || wcount == -1) {
++ #ifndef VMS
+        SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+  #else
+        SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, strerror(errno,vaxc$errno));
+**************
+*** 4827,4832
+      wcount = write(dstFd, buf, rcount);
+      if (rcount != wcount || wcount == -1) {
+        SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+        copyerr++;
+        break;
+      }
+--- 4923,4931 -----
+      if (rcount != wcount || wcount == -1) {
+  #ifndef VMS
+        SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
++ #else
++       SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, strerror(errno,vaxc$errno));
++ #endif
+        copyerr++;
+        break;
+      }
+**************
+*** 4832,4837
+      }
+    }
+    if (rcount < 0) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+      copyerr++;
+    }
+--- 4931,4937 -----
+      }
+    }
+    if (rcount < 0) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, strerror(errno,vaxc$errno));
+**************
+*** 4833,4838
+    }
+    if (rcount < 0) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
+      copyerr++;
+    }
+  
+--- 4933,4941 -----
+    if (rcount < 0) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "%s: %s", cpSrcPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+    }
+  
+**************
+*** 4838,4843
+  
+    close(srcFd);
+    if (close(dstFd)) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+    }
+--- 4941,4947 -----
+  
+    close(srcFd);
+    if (close(dstFd)) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, strerror(errno,vaxc$errno));
+**************
+*** 4839,4844
+    close(srcFd);
+    if (close(dstFd)) {
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+    }
+  }
+--- 4943,4951 -----
+    if (close(dstFd)) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "%s: %s", cpDstPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+    }
+  }
+**************
+*** 4855,4860
+  		     cpSrcPath, cpDstPath);
+  
+    if (exists && unlink(cpDstPath)) {
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+--- 4962,4968 -----
+  		     cpSrcPath, cpDstPath);
+  
+    if (exists && unlink(cpDstPath)) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, strerror(errno,vaxc$errno));
+**************
+*** 4856,4861
+  
+    if (exists && unlink(cpDstPath)) {
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+    }
+--- 4964,4972 -----
+    if (exists && unlink(cpDstPath)) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+      return;
+    }
+**************
+*** 4881,4886
+  
+  #ifdef S_IFIFO
+    if (exists && unlink(cpDstPath)) {
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+--- 4992,4998 -----
+  
+  #ifdef S_IFIFO
+    if (exists && unlink(cpDstPath)) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, strerror(errno,vaxc$errno));
+**************
+*** 4882,4887
+  #ifdef S_IFIFO
+    if (exists && unlink(cpDstPath)) {
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+    }
+--- 4994,5002 -----
+    if (exists && unlink(cpDstPath)) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "unlink %s: %s", cpDstPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+      return;
+    }
+**************
+*** 4887,4892
+    }
+  
+    if (mkfifo(cpDstPath, st->st_mode)) {
+      SetISTR(ISTR_WARNING, "mkfifo %s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+--- 5002,5008 -----
+    }
+  
+    if (mkfifo(cpDstPath, st->st_mode)) {
++ #ifndef VMS
+      SetISTR(ISTR_WARNING, "mkfifo %s: %s", cpDstPath, sys_errlist[errno]);
+  #else
+      SetISTR(ISTR_WARNING, "mkfifo %s: %s", cpDstPath, strerror(errno,vaxc$errno));
+**************
+*** 4888,4893
+  
+    if (mkfifo(cpDstPath, st->st_mode)) {
+      SetISTR(ISTR_WARNING, "mkfifo %s: %s", cpDstPath, sys_errlist[errno]);
+      copyerr++;
+      return;
+    }
+--- 5004,5012 -----
+    if (mkfifo(cpDstPath, st->st_mode)) {
+  #ifndef VMS
+      SetISTR(ISTR_WARNING, "mkfifo %s: %s", cpDstPath, sys_errlist[errno]);
++ #else
++     SetISTR(ISTR_WARNING, "mkfifo %s: %s", cpDstPath, strerror(errno,vaxc$errno));
++ #endif
+      copyerr++;
+      return;
+    }
+*** xvdir.c
+--- vms:xvdir.c
+**************
+*** 1319,1324
+        else {
+  	char str[512];
+  
+  	sprintf(str,"Can't chdir to '%s'.\n\n  %s.",filename,sys_errlist[errno]);
+  	ErrPopUp(str, "\nPity");
+        }
+--- 1319,1325 -----
+        else {
+  	char str[512];
+  
++ #ifndef VMS
+  	sprintf(str,"Can't chdir to '%s'.\n\n  %s.",filename,sys_errlist[errno]);
+  #else
+  	sprintf(str,"Can't chdir to '%s'.\n\n  %s.",filename,strerror(errno,vaxc$errno));
+**************
+*** 1320,1325
+  	char str[512];
+  
+  	sprintf(str,"Can't chdir to '%s'.\n\n  %s.",filename,sys_errlist[errno]);
+  	ErrPopUp(str, "\nPity");
+        }
+        retval = 1;
+--- 1321,1329 -----
+  
+  #ifndef VMS
+  	sprintf(str,"Can't chdir to '%s'.\n\n  %s.",filename,sys_errlist[errno]);
++ #else
++ 	sprintf(str,"Can't chdir to '%s'.\n\n  %s.",filename,strerror(errno,vaxc$errno));
++ #endif
+  	ErrPopUp(str, "\nPity");
+        }
+        retval = 1;
+**************
+*** 1418,1423
+    fp = fopen(outFName, "w");
+    if (!fp) {
+      char  str[512];
+      sprintf(str,"Can't write file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
+      ErrPopUp(str, "\nBummer");
+      return NULL;
+--- 1422,1428 -----
+    fp = fopen(outFName, "w");
+    if (!fp) {
+      char  str[512];
++ #ifndef VMS
+      sprintf(str,"Can't write file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
+  #else
+      sprintf(str,"Can't write file '%s'\n\n  %s.",outFName, strerror(errno,vaxc$errno));
+**************
+*** 1419,1424
+    if (!fp) {
+      char  str[512];
+      sprintf(str,"Can't write file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
+      ErrPopUp(str, "\nBummer");
+      return NULL;
+    }
+--- 1424,1432 -----
+      char  str[512];
+  #ifndef VMS
+      sprintf(str,"Can't write file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
++ #else
++     sprintf(str,"Can't write file '%s'\n\n  %s.",outFName, strerror(errno,vaxc$errno));
++ #endif
+      ErrPopUp(str, "\nBummer");
+      return NULL;
+    }
+**************
+*** 1449,1454
+    if (fclose(fp) == EOF) {
+      static char *foo[] = { "\nWeird!" };
+      char  str[512];
+      sprintf(str,"Can't close file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
+      ErrPopUp(str, "\nWeird!");
+      return 1;
+--- 1457,1463 -----
+    if (fclose(fp) == EOF) {
+      static char *foo[] = { "\nWeird!" };
+      char  str[512];
++ #ifndef VMS
+      sprintf(str,"Can't close file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
+  #else
+      sprintf(str,"Can't close file '%s'\n\n  %s.",outFName, strerror(errno,vaxc$errno));
+**************
+*** 1450,1455
+      static char *foo[] = { "\nWeird!" };
+      char  str[512];
+      sprintf(str,"Can't close file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
+      ErrPopUp(str, "\nWeird!");
+      return 1;
+    }
+--- 1459,1467 -----
+      char  str[512];
+  #ifndef VMS
+      sprintf(str,"Can't close file '%s'\n\n  %s.",outFName, sys_errlist[errno]);
++ #else
++     sprintf(str,"Can't close file '%s'\n\n  %s.",outFName, strerror(errno,vaxc$errno));
++ #endif
+      ErrPopUp(str, "\nWeird!");
+      return 1;
+    }
+*** xvevent.c
+--- vms:xvevent.c
+**************
+*** 1555,1560
+        XSetNormalHints(theDisp, mainW, &hints);
+      }
+  
+      xwc.x -= 5;   xwc.y -= 25;    /* EVIL KLUDGE */
+    }
+  #endif
+--- 1555,1561 -----
+        XSetNormalHints(theDisp, mainW, &hints);
+      }
+  
++ #if !defined(MWM) || defined (VMS) /* don't do this for DEC's Motif Window Manager */
+      xwc.x -= 5;   xwc.y -= 25;    /* EVIL KLUDGE */
+  #endif /* MWM */
+    }
+**************
+*** 1556,1561
+      }
+  
+      xwc.x -= 5;   xwc.y -= 25;    /* EVIL KLUDGE */
+    }
+  #endif
+  
+--- 1557,1563 -----
+  
+  #if !defined(MWM) || defined (VMS) /* don't do this for DEC's Motif Window Manager */
+      xwc.x -= 5;   xwc.y -= 25;    /* EVIL KLUDGE */
++ #endif /* MWM */
+    }
+  #endif
+  
+*** xvgif.c
+--- vms:xvgif.c
+**************
+*** 135,149
+    register int   i, block;
+    int            aspect, gotimage;
+  
+- #ifdef VMS
+-   int status, gif_fget_counted(), ii;
+-   char vms_name[256];
+-   typedef struct {
+-     unsigned char *pos, *start, *end;	/* file positions */
+-     int chan, size;
+-   } map_block;
+-   map_block *gif_fopen(), *map;	/* routine to map file to memory */
+- #endif
+  
+  
+    /* initialize variables */
+--- 135,140 -----
+    register int   i, block;
+    int            aspect, gotimage;
+  
+  
+    /* initialize variables */
+    BitOffset = XC = YC = Pass = OutCount = gotimage = 0;
+**************
+*** 145,151
+    map_block *gif_fopen(), *map;	/* routine to map file to memory */
+  #endif
+  
+- 
+    /* initialize variables */
+    BitOffset = XC = YC = Pass = OutCount = gotimage = 0;
+    RawGIF = Raster = pic8 = NULL;
+--- 136,141 -----
+    int            aspect, gotimage;
+  
+  
+    /* initialize variables */
+    BitOffset = XC = YC = Pass = OutCount = gotimage = 0;
+    RawGIF = Raster = pic8 = NULL;
+**************
+*** 160,175
+  
+  
+    
+- #ifdef VMS
+-   (void) fgetname ( fp, vms_name, 1 );
+-   map = gif_fopen ( vms_name  );
+-   filesize = map->size;
+-   if ( filesize == -1 ) return ( gifError(pinfo, "Can't map file to memory") );
+-   gif_fgetc();	/* get first segment */
+-   dataptr = RawGIF = map->start;
+- 
+- #else
+- 
+    /* find the size of the file */
+    fseek(fp, 0L, 2);
+    filesize = ftell(fp);
+--- 150,155 -----
+  
+  
+    
+    /* find the size of the file */
+    fseek(fp, 0L, 2);
+    filesize = ftell(fp);
+**************
+*** 186,192
+    if (fread(dataptr, filesize, 1, fp) != 1) 
+      return( gifError(pinfo, "GIF data read failed") );
+  
+- #endif /* !VMS */
+  
+  
+    origptr = dataptr;
+--- 166,171 -----
+    if (fread(dataptr, filesize, 1, fp) != 1) 
+      return( gifError(pinfo, "GIF data read failed") );
+  
+  
+    origptr = dataptr;
+  
+**************
+*** 188,194
+  
+  #endif /* !VMS */
+  
+- 
+    origptr = dataptr;
+  
+    if      (strncmp((char *) dataptr, id87, 6)==0) gif89 = 0;
+--- 167,172 -----
+      return( gifError(pinfo, "GIF data read failed") );
+  
+  
+    origptr = dataptr;
+  
+    if      (strncmp((char *) dataptr, id87, 6)==0) gif89 = 0;
+**************
+*** 485,532
+    
+    CodeSize = NEXTBYTE;
+  
+- #ifdef VMS
+-   GIF_DECOMPRESS_INIT( &CodeSize );
+-   map->pos = dataptr;
+- 
+-   /* Allocate pic8 */
+-   maxpixels = Width*Height;
+- 
+-   picptr = pic8 = (byte *) malloc(maxpixels);
+-   if (!pic8) return( gifError(pinfo, "couldn't malloc 'pic8'") );
+- 
+-   if ( !Interlace )
+-     status = GIF_DECOMPRESS ( gif_fget_counted, map, maxpixels, picptr );
+-   else {
+-     /* decompress a line at a time into the proper position. */
+-     int pass, step, i, y;
+-     step = 8;
+-     y = pass = 0;
+-     for ( i = 0; i < Height; i++ ) {
+-       status = GIF_DECOMPRESS(gif_fget_counted, map, Width, &picptr[y*Width]);
+-       if ( (status&1) != 1 ) break;
+-       
+-       y += step;
+-       if ( y >= Height ) {
+- 	/* Stepsize/start-Y progression: 8/0, 8/4, 4/2, 2/1  */
+- 	if ( pass > 0 ) step = step/2;
+- 	y =  step/2;
+- 	pass++;
+-       }
+-     }
+-   }
+-   
+-   gif_fclose();
+-   if ( (status&1) == 0 ) {
+-     char msg[256];
+-     SetISTR(ISTR_WARNING, "%s:  %s", bname, 
+- 	    "Error decompressing data.  Winging it.");
+-     sprintf ( msg, "Error decompressing data, code %d, start: %x, pos: %x",
+- 	     status, map->start, map->pos );
+-     /* return( gifError(pinfo, msg) ); */
+-   }
+- 
+- #else  /* !VMS */
+    ClearCode = (1 << CodeSize);
+    EOFCode = ClearCode + 1;
+    FreeCode = FirstFree = ClearCode + 2;
+--- 463,468 -----
+    
+    CodeSize = NEXTBYTE;
+  
+    ClearCode = (1 << CodeSize);
+    EOFCode = ClearCode + 1;
+    FreeCode = FirstFree = ClearCode + 2;
+**************
+*** 680,687
+        memset(pic8+npixels, 0, maxpixels-npixels);  /* clear to EOBuffer */
+    }
+  
+- #endif  /* !VMS */
+- 
+    fclose(fp);
+  
+    /* fill in the PICINFO structure */
+--- 616,621 -----
+        memset(pic8+npixels, 0, maxpixels-npixels);  /* clear to EOBuffer */
+    }
+  
+    fclose(fp);
+  
+    /* fill in the PICINFO structure */
+**************
+*** 787,793
+  {
+    gifWarning(st);
+  
+- #ifndef VMS  
+    if (RawGIF != NULL) free(RawGIF);
+    if (Raster != NULL) free(Raster);
+  #endif
+--- 721,726 -----
+  {
+    gifWarning(st);
+  
+    if (RawGIF != NULL) free(RawGIF);
+    if (Raster != NULL) free(Raster);
+  
+**************
+*** 790,796
+  #ifndef VMS  
+    if (RawGIF != NULL) free(RawGIF);
+    if (Raster != NULL) free(Raster);
+- #endif
+  
+    if (pinfo->pic) free(pinfo->pic);
+    if (pinfo->comment) free(pinfo->comment);
+--- 723,728 -----
+  
+    if (RawGIF != NULL) free(RawGIF);
+    if (Raster != NULL) free(Raster);
+  
+    if (pinfo->pic) free(pinfo->pic);
+    if (pinfo->comment) free(pinfo->comment);
+*** xvtext.c
+--- vms:xvtext.c
+**************
+*** 243,248
+    int   i;
+    long  textlen;
+    char *text, buf[512], title[128], rfname[MAXPATHLEN+1];
+    FILE *fp;
+  
+    strcpy(rfname, fname);
+--- 243,249 -----
+    int   i;
+    long  textlen;
+    char *text, buf[512], title[128], rfname[MAXPATHLEN+1];
++   char  basefname[128];   /* just the current fname, no path */
+    FILE *fp;
+  
+    basefname[0] = '\0';
+**************
+*** 245,250
+    char *text, buf[512], title[128], rfname[MAXPATHLEN+1];
+    FILE *fp;
+  
+    strcpy(rfname, fname);
+  
+    /* see if this file is compressed.  if it is, uncompress it, and view
+--- 246,252 -----
+    char  basefname[128];   /* just the current fname, no path */
+    FILE *fp;
+  
++   basefname[0] = '\0';
+    strcpy(rfname, fname);
+  
+    /* see if this file is compressed.  if it is, uncompress it, and view
+**************
+*** 251,256
+       the uncompressed version */
+  
+    if (ReadFileType(fname) == RFT_COMPRESS) {
+      if (!UncompressFile(fname, rfname)) return;    /* failed to uncompress */
+    }
+        
+--- 253,259 -----
+       the uncompressed version */
+  
+    if (ReadFileType(fname) == RFT_COMPRESS) {
++ #ifndef VMS
+      if (!UncompressFile(fname, rfname)) return;    /* failed to uncompress */
+  #else
+    /* chop off trailing '.Z' from friendly displayed basefname, if any */
+**************
+*** 252,257
+  
+    if (ReadFileType(fname) == RFT_COMPRESS) {
+      if (!UncompressFile(fname, rfname)) return;    /* failed to uncompress */
+    }
+        
+  
+--- 255,266 -----
+    if (ReadFileType(fname) == RFT_COMPRESS) {
+  #ifndef VMS
+      if (!UncompressFile(fname, rfname)) return;    /* failed to uncompress */
++ #else
++   /* chop off trailing '.Z' from friendly displayed basefname, if any */
++     strcpy (basefname, fname);
++     *rindex (basefname, '.') = '\0';
++     if (!UncompressFile(basefname, rfname)) return;/* failed to uncompress */
++ #endif
+    }
+        
+  
+**************
+*** 258,263
+  
+    fp = fopen(rfname, "r");
+    if (!fp) {
+      sprintf(buf,"Couldn't open '%s':  %s", rfname, sys_errlist[errno]);
+      ErrPopUp(buf,"\nOh well");
+      return;
+--- 267,273 -----
+  
+    fp = fopen(rfname, "r");
+    if (!fp) {
++ #ifndef VMS
+      sprintf(buf,"Couldn't open '%s':  %s", rfname, sys_errlist[errno]);
+  #else
+      sprintf(buf,"Couldn't open '%s':  %s", rfname, strerror(errno,vaxc$errno));
+**************
+*** 259,264
+    fp = fopen(rfname, "r");
+    if (!fp) {
+      sprintf(buf,"Couldn't open '%s':  %s", rfname, sys_errlist[errno]);
+      ErrPopUp(buf,"\nOh well");
+      return;
+    }
+--- 269,277 -----
+    if (!fp) {
+  #ifndef VMS
+      sprintf(buf,"Couldn't open '%s':  %s", rfname, sys_errlist[errno]);
++ #else
++     sprintf(buf,"Couldn't open '%s':  %s", rfname, strerror(errno,vaxc$errno));
++ #endif
+      ErrPopUp(buf,"\nOh well");
+      return;
+    }
