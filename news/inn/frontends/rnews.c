@@ -1,4 +1,4 @@
-/*  $Revision: 1.1 $
+/*  $Revision: 1.2 $
 **
 **  A front-end for InterNetNews.
 **  Read UUCP batches and offer them up NNTP-style.  Because we may end
@@ -812,12 +812,12 @@ main(ac, av)
     /* First thing, set up logging and our identity. */
     openlog("rnews", L_OPENLOG_FLAGS, LOG_INN_PROG);
     if (setgid(getegid()) < 0) {
-	syslog(L_FATAL, "cant setgid to %d %m", getegid());
-	exit(1);
+/*	syslog(L_FATAL, "cant setgid to %d %m (realgid is %d)", getegid(), getgid());
+	exit(1); */
     }
     if (setuid(geteuid()) < 0) {
-	syslog(L_FATAL, "cant setuid to %d %m", geteuid());
-	exit(1);
+/*	syslog(L_FATAL, "cant setuid to %d %m (realuid is %d)", geteuid(), getuid());
+	exit(1); */
     }
     UUCPHost = getenv(_ENV_UUCPHOST);
     (void)umask(NEWSUMASK);
