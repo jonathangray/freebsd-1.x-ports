@@ -6,12 +6,14 @@ SUBDIR =
 G_SUBDIR =
 
 SUBDIR += golddig
+SUBDIR += nethack
 SUBDIR += seahaven
-SUBDIR += xjewel
 SUBDIR += xboing
+SUBDIR += xjewel
 SUBDIR += xpilot
 SUBDIR += xtrek
 
 .include <bsd.subdir_ports.mk>
 
 # End of Makefile.
+# $Id: Makefile,v 1.5 1994/05/23 11:31:34 sean Exp $
