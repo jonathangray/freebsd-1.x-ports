@@ -1,0 +1,465 @@
+#   Copyright (C) 1988, 1990, 1991, 1992 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-dejagnu@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+
+# these just need to be initialized
+set shell_id   	0
+
+
+# Most of these procedures try to establish the connection 3 times before
+# returning. If $verbose is set to a value of 2 or greater, then error
+# messages will appear for each attempt. If there is an error that
+# can't be recovered from, it returns a -1. If the connection is
+# established, it returns the shell's process number returned by the
+# tcl command spawn.
+#   Hostname refers to the entry in /etc/hosts for this target. The
+# procedures's name is the same as it's unix counterpart.
+
+#
+# telnet -- connect using telnet
+#
+proc telnet { args } {
+    global verbose
+    global connectmode
+    global shell_prompt
+    global spawn_id
+
+    set hostname [lindex $args 0]
+    if [llength $args]>1 then {
+        set port [lindex $args 1]
+    } else {
+        set port 23
+    }
+    set retries 0
+    set result 0
+    spawn telnet $hostname $port
+    expect {
+	"$shell_prompt"	{ 
+	    verbose "Got prompt\n"
+	    set result 0
+	}
+	-re "telnet: connect: Connection refused.*$" {
+	    error "Connection refused."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+	-re "Sorry, this system is engaged.*Connection closed by foreign host.*$" {
+	    warning "Already connected."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+	timeout			{ 
+	    warning "Timed out trying to connect."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+    }
+
+    if $result<0 then {
+	error "Couldn't connect after $retries retries."
+	return -1
+    } else {
+    set connectmode "telnet"
+    return $spawn_id
+}
+}
+
+#
+# rlogin -- connect to using rlogin
+#
+proc rlogin { hostname } {
+    global verbose
+    global connectmode
+    global shell_prompt
+    global spawn_id
+
+    set retries 0
+    set result -1
+    spawn rlogin $hostname
+    expect {
+	"$shell_prompt"	{ 
+	    verbose "Got prompt"
+	    set result 0
+	}
+	-re "Sorry, shell is locked.*Connection closed.*$" {
+	    warning "Already connected."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }    
+	}
+	-re "Sorry, this system is engaged.*Connection closed.*$" {
+	    warning "System engaged."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }    
+	}
+	timeout			{ 
+	    error "Timed out trying to connect."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+    }
+
+    if $result<0 then {
+	error "Couldn't connect after $retries retries."
+	return -1
+    } else {
+	set connectmode "rlogin"
+	return $spawn_id
+    }
+}
+
+#
+# rsh -- this procedure connects to using rsh
+#
+proc rsh { hostname } {
+    global verbose
+    global connectmode
+    global shell_prompt
+    global spawn_id
+
+    set retries 0
+    set result -1
+    spawn rsh $hostname
+    expect {
+	"$shell_prompt"	{ 
+	    if $verbose>1 then {
+		send_user "Got prompt\n"
+	    }
+	    set result 0
+	}
+	-re "Sorry, shell is locked.*Connection closed.*$" {
+	    warning "Already connected."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+	timeout			{	    
+	    error "Timed out trying to connect."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+    }
+
+    if $result<0 then {
+	error "Couldn't connect after $retries retries."
+	return -1
+    } else {
+	set connectmode "rsh"
+	return $spawn_id
+    }
+}
+
+#
+# tip -- connect to using tip
+#        port - must be a name from /etc/remote
+#        returns -1 if it failed, the spawn_id if it worked
+#
+proc tip { port } {
+    global verbose
+    global shell_prompt
+    global spawn_id
+
+    set retries 0
+    set result -1
+
+    spawn tip -v $port
+    expect {
+	-re ".*connected.*$" { 
+	    send "\r\n"
+	    expect {
+		-re ".*$shell_prompt.*$" {
+		    if $verbose>1 then {
+			send_user "Got prompt\n"
+		    }
+		    set result 0
+		    incr retries
+		}
+		timeout {
+		    warning "Never got prompt."
+		    set result -1
+		    incr retries
+		    if $retries<=2 then {
+			exp_continue
+		    }
+		}
+	    }
+	}
+	-re "all ports busy.*$" {
+	    set result -1
+	    error "All ports busy."
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }	    
+	}
+	-re "Connection Closed.*$" {
+	    error "Never connected."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+	-re ".*: Permission denied.*link down.*$" {
+	    error "Link down."
+	    set result -1
+	    incr retries
+	}
+	timeout			{	    
+	    error "Timed out trying to connect."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+	eof {
+	    error "Got EOF from tip."
+	    set result -1
+	    incr retries
+	}
+    }
+
+    send "\n~s"
+    expect {
+	"~\[set\]*" {
+	    verbose "Setting verbose mode" 1
+	    send "verbose\n\n\n"
+	}	
+    }
+    if $result<0 then {
+	error "Couldn't connect after $retries retries."
+	return -1
+    } else {
+	set connectmode "tip"
+	return $spawn_id
+    }
+}
+
+#
+# tip_download -- downloads using the ~put command under tip
+#                 arg - is a full path name to the file to download
+#                 returns 1 if an error occured, otherwise it returns
+#                 the spawn_id.
+#
+proc tip_download { shell_id file } {
+    global verbose
+    global decimal
+    global shell_prompt
+    global expect_out
+
+    set result 1
+    if ![file exists $file] then {
+	error "$file doesn't exist."
+	return 1
+    }
+
+    send -i $shell_id "\n~p"
+    expect {
+	-i $shell_id "~\[put\]*" {
+	    verbose "Downloading $file, please wait" 1
+	    send -i $shell_id "$file\n"
+	    set timeout 50
+	    expect {
+		-i $shell_id -re ".*$file.*$" {
+		    exp_continue
+		}
+		-i $shell_id -re ".*lines transferred in.*minute.*seconds.*$shell_prompt.*$" {
+		    verbose "Download $file successfully" 1
+		    set result 0
+		}
+		-i $shell_id -re ".*Invalid command.*$shell_prompt$" {
+		    warning "Got an Invalid command to the monitor"
+		}
+		-i $shell_id -re ".*$decimal\r" {
+		    if $verbose>1 then {
+			if [info exists expect_out(buffer)] then {
+			    send_user "$expect_out(buffer)\r"
+			}	
+			exp_continue
+		    }
+		}
+		-i $shell_id timeout {
+		    error "Timed out trying to download."
+		    set result 1
+		}
+	    }
+	}	
+	timeout {
+	    error "Timed out waiting for response to put command."
+	}
+    }	
+    set timeout 10
+    return $result
+}
+
+#
+# kermit -- connect to using kermit
+#        args - first is the device name, ie. /dev/ttyb
+#               second is the optional baud rate
+#        returns -1 if it failed, otherwise it returns
+#                 the spawn_id.
+#
+proc kermit { args } {
+    global verbose
+    global shell_prompt
+    global spawn_id
+
+    if [llength $args]==1 then {
+	set baud 9600
+    } else {
+	set baud [lindex $args 1]
+    } 
+    set port [lindex $args 0]
+    set retries 0
+    set result -1
+    spawn kermit -l $port -b $baud
+    expect {
+	-re ".*ermit.*>.*$" { 
+	    send "c\n"
+	    expect {
+		-re ".*Connecting to $port.*Type the escape character followed by C to.*$" {
+		    if $verbose>1 then {
+			send_user "Got prompt\n"
+		    }
+		    set result 0
+		    incr retries
+		}
+		timeout {
+		    warning "Never got prompt."
+		    set result -1
+		    incr retries
+		    if $retries<=2 then {
+			exp_continue
+		    }
+		}
+	    }
+	}
+	-re "Connection Closed.*$" {
+	    error "Never connected."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+	timeout			{	    
+	    warning "Timed out trying to connect."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		exp_continue
+	    }
+	}
+    }
+
+    if $result<0 then {
+	error "Couldn't connect after $retries retries."
+	return -1
+    } else {
+	set connectmode "tip"
+	return $spawn_id
+    }
+}
+
+#
+# exit_remote_shell -- exit the remote shell.
+#                   shell_id - This is the id number returned by the
+#                         any of the connection procedures procedure. 
+#
+proc exit_remote_shell { shell_id } {
+    global verbose
+
+    if $shell_id<0 then {
+	return
+    }
+
+    verbose "Exiting the remote shell $shell_id"
+    
+    catch "close -i $shell_id"
+    catch "wait -i $shell_id"
+    set shell_id 0
+    return 0
+}
+
+
+#
+# download -- download a file using stdin. This will download a file
+#             regardless of wether rlogin, telnet, tip, or kermit was
+#             used to establish the connection.
+#
+proc download { args } {
+    global spawn_id
+    global OBJCOPY
+    global verbose
+
+    set file [lindex $args 0]
+
+    if [llength $args]>1 then {
+        set shellid [lindex $args 1]
+    } else {
+        set shellid $spawn_id
+    }
+
+    if [file exists $file] then {
+        exec $OBJCOPY -O srec $file $file.srec
+    } else {
+        error "$file does not exist."
+    }
+    set fd [open $file.srec r]
+    while { [gets $fd cur_line]>=0 } {
+        set errmess ""
+        catch "send -i $shellid \"$cur_line\"" errmess
+        if [string match "write\(spawn_id=\[0-9\]+\):" $errmess] then {
+            error "sent \"$command\" got expect error \"$errmess\""
+            catch "close"
+            return -1
+        }
+        if $verbose>=2 then {
+            send_user "."
+        }
+        verbose "Sent $cur_line" 3
+    }
+    close $fd
+    unset fd
+    return 0
+}

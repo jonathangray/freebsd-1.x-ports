@@ -1,0 +1,806 @@
+# Test Framework Driver
+#   Copyright (C) 1988, 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-dejagnu@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+    
+set frame_version	1.2
+if ![info exists argv0] then {
+    send_error "Must use a version of Expect greater than 5.0\n"
+    exit 1
+}
+
+#
+# trap some signals so we know whats happening. These definitions are only
+# temporary until we read in the library stuff
+#
+trap { send_user "\nterminated\n";             exit 1 } SIGTERM
+trap { send_user "\ninterrupted by user\n";    exit 1 } SIGINT
+trap { send_user "\nsegmentation violation\n"; exit 1 } SIGSEGV
+trap { send_user "\nsigquit\n";                exit 1 } SIGQUIT
+
+#
+# initialize a few global variables used by all tests
+#
+set mail_logs   0		;# flag for mailing of summary and diff logs
+set psum_file   "latest"	;# file name of previous summary to diff against
+set testcnt	0		;# number of testcases that ran
+set passcnt	0		;# number of testcases that passed
+set failcnt	0		;# number of testcases that failed
+set xfailcnt	0		;# number of testcases expected to fail which did
+set xpasscnt	0		;# number of testcases that passed unexpectedly
+set warncnt     0               ;# number of warnings
+set errcnt      0               ;# number of errors
+set unsupportedcnt 0
+set untestedcnt 0
+set exit_status	0		;# exit code returned by this program
+set xfail_flag  0
+set xfail_prms	0
+set sum_file	""		;# name of the file that contains the summary log
+set base_dir	""		;# the current working directory
+set logname     ""		;# the users login name
+set passwd      ""
+set prms_id	0               ;# GNATS prms id number
+set bug_id	0               ;# optional bug id number
+set test_name	""		;# name of the test driver to be run
+set dir		""		;# temp variable for directory names
+set srcdir      "."		;# source directory containing the test suite
+set ignoretests ""		;# list of tests to not execute
+set target      ""		;# type of architecture to run tests on
+set host        ""		;# type of architecture to run tests from
+set objdir	"."		;# directory where test case binaries live
+set makevars	""
+set reboot      0
+set configfile  site.exp
+#
+# set communication parameters here
+#
+set netport     ""
+set targetname  ""
+set connectmode ""
+set serialport  ""
+set baud        ""
+
+#
+# some convenience abbreviations
+#
+if ![info exists hex] then {
+    set hex "0x\[0-9A-Fa-f\]+"
+}
+if ![info exists decimal] then {
+    set decimal "\[0-9\]+"
+}
+
+#
+# set the base dir (current working directory)
+#
+set base_dir [pwd]
+
+#
+# These are tested in case they are not initialized in site.exp. They are
+# tested here instead of the init module so they can be overridden by command
+# line options.
+#
+if ![info exists all_flag] then {
+    set all_flag    0
+}
+if ![info exists binpath] then {
+    set binpath	""
+}
+if ![info exists debug] then {
+    set debug  0
+}
+if ![info exists options] then {
+    set options	""
+}
+if ![info exists outdir] then {
+    set outdir      "."
+}
+if ![info exists reboot] then {
+    set reboot    1
+}
+if ![info exists runtests] then {
+    set runtests	""
+}
+if ![info exists tracelevel] then {
+    set tracelevel  0
+}
+if ![info exists verbose] then {
+    set verbose    0
+}
+
+#
+# verbose
+#        prints a message if the message level is greater than or equal to 
+#        the verbose level. This is defined here rather than in framework.exp
+#        so we can use it while still loading in the support files.
+#
+proc verbose  { args } {
+    global verbose
+    
+    set level 1
+    
+    if [llength $args]!=1 then {
+	set level [lindex $args 1]
+    }
+    set message [lindex $args 0]
+    
+    if { [string compare $verbose $level] >= 0 } then {
+	send_user "$message\n"
+    }
+}
+
+#
+# transform -- transform a tool name to get the installed name. We only define
+#              this if there wasn't one. This way the global config file can
+#              override how the tool names are calculated.
+#
+proc transform { name } {
+    global target_triplet
+    global host_triplet
+    
+    if [string match $target_triplet $host_triplet] then {
+	return $name
+    }
+    if [string match "native" $target_triplet] then {
+	return $name
+    }
+    if [string match "" $target_triplet] then {
+	return $name
+    } else {
+	regsub "(unknown|wrs|hitachi|lynxos|fujitsu|none)-" ${target_triplet}-$name "" tmp
+	verbose "Transforming $name to $tmp"
+	return $tmp
+    }
+}
+
+#
+# findfile -- find a file and see if it exists. If you only care
+#             about the false condition, then you'll need to pass
+#             a null "" for arg1.
+#             arg0 is the filename to look for. If the only arg,
+#                  then that's what gets returned. If this is the
+#                  only arg, then if it exists, arg0 gets returned.
+#                  if it doesn't exist, return only the prog name.
+#             arg1 is optional, and it's what gets returned if
+#                  the file exists.
+#             arg2 is optional, and it's what gets returned if
+#                 the file doesn't exist.
+#
+proc findfile { args } {    
+    # look for the file
+    verbose "Seeing if [lindex $args 0] exists." 2
+    if [file exists [lindex $args 0]] then {
+	if [llength $args]>1 then {
+	    verbose "Found file, returning [lindex $args 1]"
+	    return [lindex $args 1]
+	} else {
+	    verbose "Found file, returning [lindex $args 0]"
+	    return [lindex $args 0]
+	}
+    } else {
+	if [llength $args]>2 then {
+	    verbose "Didn't find file, returning [lindex $args 2]"
+	    return [lindex $args 2]
+	} else {
+	    verbose "Didn't find file, returning [file tail [lindex $args 0]]"
+	    return [transform [file tail [lindex $args 0]]]
+	}
+    }
+}
+
+#
+# get the users login name
+#
+if [string match "" $logname] then {
+    if [info exists env(USER)] then {
+	set logname $env(USER)
+    } else {
+	if [info exists env(LOGNAME)] then {
+	    set logname $env(LOGNAME)
+	} else {
+	    # try getting it with whoami
+	    catch set logname [exec whoami] tmp
+	    if [string match "*couldn't find*to execute*" $tmp] then {
+		# try getting it with who am i
+		unset tmp
+		catch set logname [exec who am i] tmp
+		if [string match "*Command not found*" $tmp] then {	
+		    send_user "ERROR: couldn't get the users login name\n"
+		    set logname "Unknown"
+		} else {
+		    set logname [lindex [split $logname " !"] 1]
+		}
+	    }
+	}
+    }
+}
+verbose "Login name is $logname"
+
+#
+# The current search order says ~/.dejagnurc is done first.
+# For the normal case, we rely on the config file in base_dir to set
+# host_triplet and target_triplet.  Fetch it now so command line options
+# can override.
+#
+foreach file "~/.dejagnurc $base_dir/site.exp" {
+    verbose "Looking for $file" 2
+    if [file exists $file] then {
+	verbose "Found $file"
+	if [expr "[catch "source $file"] == 1" ] then {
+	    if [info exists errorInfo] then {
+		send_error "ERROR: errors in $file\n"
+		send_error "$errorInfo"
+		exit 1
+	    }
+	}
+    }
+}
+
+#
+# Parse these configuration args so the global config file can use these values
+# in the absence of a local site.exp.  We need to get these values here so we
+# can use them for loading the support files.
+#
+set match 0
+set argc [ llength $argv ]
+for { set i 0 } { $i < $argc } { incr i } {
+    global host_triplet target_triplet; 
+
+    set sub_arg [ lindex $argv $i ]
+    case $sub_arg in {
+
+	{ "-sr*" "--sr*" } {        	# (--srcdir) where the testsuite source code lives
+	    incr i
+	    set srcdir [lindex $argv $i]
+	    verbose "Using test sources in $srcdir"
+	    continue
+	}
+	
+	{ "-ho*" "--ho*" } {        	# (--host) the host configuration
+	    incr i
+	    set host_triplet [lindex $argv $i]
+	    verbose "The host is now $host_triplet"
+	    continue
+	}
+	
+	{ "-v*" "--v*" "*-verb*" } {        # (--verbose) verbose output
+	    incr verbose
+	    verbose "Verbose is now at level $verbose"
+	    continue
+	}
+		
+	{ "-ta*" "--ta*" } {        	# (--target) the target configuration
+	    incr i
+	    set target_triplet [lindex $argv $i]
+	    verbose "The target is now $target_triplet"
+	    continue
+  	    # override local site file and load the configuration of 
+	    # a different target
+	}
+    }
+}
+
+set execpath 	[file dirname $argv0]
+set libdir    	[file dirname $execpath]/dejagnu
+if [info exists env(DEJAGNULIBS)] then {
+    set libdir $env(DEJAGNULIBS)
+}
+verbose "Using $libdir to find libraries"
+
+# If objdir didn't get set in $base_dir/site.exp, set it to $base_dir.
+if [string match "." $objdir] then {
+    set objdir $base_dir
+}
+
+#
+# set the host type. If it hadn't been specified by now, use config.guess
+#
+
+# find config.guess
+if ![info exists host_triplet] then {
+    foreach dir "$libdir $libdir/.. $srcdir/.. $srcdir/../.." {
+	verbose "Looking for $dir" 2
+	if [file exists $dir/config.guess] then {
+	    set config_guess $dir/config.guess
+	    verbose "Found $dir/config.guess"
+	}
+    }
+    
+    # get the canonical config name
+    if ![info exists config_guess] then {
+	verbose "WARNING: Couldn't guess configuration"
+	return
+    }
+    catch "exec $config_guess" host_triplet
+    case $host_triplet in {
+	{ "No uname command or uname output not recognized" "Unable to guess system type" } {
+	    verbose "WARNING: Uname output not recognized"
+	    set host_triplet unknown
+	}
+    }
+    verbose "Set host to $host_triplet"
+}
+
+# if the target hasn't been specified or sourced, then we have to assume
+# we are native
+if ![info exists target_triplet] then {
+    set target_triplet $host_triplet
+    verbose "Set target to $target_triplet"
+}
+
+#
+# set the now unused target_alias so all config files don't break.
+#
+if ![info exists target_alias] then {
+    set target_alias $host_triplet
+}
+
+#
+# Load the global config files here. This way the other config files can set
+# configuration values that are used by the config files.
+# All are sourced in order.
+#
+# Search order:
+#	$HOME(done)-> base_dir(done)-> objdir-> installed-> DEJAGNU
+#
+# ??? Doing objdir at all is problematic (What if it overrides some command
+# line options?  Also, quite often it is the same as $base_dir).
+# Try to remove, clarify, or rework.
+#
+# ??? It might be nice to do $HOME last as it would allow it to be the
+# ultimate override.  Though at present there is still $DEJAGNU.
+#
+
+foreach file "$objdir/site.exp" {
+    verbose "Looking for $file" 2
+    if [file exists $file] then {
+	verbose "Found $file"
+	if [expr "[catch "source $file"] == 1" ] then {
+	    if [info exists errorInfo] then {
+		send_error "ERROR: errors in $file\n"
+		send_error "$errorInfo"
+		exit 1
+	    }
+	}
+    }
+}
+
+set found 0
+foreach dir "$libdir/site.exp $libdir/site.tmpl [file dirname $srcdir]/dejagnu/site.tmpl [file dirname [file dirname $srcdir]]/dejagnu/site.tmpl" {
+    verbose "Looking for $dir" 2
+    if [file exists $dir] then {
+	if [expr "[catch "source $dir"] == 1" ] then {
+	    if [info exists errorInfo] then {
+		send_error "ERROR: errors in $dir\n"
+		send_error "$errorInfo"
+	    }
+	} else {
+	    set found 1
+	    verbose "Found $dir"
+	    break
+	}
+    }
+}
+
+# test if we found a site.exp file
+if { $found == 0 } then {
+    send_user "ERROR: Couldn't find the global config file, site.exp.\n"
+    exit 1
+} else {
+    unset found
+}
+
+# 
+# find and load the global config file if it exists.
+#
+if [info exists env(DEJAGNU)] then {
+    set configfile $env(DEJAGNU)
+    verbose "Looking for $configfile" 2
+    if [file exists $configfile] then {
+	verbose "Found $configfile"
+	if [expr "[catch "source $configfile"] == 1" ] then {
+	    if [info exists errorInfo] then {
+		send_error "ERROR: errors in $configfile\n"
+		send_error "$errorInfo"
+		exit 1
+	    }
+	}
+    }   
+}
+
+#
+# parse the command line arguments
+#
+set match 0
+set argc [ llength $argv ]
+for { set i 0 } { $i < $argc } { incr i } {
+    set sub_arg [ lindex $argv $i ]
+    case $sub_arg in {
+	
+	{ "-v*" "--v*" "*-verb*" } {	# (--verbose) verbose output
+	    # Already parsed.
+	    continue
+	}
+
+	{ "-ho*" "--ho*" } {        	# (--host) the host configuration
+	    # Already parsed.
+	    incr i
+	    continue
+	}
+	
+	{ "-ta*" "--ta*" } {        	# (--target) the target configuration
+	    # Already parsed.
+	    incr i
+	    continue
+	}
+	
+	{ "-a*" "--a*" } {        	# (--all) print all test output to screen
+	    set all_flag 1
+	    verbose "Print all test output to screen"
+	    continue
+	}
+	
+        { "-b*" "--b*" } {        	# (--baud) the baud to use for a serial line
+	    incr i
+	    set baud [lindex $argv $i]
+	    verbose "The baud rate is now $baud"
+	    continue
+	}
+	
+	{ "-co*" "--co*" } {        	# (--connect) the connection mode to use
+	    incr i
+	    set connectmode [lindex $argv $i]
+	    verbose "Comm method is $connectmode"
+	    continue
+	}
+	
+	{ "-d*" "--d*" } {        	# (--debug) expect internal debugging
+	    if [file exists ./dbg.log] then {
+		catch "exec rm -f ./dbg.log"
+	    }
+	    if $verbose>2 then {
+		exp_internal -f dbg.log 1
+	    } else {
+		exp_internal -f dbg.log 0
+	    }
+	    verbose "Expect Debugging is ON"
+	    continue
+	}
+	
+	{ "-D[01]" "--D[01]" } { 			# (-Debug) turn on Tcl debugger
+	    verbose "Tcl debugger is ON"
+	    continue
+	}
+	
+	{ "-m*" "--m*" } {        	# (--mail) mail the output
+	    incr i
+	    set mailing_list [lindex $argv $i]
+            set mail_logs 1
+	    verbose "Mail results to $mailing_list"
+	    continue
+	}
+	
+	{ "-r*" "--r*" } {        	# (--reboot) reboot the target
+	    set reboot 1
+	    verbose "Will reboot the target (if supported)"
+	    continue
+	}
+	
+	{ "-ob*" "--ob*" } {        	# (--objdir) where the test case object code lives
+	    incr i
+	    set objdir [lindex $argv $i]
+	    verbose "Using test binaries in $objdir"
+	    continue
+	}
+	
+	{ "-ou*" "--ou*" } {        	# (--outdir) where to put the output files
+	    incr i
+	    set outdir [lindex $argv $i]
+	    verbose "Test output put in $outdir"
+	    continue
+	}
+	
+	{ "*.exp" "*.C" "*.c" "*.s" "*.o" } {    	#  specify test names to run
+	    lappend runtests [lindex $argv $i]
+	    verbose "Running only tests $runtests"
+	    continue
+	}
+	
+	{ "-i*" "--i*" }  {        	#  (--ignore) specify test names to exclude
+	    incr i
+	    set ignoretests [lindex $argv $i]
+	    verbose "Ignoring test $ignoretests"
+	    continue
+	}
+	
+
+	{ "-sr*" "--sr*" } {        	# (--srcdir) where the testsuite source code lives
+	    # Already parsed, but parse again to make sure command line
+	    # options override any config file.
+	    incr i
+	    set srcdir [lindex $argv $i]
+	    continue
+	}
+	
+	{ "-st*" "--st*" } {        	# (--strace) expect trace level
+	    incr i
+	    set tracelevel [ lindex $argv $i ]
+	    strace $tracelevel
+	    verbose "Source Trace level is now $tracelevel"
+	    continue
+	}
+	
+	{ "-n*" "--n*" } {        	# (--name) the target's name
+	    incr i
+	    set targetname [lindex $argv $i]
+	    verbose "Testing target $targetname"
+	    continue
+	}
+	
+	{ "-to*" "--to*" } {        	# (--tool) specify tool name
+	    incr i
+	    set tool [lindex $argv $i]
+	    verbose "Testing $tool"
+	    continue
+        }
+	
+	{ "*-V*" "*-vers*" } {        	# (--version) version numbers
+	    send_user "Expect version is\t[exp_version]\n"
+	    send_user "Tcl version is\t\t[ info tclversion ]\n"
+	    send_user "Framework version is\t$frame_version\n"
+	    exit
+	}
+	
+	{ "[A-Z]*=*" } {        			# process makefile style args like CC=gcc, etc...
+	    set tmp [split $sub_arg "="]
+	    set [lindex $tmp 0] [lindex $tmp 1]
+	    verbose "[lindex $tmp 0] is now [lindex $tmp 1]"
+	    append makevars "set [lindex $tmp 0] [lindex $tmp 1];"
+	    unset tmp
+	    continue
+	}
+	
+	{ "-he*" "--he*" } {        # (--help) help text
+	    send_user "USAGE: runtest \[options...\]\n"
+	    send_user "\t--all (-a)\t\tPrint all test output to screen\n"
+	    send_user "\t--baud (-b)\t\tThe baud rate\n"
+	    send_user "\t--connect (-co)\t\[type\]\tThe type of connection to use\n"
+	    send_user "\t--debug (-de)\t\tSet expect debugging ON\n"
+	    send_user "\t--help (-he)\t\tPrint help text\n"
+	    send_user "\t--mail \[name(s)\]\tWho to mail the results to\n"
+	    send_user "\t--reboot \[name\]\t\tReboot the target (if supported)\n"
+            send_user "\t--objdir \[name\]\t\tThe test suite binary directory\n"
+	    send_user "\t--outdir \[name\]\t\tThe directory to put logs in\n"
+	    send_user "\t--ignore \[name(s)\]\tThe names of specific tests to ignore\n"
+	    send_user "\t--srcdir \[name\]\t\tThe test suite source code directory\n"
+	    send_user "\t--strace \[number\]\tSet expect tracing ON\n"
+	    send_user "\t--name \[name\]\t\tThe hostname of the target board\n"
+	    send_user "\t--target \[string\]\tThe canonical config name of the target board\n"
+	    send_user "\t--host \[string\]\t\tThe canonical config name of the host machine\n"
+	    send_user "\t--tool\[name(s)\]\t\tRun tests on these tools\n"
+	    send_user "\t--verbose (-v)\t\tEmit verbose output\n"
+	    send_user "\t--version (-V)\t\tEmit all version numbers\n"
+	    send_user "\t--D\[0-1\]\t\tTcl debugger\n"
+	    send_user "\tMakefile style arguments can also be used, ex. CC=gcc\n\n"
+	    exit 0	
+	}
+	
+	default {        # default
+	    send_user "\nIllegal Argument \"$sub_arg\"\n"
+	    send_user "try \"runtest --help\" for option list\n"
+	    exit 0
+	}
+	
+    }
+}
+
+#
+# check for a few crucial variables
+#
+if ![info exists tool] then {
+    send_error "ERROR: No tool specified, use the --tool option\n"
+    exit 1
+}
+
+if ![info exists target_triplet] then {
+    send_error "ERROR: No target configuration. Check the config file.\n"
+    exit 1
+}
+
+if ![info exists host_triplet] then {
+    send_error "WARNING: No host configuration. Check the config file.\n"
+}
+
+#
+# initialize a few Tcl variables to something other than their default
+#
+if { $verbose > 2 } then {
+    log_user 1
+} else {
+    log_user 0
+}
+
+set timeout     10
+
+#
+# load_lib 
+#        loads a library by sourcing it. If there a multiple files with
+#        the same name, they all get sourced in order. The order is first
+#        look in the install dir, then in a parallel dir in the source tree,
+#	 (up one or two levels), then in the current dir.
+#
+proc load_lib { file } {
+    global verbose libdir srcdir base_dir execpath tool;
+    
+    set found 0
+    set tmp   ""
+    foreach dir "$libdir $libdir/lib [file dirname [file dirname $srcdir]]/dejagnu/lib $srcdir/lib ." {
+	verbose "Looking for library file $dir/$file" 2
+	if [file exists $dir/$file] then {
+ 	    verbose "Loading library file $dir/$file"
+	    if [expr "[catch "uplevel #0 source $dir/$file"] == 1" ] then {
+		if [info exists errorInfo] then {
+		    send_error "ERROR: errors in library file $dir/file\n"
+		    send_error "$errorInfo"
+		exit 1
+		}
+	    } else {
+		set found 1
+		break
+	    }
+	}
+    }
+    if { $found == 0 } then {
+	send_user "ERROR: Couldn't load library file $file.\n"
+	exit 1
+    }
+    unset found
+    unset tmp
+}
+
+#
+# load the testing framework libraries
+#
+load_lib utils.exp
+load_lib framework.exp
+load_lib debugger.exp
+
+#
+# open log files
+#
+open_logs
+
+clone_output "Test Run By $logname on [exec date]"
+if ![string match $target_triplet $host_triplet] then {
+    clone_output "Target is $target_triplet"
+    clone_output "Host   is $host_triplet"
+} else {
+    clone_output "Native configuration is $host_triplet"
+}
+clone_output "\n\t\t=== $tool tests ===\n"
+
+#
+# Find the tool init file. This is in the config directory of the tool's
+# testsuite directory. These used to all be named $target_abbrev-$tool.exp,
+# but as the $tool variable goes away, it's now just $target_abbrev.exp.
+# First we look for a file named with both the abbrev and the tool names.
+# Then we look for one named with just the abbrev name. Finally, we look for
+# a file called default, which is the default actions, as some tools could
+# be purely host based. Unknown is mostly for error trapping.
+#
+
+set found 0 
+foreach initfile "${target_abbrev}-${tool}.exp ${target_abbrev}.exp default.exp unknown.exp" {
+    verbose "Looking for tool init file $srcdir/config/$initfile" 2
+    if [file exists $srcdir/config/$initfile] then {
+	verbose "Using $srcdir/config/$initfile as tool init file."
+	if [catch "uplevel #0 source $srcdir/config/$initfile"]==1 then {
+	    if [info exists errorInfo] then {
+		send_error "ERROR: errors in tool init file $srcdir/config/$initfile\n"
+		send_error "$errorInfo"
+		exit 1
+	    }
+	}
+	set found 1
+	break
+    }
+}
+
+if $found==0 then {
+    send_error "ERROR: Couldn't find tool init file $srcdir/config/$initfile.\n"
+    exit 1
+}
+unset found
+if [info exists errorInfo] then {
+    unset errorInfo
+}
+
+#
+# trap some signals so we know whats happening. These replace the previous
+# ones because we've now loaded the library stuff.
+#
+foreach sig "{SIGTERM {terminated}} \
+             {SIGINT {interrupted by user}} \
+             {SIGQUIT {interrupted by user}} \
+             {SIGSEGV {segmentation violation}}" {
+    trap {
+	send_error "Got a [trap -name] signal\n"
+	log_summary
+    } [lindex $sig 0]
+}
+
+#
+# main test execution loop
+#
+reset_vars
+append srcdir "/"
+
+foreach dir [lsort [getdirs $srcdir $tool*]] {
+    foreach test_name [lsort [find $dir *.exp]] {
+	# make sure we have only single path delimiters
+	regsub -all "//" $srcdir "/" srcdir
+	# get the path part after the $srcdir so we know the subdir we're in
+	regsub $srcdir [file dirname $test_name] "" subdir
+	if [string match "" ${test_name}] then {
+	    continue
+	}
+	# check to see if the range of tests is limited 
+	if ![string match "" $runtests] then {
+	    if ![expr 0<=[lsearch $runtests [file tail ${test_name}]]] then {
+		continue
+	    }
+	}
+	if ![string match "" $ignoretests] then {
+	    if [expr 0<=[lsearch $ignoretests [file tail ${test_name}]]] then {
+		continue
+	    }
+	}
+	if [string match "" $test_name] then {
+	    perror "$test_name does not exist."
+	} else {
+	    clone_output "Running ${test_name} ..."
+	}
+	set prms_id	0
+	set bug_id	0
+	set test_result ""
+	if [file exists $test_name] then {
+	    if [expr "[catch "uplevel #0 source ${test_name}"] == 1" ] then {
+                if [info exists errorInfo] then {
+		    send_error "$errorInfo"
+		    unset errorInfo
+		}
+		continue
+	    } 
+	} else {
+	    perror "$test_name does not exist."
+	}
+    }    
+}
+
+#
+# all done, cleanup
+#
+if { [info procs ${tool}_exit] != "" } then {
+    if {[catch "${tool}_exit" tmp]} {
+	warning "${tool}_exit failed:\n$tmp"
+    }
+}
+
+log_summary

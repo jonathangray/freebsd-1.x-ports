@@ -1,0 +1,224 @@
+#!/bin/sh
+# This script automatically test the given tool with the tool's test cases,
+# reporting anything of interest.
+
+# exits with 1 if there is nothing of interest
+# exits with 0 if there is something interesting
+# exits with 2 if an error occurred
+
+# Limitations, don't run this multiple times in one day, unless the -noupdate
+# flag is given.
+
+# Written by Mike Stump <mrs@cygnus.com>
+
+if [ $# = 2 ]; then
+	if [ "$1" = -noupdate ]; then
+		update=no
+		shift
+	fi
+fi
+
+if [ $# != 1 ]; then
+	echo "Usage: [-noupdate] tool_name" >&2
+	exit 2
+fi
+
+tool=$1
+if [ "$tool" = g++ ]; then
+	devoname=gcc
+elif [ "$tool" = gcc ]; then
+	devoname=gcc
+elif [ "$tool" = gdb ]; then
+	devoname=gdb
+else
+	echo "Only gcc, g++ and gdb supported." >&2
+	exit 2
+fi
+
+# Default DEVOSRCDIR
+if [ "$DEVOSRCDIR" = "" ]; then
+	DEVOSRCDIR=$HOME/devo ; export DEVOSRCDIR
+fi
+
+# Check DEVOSRCDIR
+if [ ! -d "$DEVOSRCDIR" ]; then
+	echo "$0: no directory $DEVOSRCDIR" >&2
+	exit 2
+fi
+
+# Default DEVOBINDIR
+if [ "$DEVOBINDIR" = "" ]; then
+	CPU=`$DEVOSRCDIR/config.guess`
+	if [ $? != 0 ]; then
+		echo "$0: cannot run config.guess" >&2
+		exit 2
+	fi
+	DEVOBINDIR=$HOME/$CPU ; export DEVOBINDIR
+fi
+
+# Check DEVOBINDIR
+if [ ! -d "$DEVOBINDIR" ]; then
+	echo "$0: no directory $DEVOBINDIR" >&2
+	exit 2
+fi
+
+# Specialize DEVOSRCDIR
+if [ -d "$DEVOSRCDIR/$devoname" ]; then
+	DEVOSRCDIR=$DEVOSRCDIR/$devoname
+else
+	echo "$0: Cannot find source directory." >&2
+	exit 2
+fi
+
+# Default LOGDIR
+if [ "$LOGDIR" = "" ]; then
+	LOGDIR=$HOME/logs ; export LOGDIR
+fi
+
+# Check LOGDIR
+if [ ! -d "$LOGDIR" ]; then
+	echo "$0: no directory $LOGDIR" >&2
+	exit 2
+fi
+	
+# Specialize DEVOBINDIR
+if [ -d "$DEVOBINDIR/$devoname" ]; then
+	DEVOBINDIR=$DEVOBINDIR/$devoname
+else
+	echo "$0: Cannot find binary directory." >&2
+	exit 2
+fi
+
+# Binary directory
+cd $DEVOBINDIR || exit 2
+
+tmp=/tmp/$tool-testing.$$a
+tmp1=/tmp/$tool-testing.$$b
+tmp2=/tmp/$tool-testing.$$c
+now_s=/tmp/$tool-testing.$$d
+before_s=/tmp/$tool-testing.$$e
+
+make "RUNTESTFLAGS=-v -v -v -v -a -a" check-$tool >/dev/null 2>/dev/null
+# ./runtest -tool $tool -v -v -v -v -a -a >/dev/null 2>/dev/null
+sed 's/^XFAIL/FAIL/; s/^XPASS/PASS/' <$tool.sum >$tool.1.sum || exit 2
+mv $tool.1.sum $tool.sum
+
+if [ "$update" = no ]; then
+	now=$tool.sum
+	before=`ls $LOGDIR/$tool-??????.sum | tail -1`
+else
+	mv -f $tool.sum $LOGDIR/$tool-`date '+%y%m%d'`.sum || exit 2
+	mv -f $tool.log $LOGDIR/$tool-`date '+%y%m%d'`.log || exit 2
+
+	now=`ls $LOGDIR/$tool-??????.sum | tail -1`
+	before=`ls $LOGDIR/$tool-??????.sum | tail -2 | sed 1q`
+fi
+trap "rm -f $tmp $tmp1 $tmp2 $now_s $before_s" 0 1 2 3 5 9 13 15
+
+if [ "$before" = "" ]; then
+	echo "Need previous summary to compare against." >&2
+	exit 2
+fi
+
+sort +0.4 "$now" > "$now_s"
+sort +0.4 "$before" > "$before_s"
+
+grep '^FAIL' "$now_s" | sed 's/^....:	//' >$tmp1
+grep '^PASS' "$before_s" | sed 's/^....:	//' | comm $tmp1 -12 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "Tests that now fail, but worked before:"
+	echo
+	cat $tmp2
+	showchangelog=1
+	echo
+fi
+
+grep '^PASS' "$now_s" | sed 's/^....:	//' >$tmp1
+grep '^FAIL' "$before_s" | sed 's/^....:	//' | comm $tmp1 -12 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "Tests that now work, but didn't before:"
+	echo
+	cat $tmp2
+	echo
+fi
+
+grep '^FAIL' "$now_s" | sed 's/^....:	//' >$tmp1
+grep '^[PF]A[SI][SL]' "$before_s" | sed 's/^....:	//' | comm $tmp1 -23 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "New tests that FAIL:"
+	echo
+	cat $tmp2
+	echo
+fi
+
+grep '^PASS' "$now_s" | sed 's/^....:	//' >$tmp1
+grep '^[PF]A[SI][SL]' "$before_s" | sed 's/^....:	//' | comm $tmp1 -23 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "New tests that PASS:"
+	echo
+	cat $tmp2
+	echo
+fi
+
+grep '^[PF]A[SI][SL]' "$now_s" | sed 's/^....:	//' >$tmp1
+grep '^PASS' "$before_s" | sed 's/^....:	//' | comm $tmp1 -13 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "Old tests that passed, that have disappeared: (Eeek!)"
+	echo
+	cat $tmp2
+	echo
+fi
+
+grep '^[PF]A[SI][SL]' "$now_s" | sed 's/^....:	//' >$tmp1
+grep '^FAIL' "$before_s" | sed 's/^....:	//' | comm $tmp1 -13 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "Old tests that failed, that have disappeared: (Eeek!)"
+	echo
+	cat $tmp2
+	echo
+fi
+
+
+if [ "$devoname" != "" ]; then
+	if [ "$showchangelog" = 1 ]; then
+		echo "Here is what's new in the ChangeLog:"
+		echo
+		diff -c $LOGDIR/$devoname.ChangeLog $DEVOSRCDIR/ChangeLog
+		echo
+		if [ "$tool" = g++ ]; then
+			echo "Here is what's new in the cp/ChangeLog:"
+			echo
+			diff -c $LOGDIR/g++.ChangeLog $DEVOSRCDIR/cp/ChangeLog
+		fi
+		echo
+	fi
+	if [ "$update" != no ]; then
+		# save the old ChangeLog as a reference for next time
+		rm -f $LOGDIR/$devoname.ChangeLog
+		cp -p $DEVOSRCDIR/ChangeLog $LOGDIR/$devoname.ChangeLog
+		if [ "$tool" = g++ ]; then
+			rm -f $LOGDIR/g++.ChangeLog
+			cp -p $DEVOSRCDIR/cp/ChangeLog $LOGDIR/g++.ChangeLog
+		fi
+	fi
+fi
+
+diff $before $now | grep -s . >/dev/null
+if [ $? = 0 ]; then
+	echo "Details:"
+	echo
+	diff $before $now
+	echo
+fi

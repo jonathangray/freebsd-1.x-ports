@@ -1,0 +1,163 @@
+# Copyright (C) 1988, 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-dejagnu@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+
+#
+# set target variables only if needed.
+#
+global  targetname
+global connectmode
+global env
+
+if ![info exists targetname] then {
+    if [info exists env(TARGETNAME)] then {
+	set targetname $env(TARGETNAME)
+    } else {
+	puts stderr "ERROR: Need a target name for the vxworks board."
+	puts stderr "       Use the --name option\n"
+	exit 1
+    }
+}
+
+# the default connect program to use
+if ![info exists connectmode] then {
+    set connectmode	"telnet"
+    warning "Using default of $connectmode for target communication."
+}		
+
+#
+# vxworks_ld -- load a file into vxworks. NOTE - this uses a
+#            default ftp device called "filesys" to load file. This
+#            way it works without NFS.
+#
+proc vxworks_ld { shell_id args } { 
+    global shell_prompt
+    global expect_out
+    global logname
+    global passwd
+
+    set timeout 100
+    set result 0
+    set retries 0
+
+    send -i $shell_id "iam \"$logname\"\r\n"
+    expect {
+	-i $shell_id "iam*value = 0 = 0x0*$shell_prompt" {
+	    verbose "Set default user." 2
+	}
+	-i $shell_id timeout {
+	    warning "Couldn't set default user."
+	    set result -1
+	}
+    }
+
+    # FIXME: make the filesystem device be configurable
+    send -i $shell_id "ld < filesys:$args\r\n"
+    verbose "Loading filesys:$args into VxWorks."
+    expect {
+	-i $shell_id "Login incorrect." {
+	    system stty -echo
+	    if [string match "" $passwd] then {
+		warning "Login failed for default user"
+		send_user "Type in password (for $logname) please: "
+		expect_user -re "(.*)\n"
+	    send_user "\n"
+	    set passwd "$expect_out(1,string)"
+	    system stty echo
+	    }
+	    send -i $shell_id "iam \"$logname\",\"$passwd\"\r\n"
+	    expect {
+		-i $shell_id "iam*value = 0 = 0x0*$shell_prompt " {
+		    verbose "Set new user and password" 2
+		}
+		-i $shell_id timeout {
+		    warning "Couldn't set user and password."
+		    set result -1
+		}
+	    }
+	    send -i $shell_id "ld < filesys:$args\r\n"
+	    incr retries
+	    if $retries<2 then {
+		exp_continue
+	    }
+	}
+	-i $shell_id -re "USER*command not understood" {
+	    warning "Need to set the user and password"
+	    set result -1
+	}
+	-i $shell_id -re "ld.*undefined symbol:.*value = -1.*$shell_prompt $" {
+	    warning "Undefined symbol, $args not loaded."
+	    set result -1
+	}
+	-i $shell_id -re "ld.*value = 0 = 0x0.*$shell_prompt $" {
+            verbose "Loaded $args into vxworks."
+	}
+	-i $shell_id -re "ld <.*can't open input.*$shell_prompt $" {
+	    warning "$args doesn't exist."
+	    set result -1
+	}
+	-i $shell_id timeout               { 
+	    warning "Timed out trying load $args."
+	    set result -1
+	}
+    }
+    
+    if [info exists expect_out(buffer)] then {
+	send_log "$expect_out(buffer)"
+    }
+    set timeout 10
+    return $result
+}
+
+#
+# vxworks_spawn -- start a thread (process) executing.
+#                  Returns 0 if the test executed successfully,
+#                        a 1 if the test failed, and
+#                        a -1 if the was a test framework error
+#
+proc vxworks_spawn { shell_id function } {
+    global shell_prompt
+    set result -1
+
+    send -i $shell_id "sp $function\n"
+    expect {
+	-i $shell_id -re "sp $function.*task spawned:.*task \[0-9\]+ - aborted..*$shell_prompt $" {
+            verbose "$function aborted"
+	    set result 1
+	}
+	-i $shell_id -re "sp $function.*task spawned:.*value.*$shell_prompt $" {
+	    verbose "$function executed successfully"
+	    set result 0
+	}
+	-i $shell_id timeout { 
+	    warning "Couldn't run $function (timed out)"
+	    set result -1
+	}
+    }
+
+    if [info exists expect_out(buffer)] then {
+	send_log "$expect_out(buffer)"
+    }
+   
+   return $result
+}
+
+
+

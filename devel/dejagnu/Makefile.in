@@ -1,0 +1,240 @@
+srcdir = .
+prefix = /usr/local
+
+exec_prefix = $(prefix)
+bindir = $(exec_prefix)/bin
+libdir = $(exec_prefix)/lib
+
+datadir = $(libdir)/dejagnu
+#confdir = $(datadir)/$(target_alias)
+mandir  = $(prefix)/man
+man1dir = $(mandir)/man1
+man2dir = $(mandir)/man2
+man3dir = $(mandir)/man3
+man4dir = $(mandir)/man4
+man5dir = $(mandir)/man5
+man6dir = $(mandir)/man6
+man7dir = $(mandir)/man7
+man8dir = $(mandir)/man8
+man9dir = $(mandir)/man9
+infodir = $(prefix)/info
+includedir = $(prefix)/include
+gxx_includedir = $(tooldir)/g++-include
+docdir = $(datadir)/doc
+program_transform_name = 
+
+SHELL = /bin/sh
+
+INSTALL = `cd $(srcdir); pwd`/../install.sh -c
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL)
+
+CFLAGS = -g
+CHILLFLAGS = $(CFLAGS)
+CHILL_LIB = -lchill
+
+CXX = gcc
+CXXFLAGS = -g -O
+
+LINK=		ln -s
+SUBDIRS=
+SITEFRAG=site.tmpl
+
+# These let the DejaGnu test suite run when DejaGnu isn't 
+# installed yet, so run it from the srcdir and objdir.
+EXPECT = ` \
+  if [ -f $${rootme}/../expect/expect ] ; then \
+    echo $${rootme}/../expect/expect ; \
+  else echo expect ; fi`
+
+RUNTESTFLAGS =
+RUNTEST = ` \
+  if [ -f $${srcdir}/../dejagnu/runtest ] ; then \
+    echo $${srcdir}/../dejagnu/runtest ; \
+  else echo runtest ;  fi`
+
+TCLIBRARY = `if [ -f $${rootme}/expect/expect ] ; \
+	then echo TCL_LIBRARY=$${srcdir}/../tcl/library ; \
+	else echo "" ; fi`
+
+FLAGS_TO_PASS = \
+	"CC=$(CC)" \
+	"CFLAGS=$(CFLAGS)" \
+	"INSTALL=$(INSTALL)" \
+	"INSTALL_DATA=$(INSTALL_DATA)" \
+	"INSTALL_PROGRAM=$(INSTALL_PROGRAM)" \
+	"LDFLAGS=$(LDFLAGS)" \
+	"MAKEINFO=$(MAKEINFO)" \
+	"EXPECT=$(EXPECT)" \
+	"TCLIBRARY=$(TCLIBRARY)" \
+	"RUNTEST=$(RUNTEST)" \
+	"RUNTESTFLAGS=$(RUNTESTFLAGS)" \
+	"exec_prefix=$(exec_prefix)" \
+	"prefix=$(prefix)" \
+	"tooldir=$(tooldir)"
+
+#### host, target, and site specific Makefile frags come in here.
+
+all:	 subdirs
+
+.PHONY: check installcheck
+installcheck:
+
+.NOEXPORT:
+MAKEOVERRIDES=
+
+INFODIRS=doc
+dvi info:
+	@rootme=`pwd`/ ; export rootme ; \
+	rootsrc=`cd $(srcdir); pwd`/ ; export rootsrc ; \
+	$(MAKE) subdir_do DO=$@ "DODIRS=$(INFODIRS)" $(FLAGS_TO_PASS)
+
+install-info:
+	@rootme=`pwd`/ ; export rootme ; \
+	$(MAKE) subdir_do DO=install-info "DODIRS=$(INFODIRS)" $(FLAGS_TO_PASS)
+
+install:
+	$(INSTALL_PROGRAM) $(srcdir)/runtest $(bindir)/runtest
+	$(INSTALL_PROGRAM) $(srcdir)/runtest $(bindir)/$(target_alias)-runtest
+	$(INSTALL_PROGRAM) $(srcdir)/runtest.exp $(datadir)/runtest.exp
+	$(INSTALL_PROGRAM) $(srcdir)/../config.guess $(datadir)/config.guess
+	$(INSTALL_DATA) $(srcdir)/site.tmpl $(datadir)/site.exp
+	-for file in $(srcdir)/lib/*.exp; \
+	do \
+		$(INSTALL_DATA) $$file $(datadir) ; \
+	done
+	@rootme=`pwd`/ ; export rootme ; \
+	$(MAKE) subdir_do DO=install "DODIRS=$(INFODIRS)" $(FLAGS_TO_PASS)
+
+subdir_do: force
+	@for i in $(DODIRS); do \
+	    if [ -d ./$$i ] ; then \
+		if (rootme=`pwd`/ ; export rootme ; \
+		    rootsrc=`cd $(srcdir); pwd`/ ; export rootsrc ; \
+		    cd ./$$i; \
+		    $(MAKE) $(FLAGS_TO_PASS) $(DO)) ; then true ; \
+		else exit 1 ; fi ; \
+	    else true ; fi ; \
+	done
+force:
+
+subdirs:
+	@for dir in ${SUBDIRS}; \
+	do \
+		echo "$$dir:"; \
+		if [ -d $$dir ]; then \
+			(rootme=`pwd`/ ; export rootme ; \
+			 rootsrc=`cd $(srcdir); pwd`/ ; export rootsrc ; \
+			 cd $$dir; $(MAKE) $(FLAGS_TO_PASS)); \
+		fi; \
+	done
+
+clean:
+	-rm -f *~ core *.o a.out xgdb *.x
+		for dir in ${SUBDIRS}; \
+		do \
+			echo "$$dir:"; \
+			if [ -d $$dir ]; then \
+				(cd $$dir; $(MAKE) clean); \
+			fi; \
+		done
+
+distclean: clean
+	-rm -f *~ core
+	-rm -f Makefile config.status *-init.exp site.bak site.exp
+	-rm -fr *.log summary detail *.sum blockit
+		for dir in ${SUBDIRS}; \
+		do \
+			echo "$$dir:"; \
+			(cd $$dir; $(MAKE) distclean); \
+		done
+
+check:	
+	@if [ -f testsuite/Makefile ]; then \
+	   rootme=`pwd`; export rootme; \
+	   cd testsuite; \
+	   $(MAKE) $(FLAGS_TO_PASS) check; \
+	else true; fi
+
+#
+# this stuff is only used for building release tapes
+#
+    
+# This target works on testsuites that are being released seperately
+# from the tool source. So, we create a minimal Makefile.in and
+# configure.in so we can still configure recursively, and  "make all"
+# or "make check" will work correctly from the top level directory.
+# Just to be exciting, we also have to edit the top level makefile a
+# little cause it wants to install the gcc fixincludes cause it sees a
+# Makefile in the gcc directory.
+
+
+testsuites: force
+	@for dir in $(srcdir)/../* ; \
+	    do \
+	    if [ -d $$dir ] ; then \
+		if [ -f $$dir/testsuite/config/makefile.rel.in ] ; then \
+		    if [ -f $$dir/Makefile.in ] ; then \
+			echo "Not making release Makefile.in for $$dir, file exists" ; \
+		    else \
+			echo "Creating $$dir/Makefile.in" ; \
+			cp $$dir/testsuite/config/makefile.rel.in $$dir/Makefile.in ; \
+		    fi ; \
+		fi ; \
+		if [ -f $$dir/testsuite/config/config.rel.in ] ; then \
+		    if [ -f $$dir/configure.in ] ; then \
+			echo "Not making release configure.in for $$dir, file exists" ; \
+		    else \
+			echo "Creating $$dir/configure.in" ; \
+			cp $$dir/testsuite/config/config.rel.in $$dir/configure.in ; \
+		    fi ; \
+		fi ; \
+	    fi ; \
+	done
+	-@mv -f $(srcdir)/../Makefile.in $(srcdir)/../Makefile.in.bak
+	@sed -e 's/INSTALL_TARGET = install.all/INSTALL_TARGET = install-dirs \
+	$$(INSTALL_MODULES) $$(INSTALL_TARGET_MODULES) $$(INSTALL_X11_MODULES)/' \
+	-e 's/\$$(MAKE) \$$(FLAGS_TO_PASS) install)/$$(MAKE) install)/' \
+	$(srcdir)/../Makefile.in.bak > $(srcdir)/../Makefile.in
+		
+
+Install: $(srcdir)/Install.in
+	@RELEASEDIR=test-`date +%y%m%d` ; export RELEASEDIR ; \
+	$(srcdir)/../etc/subst-strings $(host_canonical) $(target_canonical) `date +%y%m%d` dejagnu $(bindir) $(srcdir) $(srcdir)/Install.in Install
+	@chmod a+x Install
+	@$(srcdir)/../etc/subst-strings $(host_canonical) $(target_canonical) `date +%y%m%d` dejagnu $(bindir) $(srcdir) $(srcdir)/../etc/install-texi.in install.texi
+
+blockit: blockit.c
+	$(CC) -o blockit $(srcdir)/blockit.c
+
+TAPE    = /dev/nrst8
+GNUTAR  = tar
+tape:   blockit Install
+	@echo "Fixing permissions..."
+	@chmod -R go=u $(prefix)
+	@chmod -R u+w $(prefix)
+	@chmod -R go-w $(prefix)
+	@# this is to remove a bogus directory created by the top level makefile
+	@if [ -d $(exec_prefix)/$(target_canonical) ]; then rm -fr $(exec_prefix)/$(target_canonical); fi
+	@echo "Creating \"src\" link..."
+	@rm -f $(prefix)/src
+	@ln -s $(srcdir)/.. $(prefix)/src
+	@#mt -f ${TAPE} ret
+	@echo "Putting Install on tape..."
+	@mt -f ${TAPE} rewind
+	@${GNUTAR} cf ${TAPE} Install
+	@echo "Building release files..."
+	@${GNUTAR} cfh - -C $(srcdir)/.. CYGNUS -C $(prefix) . | nice compress -vV | blockit > ${TAPE}
+	@rm -f $(prefix)/src
+	@mt -f ${TAPE} asf 0
+	@tar tvvf ${TAPE}
+	@mt -f ${TAPE} rewind
+	@mt -f ${TAPE} fsf 1
+	@echo "Putting release on tape..."
+	@dd bs=62k if=${TAPE} | compress -d | ${GNUTAR} tvvf -
+	@mt -f ${TAPE} rewind
+	@echo "Done writing tape."
+
+Makefile: $(srcdir)/Makefile.in $(host_makefile_frag) $(target_makefile_frag)
+	$(SHELL) ./config.status
+

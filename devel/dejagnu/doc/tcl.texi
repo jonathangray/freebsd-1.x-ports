@@ -1,0 +1,4452 @@
+@c  Copyright (c) 1993 The Regents of the University of California.
+@c  All rights reserved.
+@c 
+@c  Permission is hereby granted, without written agreement and without
+@c  license or royalty fees, to use, copy, modify, and distribute this
+@c  documentation for any purpose, provided that the above copyright
+@c  notice and the following two paragraphs appear in all copies.
+@c 
+@c  IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+@c  FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+@c  ARISING OUT OF THE USE OF THIS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+@c  CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+@c 
+@c  THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+@c  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+@c  AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+@c  ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+@c  PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+@node Tcl
+@appendix Tcl Overview
+
+@cindex Tcl overview
+This appendix presents the same information available in the Tool
+Command Language (Tcl) reference-manual entries (``man pages''); we
+include it in the DejaGnu manual for convenient reference.  The author
+of Tcl, and of the reference-manual entries where this information
+originally appeared, is John Ousterhout, of the University of California
+at Berkeley (@code{ouster@@sprite.berkeley.edu}).
+
+The following copyright terms apply to the documentation in this
+Appendix:
+
+@cartouche
+@quotation
+Copyright @copyright{} 1993 The Regents of the University of California.
+All rights reserved.
+
+Permission is hereby granted, without written agreement and without
+license or royalty fees, to use, copy, modify, and distribute this
+documentation for any purpose, provided that the above copyright
+notice and the following two paragraphs appear in all copies.
+
+IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY
+FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+ARISING OUT OF THE USE OF THIS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ON AN ``AS IS'' BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+@end quotation
+@end cartouche
+
+@menu
+* Tcl Syntax:: 		Summary of Tcl language syntax
+* Tcl Expressions::	Writing expressions in Tcl
+* Tcl Commands::	Commands built into Tcl
+* Tcl Variables::	Variables built into Tcl
+* Tcl Library::         Tcl standard library
+@end menu
+
+@node Tcl Syntax
+@section Summary of Tcl language syntax
+
+@cindex Tcl syntax
+@cindex syntax of Tcl
+The following rules define the syntax and semantics  of  the
+Tcl language:
+
+@enumerate
+@item
+@cindex Tcl script
+@cindex script, Tcl
+A Tcl script is a string containing one or more commands.  Semicolons
+and newlines are command separators unless quoted as described below.
+Close brackets are command terminators during command substitution (see
+below) unless quoted.
+
+@item
+@cindex command evaluation, Tcl
+@cindex Tcl command evaluation
+Tcl evaluates commands in two steps.  First, the Tcl interpreter breaks
+the command into words and performs substitutions as described below.
+These substitutions are performed in the same way for all commands.  The
+first word is used to locate a command procedure to carry out the
+command, then all of the words of the command are passed to the command
+procedure.  The command procedure is free to interpret each of its words
+in any way it likes, such as an integer, variable name, list, or Tcl
+script.  Different commands interpret their words differently.
+
+@cindex Tcl special characters
+@cindex special characters in Tcl
+@item
+@cindex word separators, Tcl
+@cindex Tcl word separators
+Words of a command are separated by whitespace (except for newlines,
+which are command separators).
+
+@item
+@cindex double-quote, in Tcl
+@cindex Tcl double-quote
+@cindex Tcl @code{"}
+If the first character of a word is double-quote (@code{"}) then the
+word is terminated by the next double-quote character.  If semicolons,
+close brackets, or whitespace characters (including newlines) appear
+between the quotes then they are treated as ordinary characters and
+included in the word.  Command substitution, variable substitution, and
+backslash substitution are performed on the characters between the
+quotes as described below.  The double-quotes are not retained as part
+of the word.
+
+@item
+@cindex braces, in Tcl
+@cindex Tcl braces
+@cindex curly braces, in Tcl
+@cindex Tcl @code{@{@dots{}@}}
+If the first character of a word is an open brace (@code{@{}) then the
+word is terminated by the matching close brace (@code{@}}).  Braces nest
+within the word: for each additional open brace there must be an
+additional close brace (however, if an open brace or close brace within
+the word is quoted with a backslash then it is not counted in locating
+the matching close brace).  No substitutions are performed on the
+characters between the braces except for backslash-newline substitutions
+described below, nor do semicolons, newlines, close brackets, or
+whitespace have any special interpretation.  The word will consist of
+exactly the characters between the outer braces, not including the
+braces themselves.
+
+@item
+@cindex brackets, in Tcl
+@cindex square brackets, in Tcl
+@cindex Tcl brackets
+@cindex command substitution, Tcl
+@cindex Tcl command substitution
+@cindex Tcl @code{[@dots{}]}
+If a word contains an open bracket (@code{[}) then Tcl performs command
+substitution.  To do this it invokes the Tcl interpreter recursively to
+process the characters following the open bracket as a Tcl script.  The
+script may contain any number of commands and must be terminated by a
+close bracket (@code{]}).  The result of the script (i.e. the result of its
+last command) is substituted into the word in place of the brackets and
+all of the characters between them.  There may be any number of command
+substitutions in a single word.  Command substitution is not performed
+on words enclosed in braces.
+
+@item
+@cindex variable substitution, Tcl
+@cindex Tcl variable substitution
+@cindex dollar signs, in Tcl
+@cindex Tcl dollar signs
+@cindex Tcl @code{$}
+If a word contains a dollar-sign (@code{$}) then Tcl performs variable
+substitution: the dollar-sign and the following characters are replaced
+in the word by the value of a variable.  Variable substition may take
+any of the following forms:
+
+@table @code
+@item $@var{name}
+@var{name} is the name of a scalar variable; the name is terminated by
+any character that isn't a letter, digit, or underscore.
+
+@item $@var{name}(@var{index})
+@var{name} gives the name of an array variable and @var{index} gives the
+name of an element within that array.  @var{name} must contain only
+letters, digits, and underscores.  Command substitutions, variable
+substitutions, and backslash substitutions are performed on the
+characters of @var{index}.
+
+@item $@{@var{name}@}
+@var{name} is the name of a scalar variable.  It may contain any
+characters whatsoever except for close braces.
+@end table
+
+There may be any number of variable substitutions in a single word.
+Variable substitution is not performed on words enclosed in braces.
+
+@item
+@cindex Tcl @code{\@var{c}}
+@cindex @code{\@var{c}}, in Tcl
+@cindex backslash, in Tcl
+@cindex Tcl backslash
+@cindex escape sequences, Tcl
+@cindex Tcl escape sequences
+@cindex Tcl, special chars as text
+@cindex special chars as text in Tcl
+If a backslash (@code{\}) appears within a word then backslash substitution
+occurs.  In all cases but those described below the backslash is dropped
+and the following character is treated as an ordinary character and
+included in the word.  This allows characters such as double quotes,
+close brackets, and dollar signs to be included in words without
+triggering special processing.  The following table lists the backslash
+sequences that are handled specially, along with the value that replaces
+each sequence.
+
+@c We use ftable even though these aren't "functions" to get the escape
+@c sequences conveniently into our (unified) index
+@ftable @code
+@item \a
+Audible alert (bell) (@code{0x7}).
+
+@item \b
+Backspace (@code{0x8}).
+
+@item \f
+Form feed (@code{0xc}).
+
+@item \n
+Newline (@code{0xa}).
+
+@item \r
+Carriage-return (@code{0xd}).
+
+@item \t
+Tab (@code{0x9}).
+
+@item \v
+Vertical tab (@code{0xb}).
+
+@item \@key{newline} @key{whitespace}
+A single space character replaces the backslash, @key{newline}, and all
+@key{whitespace} characters after the @key{newline}.  This backslash
+sequence is unique in that it is replaced in a separate preprocessing
+pass before the command is actually parsed.  This means that it will be
+replaced @emph{even when it occurs between braces}, and the resulting
+space will be treated as a word separator if it isn't in braces or
+quotes.
+
+@item \\
+Backslash (@code{\}).
+
+@item \@var{ooo}
+The digits ooo (one, two, or three of them) give the octal value of the
+character.
+
+@item \x@var{hh}
+The hexadecimal digits @var{hh} give the hexadecimal value of the
+character.  Any number of digits may be present.
+@end ftable
+
+Backslash substitution is not performed on words enclosed in braces,
+except for @code{\@key{newline}} as described above.
+
+@item
+@cindex comments, in Tcl
+@cindex Tcl comments
+@cindex Tcl @code{#}
+If a hash character (@code{#}) appears at a point where Tcl is expecting
+the first character of the first word of a command, then the hash
+character and the characters that follow it, up through the next
+newline, are treated as a comment and ignored.  The comment character
+only has significance when it appears at the beginning of a command.
+
+@item
+@cindex Tcl one-pass processing
+@cindex one-pass processing, Tcl
+Each character is processed exactly once by the Tcl interpreter as part
+of creating the words of a command.
+
+For example, if variable substition occurs then no further substitions
+are performed on the value of the variable; the value is inserted into
+the word verbatim.  If command substitution occurs then the nested
+command is processed entirely by the recursive call to the Tcl
+interpreter; no substitutions are perfomed before making the recursive
+call and no additional substitutions are performed on the result of the
+nested script.
+
+@item
+@cindex Tcl word boundaries and substitutions
+@cindex Tcl substitutions and word boundaries
+@cindex substitutions and word boundaries, Tcl
+@cindex word boundaries and substitutions, Tcl
+Substitutions do not affect the word boundaries of a command.  For
+example, during variable substitution the entire value of the variable
+becomes part of a single word, even if the variable's value contains
+spaces.
+@end enumerate
+
+@node Tcl Expressions
+@section Writing expressions in Tcl
+
+@cindex expressions, Tcl
+@cindex whitespace, in Tcl expressions
+A Tcl expression consists of a combination of operands, operators, and
+parentheses.  White space may be used between the operands and operators
+and parentheses; it is ignored by the expression processor.
+
+The command @code{expr} evaluates expressions with no further effect.
+@xref{expr,, Evaluate an expression}.  The conditional command
+@code{if}, and two of the looping commands (@code{for} and @code{while})
+also evaluate Tcl expressions to test conditions.
+
+For some examples of simple expressions, suppose the variable @code{a}
+has the value @code{3} and the variable @code{b} has the value @code{6}.
+Then the command on the left side of each of the lines below will
+produce the value on the right side of the line:
+
+@example
+expr 3.1 + $a                   6.1
+expr 2 + "$a.$b"                5.6
+expr 4*[llength "6 2"]          8
+expr @{@{word one@} < "word $a"@}   0
+@end example
+
+@menu
+* Operands::          Operands in Tcl expressions.
+* Operators::         Operators in Tcl expressions.
+* Math Functions::    Mathematical functions in Tcl.
+* Types::             Types, overflow, and precision in Tcl.
+* String Operations:: String operations in Tcl expressions.
+@end menu
+
+@node Operands
+@subsection Operands in Tcl expressions
+
+@cindex Operands, of Tcl expressions
+
+@cindex integers, in Tcl expressions
+@cindex strings, in Tcl expressions
+Where possible, operands are interpreted as integer values.  Integer
+values may be specified in decimal (the normal case), in octal (if the
+first character of the operand is @samp{0}), or in hexadecimal (if the
+first two characters of the operand are @samp{0x}).  If an operand does
+not have one of the integer formats given above, then it is treated as a
+floating-point number if that is possible.  Floating-point numbers may
+be specified in any of the ways accepted by an @sc{ansi}-compliant C
+compiler (except that the @samp{f}, @samp{F}, @samp{l}, and @samp{L}
+suffixes will not be permitted in most installations).  For example, all
+of the following are valid floating-point numbers: @samp{2.1},
+@samp{3.}, @samp{6e4}, @samp{7.91e+16}.  If no numeric interpretation is
+possible, then an operand is left as a string (and only a limited set of
+operators may be applied to it).
+
+Operands may be specified in any of the following ways:
+
+@enumerate
+@item
+@cindex numeric operands, Tcl
+As an numeric value, either integer or floating-point.
+
+@item
+@cindex variable operands, Tcl
+As a Tcl variable, using standard @samp{$} notation.  The variable's
+value will be used as the operand.
+
+@item
+@cindex string operands, Tcl
+As a string enclosed in double-quotes (@code{"}).  The expression parser
+will perform backslash, variable, and command substitutions on the
+information between the quotes, and use the resulting value as the
+operand.
+
+@item
+As a string enclosed in @samp{@{@}} braces.  The characters between the
+open brace and matching close brace will be used as the operand without
+any substitutions.
+
+@item
+@cindex commands as operands, Tcl
+As a Tcl command enclosed in @samp{[]} brackets.  The command will be
+executed and its result will be used as the operand.
+
+@item
+@cindex math function operands, Tcl
+As a mathematical function whose arguments have any of the above forms
+for operands, such as @samp{sin($x)}.  @xref{Math Functions,,
+Mathematical functions in Tcl}, for a list of defined functions.
+@end enumerate
+
+@cindex braces, recommended around expressions
+Where substitutions occur above (e.g.  inside quoted strings), they are
+performed by the expression processor.  However, an additional layer of
+substitution may already have been performed by the command parser
+before the expression processor was called.  As discussed below, it is
+usually best to enclose expressions in braces to prevent the command
+parser from performing substitutions on the contents.
+
+@node Operators
+@subsection Operators in Tcl expressions
+
+@cindex precedence, of Tcl operators
+The operators Tcl recognizes in expressions are listed below, grouped in
+decreasing order of precedence:
+
+@table @code
+@item -  ~  !
+@cindex arithmetic negation, Tcl exprs
+@cindex Boolean negation, Tcl exprs
+@cindex negation, Tcl exprs
+Unary minus, bit-wise @sc{not}, logical @sc{not}.  None of these
+operands may be applied to string operands, and bit-wise @sc{not} may be
+applied only to integers.
+
+@item *  /  %
+@cindex multiply, Tcl exprs
+@cindex divide, Tcl exprs
+@cindex remainder, Tcl exprs
+Multiply, divide, remainder.  None of these operands may be applied to
+string operands, and remainder may be applied only to integers.  The
+remainder will always have the same sign as the divisor and an absolute
+value smaller than the divisor.
+
+@item +  -
+@cindex add, Tcl exprs
+@cindex subtract, Tcl exprs
+Add and subtract.  Valid for any numeric operands.
+
+@item <<  >>
+@cindex left shift, Tcl exprs
+@cindex right shift, Tcl exprs
+@cindex bit shifts, Tcl exprs
+Left and right shift.  Valid for integer operands only.
+
+@item <  >  <=  >=
+@cindex less than, Tcl exprs
+@cindex greater than, Tcl exprs
+@cindex greater than or equal, Tcl exprs
+@cindex less than or equal, Tcl exprs
+Boolean less, greater, less than or equal, and greater than or equal.
+Each operator produces @code{1} if the condition is true, @code{0}
+otherwise.  These operators may be applied to strings as well as numeric
+operands, in which case string comparison is used.
+
+@item ==  !=
+@cindex equal, Tcl exprs
+@cindex not equal, Tcl exprs
+Boolean equal and not equal.  Each operator produces a zero/one result.
+Valid for all operand types.
+
+@item &
+@cindex and, bitwise, Tcl exprs
+@cindex bitwise and, Tcl exprs
+Bit-wise @sc{and}.  Valid for integer operands only.
+
+@item ^
+@cindex xor, bitwise, Tcl exprs
+@cindex bitwise xor, Tcl exprs
+@cindex exclusive or, Tcl exprs
+Bit-wise exclusive @sc{or}.  Valid for integer operands only.
+
+@item |
+@cindex or, bitwise, Tcl exprs
+@cindex bitwise or, Tcl exprs
+Bit-wise @sc{or}.  Valid for integer operands only.
+
+@item &&
+@cindex and, logical, Tcl exprs
+@cindex logical and, Tcl exprs
+Logical @sc{and}.  Produces a @code{1} result if both operands are
+non-zero, @code{0} otherwise.  Valid for numeric operands only (integers
+or floating-point).
+
+@item ||
+@cindex or, logical, Tcl exprs
+@cindex logical or, Tcl exprs
+Logical @sc{or}.  Produces a @code{0} result if both operands are zero,
+@code{1} otherwise.  Valid for numeric operands only (integers or
+floating-point).
+
+@item @var{x} ? @var{y} : @var{z}
+@cindex if-then-else, Tcl exprs
+@cindex conditionals, Tcl exprs
+If-then-else, as in C.  If @var{x} evaluates to non-zero, then the
+result is the value of @var{y}.  Otherwise the result is the value of
+@var{z}.  The @var{x} operand must have a numeric value.
+@end table
+
+@cindex C, Tcl operators compatible with
+@cindex operators, compatible with C
+See the C manual for more details on the results produced by each
+operator.  All of the binary operators group left-to-right within the
+same precedence level.  For example, the command
+
+@example
+expr 4*2 < 7
+@end example
+
+@noindent
+returns @code{0}.
+
+@cindex lazy evaluation in Tcl exprs
+The @code{&&}, @code{||}, and @code{?:} operators have ``lazy
+evaluation'', just as in C, which means that operands are not evaluated
+if they are not needed to determine the outcome.  For example, in the
+command
+
+@example
+expr @{$v ? [a] : [b]@}
+@end example
+
+@noindent
+only one of @samp{[a]} or @samp{[b]} will actually be evaluated,
+depending on the value of @samp{$v}.  Note, however, that this is only
+true if the entire expression is enclosed in braces; otherwise the Tcl
+parser will evaluate both @samp{[a]} and @samp{[b]} before invoking the
+@code{expr} command.
+
+@node Math Functions
+@subsection Mathematical functions in Tcl
+
+@cindex math fns, in Tcl exprs
+Tcl supports the following mathematical functions in expressions:
+
+@example
+acos        cos         hypot      sinh
+asin        cosh        log        sqrt
+atan        exp         log10      tan 
+atan2       floor       pow        tanh
+ceil        fmod        sin                            
+@end example
+
+Each of these functions invokes the C math library function of the same
+name; see the manual entries for the library functions for details on
+what they do.  Tcl also implements the following functions for
+conversion between integers and floating-point numbers:
+
+@ftable @code
+@item abs(@var{arg})
+@cindex absolute value, in Tcl exprs
+Returns the absolute value of @var{arg}.  @var{arg} may be either
+integer or floating-point, and the result is returned in the same form.
+
+@item double(@var{arg})
+@cindex float conversion, in Tcl exprs
+@cindex convert to float, in Tcl exprs
+If @var{arg} is a floating value, returns @var{arg}; otherwise converts
+@var{arg} to floating and returns the converted value.
+
+@item int(@var{arg})
+@cindex truncate to integer, in Tcl exprs
+@cindex integer truncation, in Tcl exprs
+@cindex floor, in Tcl exprs
+If @var{arg} is an integer value, returns @var{arg}, otherwise converts
+@var{arg} to integer by truncation and returns the converted value.
+
+@item round(@var{arg})
+@cindex round to integer, in Tcl exprs
+If @var{arg} is an integer value, returns @var{arg}, otherwise converts
+@var{arg} to integer by rounding and returns the converted value.
+@end ftable
+
+@ignore
+@c Deja Gnu users don't need to extend Tcl, though Deja Gnu implementors
+@c (not testsuite implementors) may.
+In addition to these predefined functions, applications  may
+define additional functions using Tcl_CreateMathFunc().
+@end ignore
+
+@node Types
+@subsection Types, overflow, and precision in Tcl
+
+@cindex overflow, in Tcl exprs
+@cindex underflow, in Tcl exprs
+All internal computations involving integers are done with the C type
+@code{long}, and all internal computations involving floating-point are
+done with the C type @code{double}.  When converting a string to
+floating-point, exponent overflow is detected and results in a Tcl
+error.  For conversion to integer from string, detection of overflow
+depends on the behavior of some routines in the local C library, so it
+should be regarded as unreliable.  In any case, integer overflow and
+underflow are generally not detected reliably for intermediate results.
+Floating-point overflow and underflow are detected to the degree
+supported by the hardware, which is generally pretty reliable.
+
+@cindex numeric conversions, Tcl exprs
+Conversion among internal representations for integer, floating-point,
+and string operands is done automatically as needed.  For arithmetic
+computations, integers are used until some floating-point number is
+introduced, after which floating-point is used.  For example,
+
+@example
+expr 5 / 4
+@end example
+
+@noindent
+returns @code{1}, while
+
+@example
+expr 5 / 4.0
+expr 5 / ( [string length "abcd"] + 0.0 )
+@end example
+
+@noindent
+both return @code{1.25}.  Floating-point values are always returned with
+a @samp{.} or an @samp{e} so that they will not look like integer
+values.  For example,
+
+@example
+expr 20.0/5.0                                          
+@end example
+
+@cindex precision, numeric, Tcl exprs
+@cindex numeric precision, Tcl exprs
+@noindent
+returns @samp{4.0}, not @samp{4}.  The global variable
+@code{tcl_precision} determines the the number of significant digits
+that are retained when floating values are converted to strings (except
+that trailing zeroes are omitted).  If @code{tcl_precision} is unset
+then 6 digits of precision are used.  To retain all of the significant
+bits of an @sc{ieee} floating-point number set @code{tcl_precision} to
+@code{17}; if a value is converted to string with 17 digits of precision
+and then converted back to binary for some later calculation, the
+resulting binary value is guaranteed to be identical to the original
+one.
+
+@node String Operations
+@subsection String operations in Tcl
+
+@cindex strings, in Tcl exprs
+String values may be used as operands of the comparison operators,
+although the expression evaluator tries to do comparisons as integer or
+floating-point when it can.  If one of the operands of a comparison is a
+string and the other has a numeric value, the numeric operand is
+converted back to a string using the C @code{sprintf} format specifier
+@samp{%d} for integers and @samp{%g} for floating-point values.  For
+example, the commands
+
+@example
+expr @{"0x03" > "2"@}
+expr @{"0y" < "0x12"@}
+@end example
+
+@noindent
+both return @code{1}.  The first comparison is done using integer
+comparison, and the second is done using string comparison after the
+second operand is converted to the string @samp{18}.
+
+@node Tcl Commands
+@section Commands built into Tcl
+
+@cindex Tcl commands
+@cindex commands, Tcl
+
+Here are descriptions of all the commands built into the Tcl language
+itself.
+
+@menu
+* append::
+* array::
+* break::
+* case::
+* catch::
+* cd::
+* close::
+* concat::
+* continue::
+* eof::
+* error::
+* eval::
+* exec::
+* exit::
+* expr::
+* file::
+* flush::
+* for::
+* foreach::
+* format::
+* gets::
+* glob::
+* global::
+* history::
+* if::
+* incr::
+* info::
+* join::
+* lappend::
+* lindex::
+* linsert::
+* list::
+* llength::
+* lrange::
+* lreplace::
+* lsearch::
+* lsort::
+* open::
+* pid::
+* proc::
+* puts::
+* pwd::
+* read::
+* regexp::
+* regsub::
+* rename::
+* return::
+* scan::
+* seek::
+* set::
+* source::
+* split::
+* string::
+* switch::
+* tell::
+* time::
+* trace::
+* unknown::
+* unset::
+* uplevel::
+* upvar::
+* while::
+@end menu
+
+@node append
+@subsection Append to variable: @code{append}
+
+@cindex @code{append} (Tcl command)
+@cindex append to variable, in Tcl
+@cindex variable, appending to (Tcl))
+@cindex Tcl, appending to variable
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+append @var{varname} @var{value} @r{[} @var{value} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Append all of the @var{value} arguments to the current value of variable
+@var{varname}.  If @var{varname} doesn't exist, it is given a value
+equal to the concatenation of all the @var{value} arguments.  This
+command provides an efficient way to build up long variables
+incrementally.  For example, @samp{append a $b} is much more efficient
+than @samp{set a $a$b} if @code{$a} is long.
+
+@node array
+@subsection Manipulate array variables: @code{array}
+
+@cindex @code{array} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+array @var{option} @var{arrayname} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+This command performs one of several operations on the variable given by
+@var{arrayname}.  @var{arrayname} must be the name of an existing array
+variable.  The @var{option} argument determines what action is carried
+out by the command.  The options (which may be abbreviated) are:
+
+@ftable @code
+@item array names @var{arrayname}
+@cindex array elements, in Tcl
+@cindex element names, in Tcl
+Returns a list containing the names of all of the elements in the array.
+If there are no elements in the array then an empty string is returned.
+
+@item array size @var{arrayname}
+@cindex size of arrays, in Tcl
+Returns a decimal string giving the number of elements in the array.
+
+@cindex searching arrays, in Tcl
+@cindex array search, in Tcl
+@item array startsearch @var{arrayname}
+This command initializes an element-by-element search through the array
+given by @var{arrayname}, such that invocations of the @samp{array
+nextelement} command will return the names of the individual elements in
+the array.  When the search has been completed, the @samp{array
+donesearch} command should be invoked.  The return value is a search
+identifier that must be used in @samp{array nextelement} and @samp{array
+donesearch} commands; it allows multiple searches to be underway
+simultaneously for the same array.
+
+@item array nextelement @var{arrayname} @var{srchid}
+Returns the name of the next element in @var{arrayname}, or an empty
+string if all elements of @var{arrayname} have already been returned in
+this search.  The @var{srchid} argument identifies the search, and must
+have been the return value of an @samp{array startsearch} command.
+
+@emph{Warning:} if elements are added to or deleted from the array, then
+all searches are automatically terminated just as if @samp{array
+donesearch} had been invoked; this will cause @samp{array nextelement}
+operations to fail for those searches.
+
+@item array anymore @var{arrayname} @var{srchid}
+Returns @code{1} if there are any more elements left to be processed in
+an array search, @code{0} if all elements have already been returned.
+@var{srchid} indicates which search on @var{arrayname} to check, and
+must have been the return value from a previous invocation of
+@samp{array startsearch}.  This option is particularly useful if an
+array has an element with an empty name, since the return value from
+@samp{array nextelement} won't indicate whether the search has been
+completed.
+
+@item array donesearch @var{arrayname} @var{srchid}
+This command terminates an array search and destroys all the state
+associated with that search.  @var{srchid} indicates which search on
+@var{arrayname} to destroy, and must have been the return value from a
+previous invocation of @samp{array startsearch}.  Returns an empty
+string.
+@end ftable
+
+@node break
+@subsection Abort looping: @code{break}
+
+@cindex @code{break} (Tcl command)
+@cindex abort looping in Tcl
+@cindex loop, aborting in Tcl
+@cindex exiting loops in Tcl
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+break
+@end example
+@iftex
+@endgroup
+@end iftex
+
+This command may be invoked only inside the body of a looping command
+such as @code{for} or @code{foreach} or @code{while}.  It returns a
+@code{TCL_BREAK} code to signal the innermost containing loop command to
+return immediately.
+
+@node case
+@subsection Obsolescent command: @code{case}
+
+@cindex @code{case} (Tcl command)
+
+@smallexample
+case @var{str} @r{[} in@r{]}  @var{patlist} @var{body} @r{[} @var{patlist} @var{body} ...@r{]} 
+case @var{str} @r{[} in@r{]}  @{@var{patlist} @var{body} @r{[} @var{patlist} @var{body} ...@r{]}@}
+@end smallexample
+
+
+@quotation
+@emph{Warning:} the @code{case} command is obsolete, and is supported
+only for backward compatibility.  At some point in the future it may be
+removed entirely.  You should use the @code{switch} command instead.
+@end quotation
+
+The @code{case} command matches @var{str} against each of the
+@var{patlist} arguments in order.  Each @var{patlist} argument is a list
+of one or more patterns.  If any of these patterns matches @var{str}
+then @code{case} evaluates the following @var{body} argument by passing
+it recursively to the Tcl interpreter and returns the result of that
+evaluation.  Each @var{patlist} argument consists of a single pattern or
+list of patterns.  Each pattern may contain any of the wild-cards
+described under @samp{string match} (@pxref{string,, Manipulate strings:
+@code{string}}).  If a @var{patlist} argument is the word @code{default},
+the corresponding @var{body} will be evaluated if no @var{patlist}
+matches @var{str}.  If no @var{patlist} argument matches @var{str} and
+no default is given, then the @code{case} command returns an empty
+string.
+
+Two syntaxes are provided for the @var{patlist} and @var{body}
+arguments.  The first uses a separate argument for each of the patterns
+and commands; this form is convenient if substitutions are desired on
+some of the patterns or commands.  The second form places all of the
+patterns and commands together into a single argument; the argument must
+have proper list structure, with the elements of the list being the
+patterns and commands.  The second form makes it easy to construct
+multi-line @code{case} commands, since the braces around the whole list
+make it unnecessary to include a backslash at the end of each line.
+Since the @var{patlist} arguments are in braces in the second form, no
+command or variable substitutions are performed on them; this makes the
+behavior of the second form different than the first form in some cases.
+
+@node catch
+@subsection Trap exceptions: @code{catch}
+
+@cindex @code{catch} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+catch @var{script} @r{[} @var{varname} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex error trapping, Tcl
+@cindex trapping errors, Tcl
+@cindex exception handling, Tcl
+The @code{catch} command may be used to prevent errors from aborting
+command interpretation.  @code{catch} calls the Tcl interpreter
+recursively to execute @var{script}, and always returns a @code{TCL_OK}
+code, regardless of any errors that might occur while executing
+@var{script}.  The return value from @code{catch} is a decimal string
+giving the code returned by the Tcl interpreter after executing
+@var{script}.  This will be 0 (@code{TCL_OK}) if there were no errors in
+@var{script}; otherwise it will have a non-zero value corresponding to
+one of the exceptional return codes (@pxref{return,, Return from a
+procedure: @code{return}}, for descriptions of exception code values).
+If the @var{varname} argument is given, then it gives the name of a
+variable; @code{catch} will set the variable to the string returned from
+@var{script} (either a result or an error message).
+
+@node cd
+@subsection Change working directory: @code{cd}
+
+@cindex @code{cd} (Tcl command)
+@cindex working directory, Tcl
+@cindex changing directories, Tcl
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+cd @r{[} @var{dirname} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Change the current working directory to @var{dirname}, or to the home
+directory (as specified in the @code{HOME} environment variable) if
+@var{dirname} is not given.  Returns an empty string.
+
+If @var{dirname} starts with a tilde, then tilde-expansion is done: the
+first element of @var{dirname} is replaced with the location of the home
+directory for the given user.  The substitution is carried out in the
+same way that it would be done by @code{csh}.  If the tilde is followed
+immediately by a slash, then the @code{HOME} environment variable is
+substituted.  Otherwise the characters between the tilde and the next
+slash are taken as a user name, which is looked up in the password file;
+the user's home directory is retrieved from the password file and
+substituted.
+
+@node close
+@subsection Close an open file: @code{close}
+
+@cindex @code{close} (Tcl command)
+@cindex file closing, Tcl
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+close @var{fileid}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Closes the file given by @var{fileid}.  @var{fileid} must be the return
+value from a previous invocation of the @code{open} command; after this
+command, it should not be used anymore.  If @var{fileid} refers to a
+command pipeline instead of a file, then @code{close} waits for the children to
+complete.  The normal result of this command is an empty string, but
+errors are returned if there are problems in closing the file or waiting
+for children to complete.
+
+@node concat
+@subsection Join lists together: @code{concat}
+
+@cindex @code{concat} (Tcl command)
+@cindex catenating lists in Tcl
+@cindex concatenating lists in Tcl
+@cindex joining lists in Tcl
+@cindex lists, joining in Tcl
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+concat @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+This command treats each argument as a list and concatenates them into a
+single list.  It also eliminates leading and trailing spaces in each
+@var{arg} and adds a single separator space between each @var{arg}.  It
+permits any number of arguments.  For example, the command
+
+@example
+concat a b @{c d e@} @{f @{g h@}@}
+@end example
+
+@noindent
+will return as its result
+
+@example
+a b c d e f @{g h@}
+@end example
+
+If no @var{arg} is supplied, the result is an empty string.
+
+@node continue
+@subsection Skip to the next iteration: @code{continue}
+
+@cindex @code{continue} (Tcl command)
+@cindex loop, continuing in Tcl
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+continue
+@end example
+@iftex
+@endgroup
+@end iftex
+
+This command may be invoked only inside the body of a looping command
+such as @code{for} or @code{foreach} or @code{while}.  It returns a
+@code{TCL_CONTINUE} code to signal the innermost containing loop command
+to skip the remainder of the loop's body but continue with the next
+iteration of the loop.
+
+@node eof
+@subsection Check for end-of-file: @code{eof}
+
+@cindex @code{eof} (Tcl command)
+@cindex end of file, in Tcl
+@cindex file, testing for end in Tcl
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+eof @var{fileid}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Returns 1 if an end-of-file condition has occurred on @var{fileid}, 0
+otherwise.  @var{fileid} must be the return value from a previous call
+to @code{open}, or it may be @code{stdin}, @code{stdout}, or
+@code{stderr} to refer to one of the standard I/O channels.
+
+@node error
+@subsection Generate an error message: @code{error}
+
+@cindex @code{error} (Tcl command)
+@cindex error information, propagating
+@cindex @code{errorCode}, setting
+@cindex @code{errorInfo}, setting
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+error @var{message} @r{[} @var{info} @r{]} @r{[} @var{code} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Returns a @code{TCL_ERROR} code, which causes command interpretation to
+be unwound.  @var{message} is a string that is returned to the
+application to indicate what went wrong.
+
+If the @var{info} argument is provided and is non-empty, it is used to
+initialize the global variable @code{errorInfo}.  @code{errorInfo} is
+used to accumulate a stack trace of what was in progress when an error
+occurred; as nested commands unwind, the Tcl interpreter adds
+information to @code{errorInfo}.  If the @var{info} argument is present,
+it is used to initialize @code{errorInfo} and the first increment of
+unwind information will not be added by the Tcl interpreter.  In other
+words, the command containing the error command will not appear in
+@code{errorInfo}; in its place will be @var{info}.  This feature is most
+useful in conjunction with the @code{catch} command.  If a caught error
+cannot be handled successfully, @var{info} can be used to return a stack
+trace reflecting the original point of occurrence of the error:
+
+@example
+catch @{ @dots{} @} errMsg
+set savedInfo $errorInfo
+ @dots{} 
+error $errMsg $savedInfo
+@end example
+
+If the @var{code} argument is present, then its value is stored in the
+@code{errorCode} global variable.  This variable is intended to hold a
+machine-readable description of the error in cases where such
+information is available; see @ref{Tcl Variables,, Variables built into
+Tcl}, for information on the proper format for the variable.  If the
+@var{code} argument is not present, then @code{errorCode} is
+automatically reset to @samp{NONE} by the Tcl interpreter as part of
+processing the error generated by the command.
+
+@node eval
+@subsection Evaluate a Tcl script: @code{eval}
+
+@cindex @code{eval} (Tcl command)
+@cindex scripts, executing from Tcl
+@cindex Tcl script, evaluating
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+eval @var{arg} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@code{eval} takes one or more arguments, which together comprise a Tcl
+script containing one or more commands.  @code{eval} concatenates all
+its arguments in the same fashion as the @code{concat} command, passes
+the concatenated string to the Tcl interpreter recursively, and returns
+the result of that evaluation (or any error generated by it).
+
+@node exec
+@subsection Invoke subprocesses: @code{exec}
+
+@cindex @code{exec} (Tcl command)
+@cindex execute a subprocess (Tcl)
+@cindex pipeline execution, Tcl
+@cindex I/O redirection, Tcl
+@cindex redirecting I/O, Tcl
+@cindex subprocess, Tcl
+
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+exec @r{[} @var{opts} @r{]} @var{arg} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+This command treats its arguments as the specification of one or more
+subprocesses to execute.  The arguments take the form of a standard
+shell pipeline where each @var{arg} becomes one word of a command, and
+each distinct command becomes a subprocess.
+
+If the initial arguments to @code{exec} start with @samp{-} then they
+are treated as command-line options and are not part of the pipeline
+specification.  The following options are currently supported:
+
+@table @code
+@item -keepnewline                                           
+Retains a trailing newline in the pipeline's output.  Normally a
+trailing newline will be deleted.
+
+@item --                                                          
+Marks the end of @var{opts}.  The argument following this one will be
+treated as the first @var{arg} even if it starts with a @samp{-}.
+@end table
+
+If an @var{arg} (or pair of @var{arg} strings) has one of the forms
+described below then it is used by @code{exec} to control the flow of
+input and output among the subprocess(es).  Such arguments will not be
+passed to the subprocess(es).  In forms such as @samp{< @var{fname}}
+@var{fname} may either be in a separate argument from @samp{<} or in the
+same argument with no intervening space (i.e. @samp{<@var{fname}}).
+
+@table @code
+@item |
+Separates distinct commands in the pipeline.  The standard output of the
+preceding command will be piped into the standard input of the next
+command.
+
+@item |&
+Separates distinct commands in the pipeline.  Both standard output and
+standard error of the preceding command will be piped into the standard
+input of the next command.  This form of redirection overrides forms
+such as @samp{2>} and @samp{>&}.
+
+@item < @var{fname}
+The file named by @var{fname} is opened and used as the standard input for
+the first command in the pipeline.
+
+@item <@@ @var{fileid}
+@var{fileid} must be the identifier for an open file, such as the return
+value from a previous call to @code{open}.  It is used as the standard
+input for the first command in the pipeline.  @var{fileid} must have
+been opened for reading.
+
+@item << @var{value}
+@var{value} is passed to the first command as its standard input.
+
+@item > @var{fname}
+Standard output from the last command is redirected to the file named
+@var{fname}, overwriting its previous contents.
+
+@item 2> @var{fname} 
+Standard error from all commands in the pipeline is redirected to the
+file named @var{fname}, overwriting its previous contents.
+
+@item >& @var{fname}                                                  
+Both standard output from the last command and standard error from all
+commands are redirected to the file named @var{fname}, overwriting its
+previous contents.
+
+@item >> @var{fname}
+Standard output from the last command is redirected to the file named
+@var{fname}, appending to it rather than overwriting it.
+
+@item 2>> @var{fname}
+Standard error from all commands in the pipeline is redirected to the
+file named @var{fname}, appending to it rather than overwriting it.
+
+@item >>& @var{fname}                                                 
+Both standard output from the last command and standard error from all
+commands are redirected to the file named @var{fname}, appending to it
+rather than overwriting it.
+
+@item >@ @var{fileid}                                                    
+@var{fileid} must be the identifier for an open file, such as the return
+value from a previous call to @code{open}.  Standard output from the
+last command is redirected to the corresponding file, which must have
+been opened for writing.
+
+@item 2>@ @var{fileid}                                                   
+@var{fileid} must be the identifier for an open file, such as the return
+value from a previous call to @code{open}.  Standard error from all
+commands in the pipeline is redirected to the corresponding file.  The
+file must have been opened for writing.
+
+@item >&@ @var{fileid}                                                  
+@var{fileid} must be the identifier for an open file, such as the return
+value from a previous call to @code{open}.  Both standard output from
+the last command and standard error from all commands are redirected to
+the corresponding file.  The file must have been opened for writing.
+@end table
+
+If standard output has not been redirected then the @code{exec} command
+returns the standard output from the last command in the pipeline.  If
+any of the commands in the pipeline exit abnormally or are killed or
+suspended, then @code{exec} will return an error and the error message
+will include the pipeline's output followed by error messages describing
+the abnormal terminations; the @code{errorCode} variable will contain
+additional information about the last abnormal termination encountered.
+If any of the commands writes to its standard error file and that
+standard error isn't redirected, then @code{exec} will return an error;
+the error message will include the pipeline's standard output, followed
+by messages about abnormal terminations (if any), followed by the
+standard error output.
+
+If the last character of the result or error message is a newline then
+that character is normally deleted from the result or error message.
+This is consistent with other Tcl return values, which don't normally
+end with newlines.  However, if @samp{-keepnewline} is specified then
+the trailing newline is retained.
+
+If standard input isn't redirected with @samp{<} or @samp{<<} or
+@samp{<@@} then the standard input for the first command in the pipeline
+is taken from the application's current standard input.
+
+If the last @var{arg} is @samp{&} then the pipeline will be executed in
+background.  In this case the @code{exec} command will return a list whose
+elements are the process identifiers for all of the subprocesses in the
+pipeline.  The standard output from the last command in the pipeline
+will go to the application's standard output if it hasn't been
+redirected, and error output from all of the commands in the pipeline
+will go to the application's standard error file unless redirected.
+
+The first word in each command is taken as the command name;
+tilde-substitution is performed on it, and if the result contains no
+slashes then the directories in the @code{PATH} environment variable are
+searched for an executable by the given name.  If the name contains a
+slash then it must refer to an executable reachable from the current
+directory.  No wildcard (``glob'') expansion or other shell-like
+substitutions are performed on the arguments to commands.
+
+@node exit
+@subsection End the application: @code{exit}
+
+@cindex @code{exit} (Tcl command)
+@cindex application end, Tcl
+@cindex process termination, Tcl
+@cindex Terminating execution, Tcl
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+exit @r{[} @var{returncode} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Terminate the process, returning @var{returncode} to the system as the
+exit status.  If @var{returncode} isn't specified then it defaults to 0.
+
+@node expr
+@subsection Evaluate an expression: @code{expr}
+
+@cindex @code{expr} (Tcl command)
+@cindex evaluation, of Tcl expressions
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+expr arg ?arg arg ...?
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Concatenates arg's (adding separator spaces between them), evaluates the
+result as a Tcl expression, and returns the value.  The operators
+permitted in Tcl expressions are a subset of the operators permitted in
+C expressions, and they have the same meaning and precedence as the
+corresponding C operators.  Expressions almost always yield numeric
+results (integer or floating-point values).  For example, the expression
+
+@example
+     expr 8.2 + 6
+@end example
+
+@noindent
+evaluates to 14.2.  Tcl expressions differ from C expressions in the way
+that operands are specified.  Also, Tcl expressions support non-numeric
+operands and string comparisons.
+
+@node file
+@subsection File names and attributes: @code{file}
+
+@cindex @code{file} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+file @var{opt} @var{fname} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+This command provides several operations on a file's name or attributes.
+@var{fname} is the name of a file; if it starts with a tilde, then tilde
+substitution is done before executing the command (as for @code{cd};
+@pxref{cd,, Change working directory: @code{cd}}).  @var{opt} indicates
+what to do with the file name.  Any unique abbreviation for @var{opt} is
+acceptable.  The options currently implemented are:
+
+@ftable @code
+@item file atime @var{fname}
+@cindex file access time (Tcl)
+@cindex access time, file (Tcl)
+Returns a decimal string giving the time at which file @var{fname} was
+last accessed.  The time is measured in the standard @sc{posix} fashion
+as seconds from a fixed starting time (often January 1, 1970).  If the
+file doesn't exist or its access time cannot be queried then an error is
+generated.
+
+@item file dirname @var{fname}
+@cindex directory name (Tcl)
+Returns all of the characters in @var{fname} up to but not including the
+last slash character.  If there are no slashes in @var{fname} then
+returns @samp{.}.  If the last slash in @var{fname} is its first
+character, then returns @samp{/}.
+
+@item file executable @var{fname}
+@cindex executable file (Tcl)
+Returns @code{1} if file @var{fname} is  executable  by  the  current
+user, @code{0} otherwise.
+
+@item file exists @var{fname}
+@cindex file existence (Tcl)
+@cindex existence of file (Tcl)
+Returns @code{1} if file @var{fname} exists and the current user has
+search privileges for the directories leading to it, @code{0} otherwise.
+
+@item file extension @var{fname}
+@cindex file extension (Tcl)
+@cindex extension of file (Tcl)
+@cindex suffix of filename (Tcl)
+@cindex filename suffix (Tcl)
+Returns all of the characters in @var{fname} after and including the
+last dot in @var{fname}.  If there is no dot in @var{fname} then returns
+the empty string.
+
+@item file isdirectory @var{fname}
+Returns @code{1} if file @var{fname} is a directory, @code{0} otherwise.
+
+@item file isfile @var{fname}
+Returns @code{1} if file @var{fname} is a regular file, @code{0} otherwise.
+
+@item file lstat @var{fname} @var{varname}
+Same as @samp{file stat} (below), except using the @code{lstat} kernel
+call instead of @code{stat}.  This means that if @var{fname} refers to a
+symbolic link the information returned in @var{varname} is for the link
+rather than the file it refers to.  On systems that don't support
+symbolic links this option behaves exactly the same as the @code{stat}
+option.
+
+@item file mtime @var{fname}
+@cindex modification time, file (Tcl)
+Returns a decimal string giving the time at which file @var{fname} was
+last modified.  The time is measured in the standard @sc{posix} fashion
+as seconds from a fixed starting time (often January 1, 1970).  If the
+file doesn't exist or its modified time cannot be queried then an error
+is generated.
+
+@item file owned @var{fname}
+Returns @code{1} if file @var{fname} is owned by the current user,
+@code{0} otherwise.
+
+@item file readable @var{fname}
+Returns @code{1} if file @var{fname} is readable by the current user,
+@code{0} otherwise.
+
+@item file readlink @var{fname}
+@cindex symbolic link (Tcl)
+Returns the value of the symbolic link given by @var{fname} (i.e.  the
+name of the file it points to).  If @var{fname} isn't a symbolic link or
+its value cannot be read, then an error is returned.  On systems that
+don't support symbolic links this option is undefined.
+
+@item file rootname @var{fname}
+@cindex rootname of file (Tcl)
+Returns all of the characters in @var{fname} up to but not including the
+last @samp{.} character in the @var{fname}.  If @var{fname} doesn't
+contain a dot, then returns @var{fname}.
+
+@item file size @var{fname}
+@cindex size of file (Tcl)
+Returns a decimal string giving the size of file @var{fname} in bytes.
+If the file doesn't exist or its size cannot be queried then an error is
+generated.
+
+@item file stat @var{fname} @var{varname}
+Invokes the stat kernel call on @var{fname}, and uses the variable given
+by @var{varname} to hold information returned from the kernel call.
+@var{varname} is treated as an array variable, and the following
+elements of that variable are set: @code{atime}, @code{ctime},
+@code{dev}, @code{gid}, @code{ino}, @code{mode}, @code{mtime},
+@code{nlink}, @code{size}, @code{type}, @code{uid}.  Each element except
+@code{type} is a decimal string with the value of the corresponding
+field from the @code{stat} return structure; see the operating system
+reference manual entry for @code{stat} for details on the meanings of
+the values.  The @code{type} element gives the type of the file in the
+same form returned by the command @samp{file type}.  This command
+returns an empty string.
+
+@item file tail @var{fname}
+Returns all of the characters in @var{fname} after the last slash.  If
+@var{fname} contains no slashes then returns @var{fname}.
+
+@item file type @var{fname}
+Returns a string giving the type of file @var{fname}, which will be one
+of @samp{file}, @samp{directory}, @samp{characterSpecial},
+@samp{blockSpecial}, @samp{fifo}, @samp{link}, or @samp{socket}.
+
+@item file writable @var{fname}
+Returns @code{1} if file @var{fname} is writable by the current user,
+@code{0} otherwise.
+@end ftable
+
+@node flush
+@subsection Flush buffered output for a file: @code{flush}
+
+@cindex @code{flush} (Tcl command)
+@cindex buffer, flushing in Tcl
+@cindex file buffer, flushing in Tcl
+@cindex output, flushing in Tcl
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+flush @var{fileid}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Flushes any output that has been buffered for @var{fileid}.
+@var{fileid} must be the return value from a previous call to
+@code{open}, or it may be @code{stdout} or @code{stderr} to access one
+of the standard I/O streams; it must refer to a file that was opened for
+writing.  The command returns an empty string.
+
+@node for
+@subsection ``For'' loop: @code{for}
+
+@cindex @code{for} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+for @var{start} @var{tst} @var{nxt} @var{body}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex looping with @code{for}, in Tcl
+@cindex iterating with @code{for}, in Tcl
+@code{for} is a looping command, similar in structure to the C
+@code{for} statement.  The @var{start}, @var{nxt}, and @var{body}
+arguments must be Tcl command strings, and @var{tst} is an expression
+string.  The @code{for} command first invokes the Tcl interpreter to
+execute @var{start}.  Then it repeatedly evaluates @var{tst} as an
+expression; if the result is non-zero it invokes the Tcl interpreter on
+@var{body}, then invokes the Tcl interpreter on @var{nxt}, then repeats
+the loop.  The command terminates when @var{tst} evaluates to @code{0}.
+If a @code{continue} command is invoked within @var{body} then any
+remaining commands in the current execution of @var{body} are skipped;
+processing continues by invoking the Tcl interpreter on @var{nxt}, then
+evaluating @var{tst}, and so on.  If a @code{break} command is invoked
+within @var{body} or @var{nxt}, then the @code{for} command will return
+immediately.  The operation of @code{break} and @code{continue} are
+similar to the corresponding statements in C.  @code{for} returns an
+empty string.
+
+@node foreach
+@subsection Iterate over all elements in a list: @code{foreach}
+
+@cindex @code{foreach} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+foreach @var{varname} @var{list} @var{body}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex each element of list, iterating over
+@cindex list, iterating over each element
+@cindex iterating over each element of a list
+In this command @var{varname} is the name of a variable, @var{list} is a
+list of values to assign to @var{varname}, and @var{body} is a Tcl
+script.  For each element of @var{list} (in order from left to right),
+@code{foreach} assigns the contents of the field to @var{varname} as if
+the @code{lindex} command had been used to extract the field, then calls
+the Tcl interpreter to execute @var{body}.  The @code{break} and
+@code{continue} statements may be invoked inside @var{body}, with the
+same effect as in the @code{for} command.  @code{foreach} returns an
+empty string.
+
+@node format
+@subsection Format in the style of @code{sprintf}: @code{format}
+
+@cindex @code{format} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+format @var{fstr} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex @code{sprintf}-like formatting in Tcl
+@cindex @code{printf}-like formatting in Tcl
+This command generates a formatted string in the same way as the
+@sc{ansi} C @code{sprintf} procedure (it uses @code{sprintf} in its
+implementation).  @var{fstr} indicates how to format the result, using
+@samp{%} conversion specifiers as in @code{sprintf}, and the additional
+arguments, if any, provide values to be substituted into the result.
+The return value from @code{format} is the formatted string.
+
+
+@emph{Details on formatting.} The command operates by scanning
+@var{fstr} from left to right.  Each character from the format string is
+appended to the result string unless it is a percent sign.  If the
+character is a @samp{%} then it is not copied to the result string.
+Instead, the characters following the @samp{%} character are treated as
+a conversion specifier.  The conversion specifier controls the
+conversion of the next successive @var{arg} to a particular format and
+the result is appended to the result string in place of the conversion
+specifier.  If there are multiple conversion specifiers in the format
+string, then each one controls the conversion of one additional
+@var{arg}.  The @code{format} command must be given enough @var{arg}s to
+meet the needs of all of the conversion specifiers in @var{fstr}.
+
+Each conversion specifier may contain up to six different parts: an
+@sc{xpg3}@footnote{@sc{xpg3} refers to the third edition of the
+@cite{X/Open Portability Guide}, an X/Open interface standard.}
+position specifier, a set of flags, a minimum field width, a precision,
+a length modifier, and a conversion character.  Any of these fields may
+be omitted except for the conversion character.  The fields that are
+present must appear in the order given above.  The paragraphs below
+discuss each of these fields in turn.
+
+If the @samp{%} is followed by a decimal number and a @samp{$}, as in
+@samp{%2$d}, then the value to convert is not taken from the next
+sequential argument.  Instead, it is taken from the argument indicated
+by the number, where @code{1} corresponds to the first @var{arg}.  If
+the conversion specifier requires multiple arguments because of @code{*}
+characters in the specifier then successive arguments are used, starting
+with the argument given by the number.  This follows the @sc{xpg3}
+conventions for positional specifiers.  If there are @emph{any}
+positional specifiers in @var{fstr}, then @emph{all} of the specifiers
+must be positional.
+
+The second portion of a conversion specifier may contain any of the
+following flag characters, in any order:
+
+@table @code
+@item -
+Specifies that the converted argument should be left-justified in its
+field (numbers are normally right-justified with leading spaces if
+needed).
+
+@item +
+Specifies that a number should always be printed with a sign, even if
+positive.
+
+@item @key{space}
+Specifies that a space should be added to the beginning of the number if
+the first character isn't a sign.
+
+@item 0
+Specifies that the number should be padded on the left with zeroes
+instead of spaces.
+
+@item #
+Requests an alternate output form.  For @samp{o} and @samp{O}
+conversions it guarantees that the first digit is always @samp{0}.  For
+@samp{x} or @samp{X} conversions, @samp{0x} or @samp{0X} (respectively)
+will be added to the beginning of the result unless it is zero.  For all
+floating-point conversions (@samp{e}, @samp{E}, @samp{f}, @samp{g}, and
+@samp{G}) it guarantees that the result always has a decimal point.  For
+@samp{g} and @samp{G} conversions it specifies that trailing zeroes
+should not be removed.
+@end table
+
+The third portion of a conversion specifier is a number giving a minimum
+field width for this conversion.  It is typically used to make columns
+line up in tabular printouts.  If the converted argument contains fewer
+characters than the minimum field width then it will be padded so that
+it is as wide as the minimum field width.  Padding normally occurs by
+adding extra spaces on the left of the converted argument, but the
+@samp{0} and @samp{-} flags may be used to specify padding with zeroes
+on the left or with spaces on the right, respectively.  If the minimum
+field width is specified as @samp{*} rather than a number, then the next
+argument to the @code{format} command determines the minimum field
+width; it must be a numeric string.
+
+The fourth portion of a conversion specifier is a precision, which
+consists of a period followed by a number.  The number is used in
+different ways for different conversions.  For @samp{e}, @samp{E}, and
+@samp{f} conversions it specifies the number of digits to appear to the
+right of the decimal point.  For @samp{g} and @samp{G} conversions it
+specifies the total number of digits to appear, including those on both
+sides of the decimal point (however, trailing zeroes after the decimal
+point will still be omitted unless the # flag has been specified).  For
+integer conversions, it specifies a mimimum number of digits to print
+(leading zeroes will be added if necessary).  For s conversions it
+specifies the maximum number of characters to be printed; if the string
+is longer than this then the trailing characters will be dropped.  If
+the precision is specified with @samp{*} rather than a number then the
+next argument to the @code{format} command determines the precision; it
+must be a numeric string.
+
+The fourth part of a conversion specifier is a length modifier, which
+must be @samp{h} or @samp{l}.  If it is @samp{h} it specifies that the
+numeric value should be truncated to a 16-bit value before converting.
+This option is rarely useful.  The @samp{l} modifier is ignored.
+
+The last thing in a conversion specifier is an alphabetic character that
+determines what kind of conversion to perform.  The following conversion
+characters are currently supported:
+
+@table @code
+@item d
+Convert integer to signed decimal string.
+
+@item u
+Convert integer to unsigned decimal string.
+
+@item i
+Convert integer to signed decimal string; the integer may either be in
+decimal, in octal (with a leading @samp{0}) or in hexadecimal (with a leading
+@samp{0x}).
+
+@item o
+Convert integer to unsigned octal string.
+
+@item x
+@itemx X
+Convert integer to unsigned hexadecimal string, using digits
+@samp{0123456789abcdef} for @samp{x} and @samp{0123456789ABCDEF} for
+@samp{X}).
+
+@item c
+Convert integer to the 8-bit character it represents.
+
+@item s
+No conversion; just insert string.
+
+@item f
+Convert floating-point number to signed decimal string of the form
+@samp{@var{xx}.@var{yyy}}, where the number of @var{y} digits is
+determined by the precision (default: 6).  If the precision is 0 then no
+decimal point is output.
+
+@item e
+@itemx E
+Convert floating-point number to scientific notation in the form
+@samp{@var{x}.@var{yyy}e+@var{zz}}, where the number of @var{y} digits
+is determined by the precision (default: 6).  If the precision is 0 then
+no decimal point is output.  If the @samp{E} form is used then @samp{E}
+is printed instead of @samp{e}.
+
+@item g
+@itemx G
+If the exponent is less than @minus{}4 or greater than or equal to the
+precision, then convert floating-point number as for @samp{%e} or
+@samp{%E}.  Otherwise convert as for @samp{%f}.  Trailing zeroes and a
+trailing decimal point are omitted.
+
+@item %
+No conversion: just insert @samp{%}.
+@end table
+
+For the numerical conversions the argument being converted must be an
+integer or floating-point string; @code{format} converts the argument to
+binary and then converts it back to a string according to the conversion
+specifier.
+
+@emph{Differences from @sc{ansi} @code{sprintf}.} The behavior of the
+@code{format} command is the same as the @sc{ansi} C @code{sprintf} procedure
+except for these differences:
+
+@enumerate
+@item
+@samp{%p} and @samp{%n} specifiers are not currently supported.
+
+@item
+For @samp{%c} conversions the argument must be a decimal string, which will
+then be converted to the corresponding character value.
+
+@item
+The @samp{l} modifier is ignored; integer values are always converted as
+if there were no modifier present and real values are always converted
+as if the @samp{l} modifier were present (i.e.  type @code{double} is
+used for the internal representation).  If the @samp{h} modifier is
+specified then integer values are truncated to @code{short} before
+conversion.
+@end enumerate
+
+@node gets
+@subsection Read a line from a file: @code{gets}
+
+@cindex @code{gets} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+gets @var{fileid} @r{[} @var{varname} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex file, reading a line from in Tcl
+@cindex line, reading from file in Tcl
+@cindex reading a line from a file in Tcl
+This command reads the next line from the file given by @var{fileid} and
+discards the terminating newline character.  If @var{varname} is
+specified then the line is placed in the variable by that name and the
+return value is a count of the number of characters read (not including
+the newline).  If the end of the file is reached before reading any
+characters then @samp{-1} is returned and @var{varname} is set to an
+empty string.  If @var{varname} is not specified then the return value
+will be the line (minus the newline character) or an empty string if the
+end of the file is reached before reading any characters.  An empty
+string will also be returned if a line contains no characters except the
+newline, so @code{eof} may have to be used to determine what really
+happened.  If the last character in the file is not a newline character
+then @code{gets} behaves as if there were an additional newline
+character at the end of the file.  @var{fileid} must be @code{stdin} or
+the return value from a previous call to @code{open}; it must refer to a
+file that was opened for reading.  Any existing end-of-file or error
+condition on the file is cleared at the beginning of the @code{gets}
+command.
+
+@node glob
+@subsection Filename wildcard expansion: @code{glob}
+
+@cindex @code{glob} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+     glob @r{[} @var{opts} @r{]} @var{ptrn} @r{[} @var{ptrn} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex wildcard chars, expanding in Tcl
+@cindex expanding wildcards in filenames, Tcl
+@cindex filename globbing, Tcl
+@cindex filename wildcard expansion, Tcl
+This command performs file name wildcard expansion (``globbing'') in a
+fashion similar to the @code{csh} shell.  It returns a list of the files
+whose names match any of the patterns specified as @var{ptrn} arguments.
+
+If the initial arguments to glob start with @samp{-} then they are
+treated as options.  The following options are currently supported:
+
+@table @code
+@item -nocomplain                                        
+Allows an empty list to be returned without error; without this option
+an error is returned if the result list would be empty.
+
+@item --                                                          
+Marks the end of @var{opts}.  The argument following this one will be
+treated as a @var{ptrn} even if it starts with a @samp{-}.
+@end table
+
+The @var{ptrn} arguments may contain any of the following special
+characters:
+
+@table @code
+@item ?
+Matches any single character.
+
+@item *
+Matches any sequence of zero or more characters.
+
+@item [@var{chars}]
+Matches any single character in @var{chars}.  If @var{chars} contains a
+sequence of the form @samp{@var{a}-@var{b}} then any character between
+@var{a} and @var{b} (inclusive), in your system's standard collating
+sequence---usually @sc{ascii}---will match.
+
+@item \@var{x}
+Matches the character @var{x}.
+
+@item @{@var{a},@var{b},@dots{}@}
+Matches any of the strings @var{a}, @var{b}, etc.
+@end table
+
+As with @code{csh}, a @samp{.} at the beginning of a filename or just
+after a @samp{/} must be matched explicitly or with a @code{@{@dots{}@}}
+construct.  In addition, all @samp{/} characters must be matched
+explicitly.
+
+If the first character in a pattern is @samp{~} then it refers to the
+home directory for the user whose name follows the @samp{~}.  If the
+@samp{~} is followed immediately by @samp{/} then the value of the
+@code{HOME} environment variable is used.
+
+The @code{glob} command differs from @code{csh} wildcard expansion in
+two ways.  First, it does not sort its result list (use the @code{lsort}
+command if you want the list sorted).  Second, @code{glob} only returns
+the names of files that actually exist; in @code{csh} no check for
+existence is made unless a pattern contains a @samp{?}, @samp{*}, or
+@samp{[@dots{}]} construct.
+
+@node global
+@subsection Access global variables: @code{global}
+
+@cindex @code{global} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+global @var{varname} @r{[} @var{varname} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex scope of variables, Tcl
+@cindex Tcl variable scope
+This command is ignored unless a Tcl procedure is being interpreted.  If
+so then it declares each given @var{varname} listed to be a global
+variable, rather than a local one.  For the duration of the current
+procedure (and only while executing in the current procedure), any
+reference to any @var{varname} will refer to the global variable by the
+same name.
+
+@node history
+@subsection Manipulate the history list: @code{history}
+
+@cindex @code{history} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+history @r{[} @var{operation} @r{]} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+The history command performs one of several operations related to
+recently-executed commands recorded in a history list.  Each of these
+recorded commands is referred to as an @dfn{event}.  When specifying an
+event to the history command, the following forms may be used:
+
+@cindex events, in Tcl cmd history
+@enumerate
+@item
+A number: if positive, it refers to the event with that number (all
+events are numbered starting at 1).  If the number is negative, it
+selects an event relative to the current event (@code{-1} refers to the
+previous event, @code{-2} to the one before that, and so on).
+
+@item
+A string: selects the most recent event that matches the string.  An
+event is considered to match the string either if the string is the same
+as the first characters of the event, or if the string matches the event
+in the sense of the string match command.
+@end enumerate
+
+@menu
+* History Operations::
+* History Revision::
+@end menu
+
+@node History Operations
+@subsubsection History operations
+
+@noindent
+The history command can take any of the following forms:
+
+@table @code
+@item history
+Same as history info, described below.
+
+@item history add command @r{[} exec @r{]}
+Adds the command argument to the history list as a new event.  If
+@code{exec} is specified (or abbreviated) then the command is also
+executed and its result is returned.  If @code{exec} isn't specified
+then an empty string is returned as result.
+
+@item history change @var{newval} @r{[} event @r{]}
+Replaces the value recorded for an event with @var{newval}.  Event
+specifies the event to replace, and defaults to the current event (not
+event @code{-1}).  This command is intended for use in commands that
+implement new forms of history substitution and wish to replace the
+current event (which invokes the substitution) with the command created
+through substitution.  The return value is an empty string.
+
+@item history event @r{[} event @r{]}
+Returns the value of the event given by event.  Event defaults to
+@code{-1}.  This command causes history revision to occur.
+@xref{History Revision,, History revision}, for details.
+
+@item history info @r{[} @var{n} @r{]}
+Returns a formatted string (intended for humans to read) giving the
+event number and contents for each of the events in the history list
+except the current event.  If @var{n} is specified then only the most
+recent @var{n} events are returned.
+
+@item history keep @var{n}
+This command may be used to change the size of the history list to @var{n}
+events.  Initially, 20 events are retained in the history list.  This
+command returns an empty string.
+
+@item history nextid
+Returns the number of the next event to be recorded in the history list.
+It is useful for things like printing the event number in command-line
+prompts.
+
+@item history redo @r{[} @var{evt} @r{]}
+Re-executes the command indicated by @var{evt} and return its result.
+@var{evt} defaults to @code{-1}.  This command results in history
+revision.  @xref{History Revision,, History revision}, for details.
+
+@item history substitute @var{old} @var{new} @r{[} @var{evt} @r{]}
+Retrieves the command given by @var{evt} (@code{-1} by default), replace
+any occurrences of @var{old} by @var{new} in the command (only simple
+character equality is supported; no wild cards), execute the resulting
+command, and return the result of that execution.  This command results
+in history revision.  @xref{History Revision,, History revision}, for details.
+
+@item history words @var{sel} @r{[} @var{evt} @r{]}
+Retrieves from the command given by @var{evt} (@code{-1} by default) the
+words given by @var{sel}, and return those words in a string separated
+by spaces.  The @var{sel} argument has three forms.  If it is a single
+number then it selects the word given by that number (@code{0} for the
+command name, @code{1} for its first argument, and so on).  If it
+consists of two numbers separated by a dash, then it selects all the
+arguments between those two.  Otherwise @var{sel} is treated as a
+pattern; all words matching that pattern (in the sense of @samp{string
+match}) are returned.  In the numeric forms @samp{$} may be used to
+select the last word of a command.  For example, suppose the most recent
+command in the history list is
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@smallexample
+format @{%s is %d years old@} Alice [expr $ageInMonths/12]
+@end smallexample
+@iftex
+@endgroup
+@end iftex
+
+@noindent
+Here are some history commands and the results they would produce (the
+result of each command is shown indented below it):
+
+@smallexample
+history words $
+   [expr $ageInMonths/12]
+
+history words 1-2
+   @{%s is %d years  old@} Alice
+
+history words *a*o*
+   @{%s is %d years old@} [expr $ageInMonths/12]
+@end smallexample
+
+@samp{history words} results in history revision.
+@ifinfo
+@c this xref is silly on paper, but might be useful online.
+@xref{History Revision,, History revision}, for details.
+@end ifinfo
+@end table
+
+@node History Revision
+@subsubsection History revision
+
+@cindex history revision, Tcl
+@cindex revisionism, historical, Tcl
+The @code{history} options @code{event}, @code{redo}, @code{substitute},
+and @code{words} result in @dfn{history revision}.  When one of these
+options is invoked then the current event is modified to eliminate the
+@code{history} command and replace it with the result of the
+@code{history} command.  For example, suppose that the most recent
+command in the history list is
+
+@example
+set a [expr $b+2]
+@end example
+
+@noindent
+and suppose that the next command invoked is one of the ones on the left
+side of the table below.  The command actually recorded in the history
+event will be the corresponding one on the right side of the table.
+
+@example
+history redo          set a [expr $b+2]
+history s a b         set b [expr $b+2]
+set c [history w 2]   set c [expr $b+2]
+@end example
+
+History revision is needed because event specifiers like @code{-1} are
+only valid at a particular time: once more events have been added to the
+history list a different event specifier would be needed.  History
+revision occurs even when @code{history} is invoked indirectly from the
+current event (e.g.  a user types a command that invokes a Tcl procedure
+that invokes @code{history}): the top-level command whose execution
+eventually resulted in a @code{history} command is replaced.  If you
+wish to invoke commands like @samp{history words} without history
+revision, you can use @samp{history event} to save the current history
+event and then use @samp{history change} to restore it later.
+
+@node if
+@subsection Execute scripts conditionally: @code{if}
+
+@cindex @code{if} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+if @var{expr1} @r{[} then @r{]} @var{body1}
+   elseif @var{expr2} @r{[} then @r{]} @var{body2}
+   elseif  @dots{}
+   @r{[} else @r{]} @r{[} @var{bodyN} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex conditional command, Tcl
+The @code{if} command evaluates @var{expr1} as an expression (in the
+same way that @code{expr} evaluates its argument).  The value of the
+expression must be a Boolean (a numeric value, where 0 is false and
+anything is true, or a string value such as @samp{true} or @samp{yes}
+for true, and @samp{false} or @samp{no} for false); if it is true then
+@var{body1} is executed by passing it to the Tcl interpreter.  Otherwise
+@var{expr2} is evaluated as an expression and if it is true then
+@var{body2} is executed, and so on.  If none of the expressions
+evaluates to true then @var{bodyN} is executed.  The @code{then} and
+@code{else} arguments are optional ``noise words'' to make the command
+easier to read.  There may be any number of @code{elseif} clauses,
+including zero.  @var{bodyN} may also be omitted as long as @code{else}
+is omitted too.  The return value from the command is the result of the
+body script that was executed, or an empty string if none of the
+expressions was non-zero and there was no @var{bodyN}.
+
+@node incr
+@subsection Increment the value of a variable: @code{incr}
+
+@cindex @code{incr} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+incr @var{varname} @r{[} @var{n} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex add to a Tcl variable
+@cindex variable, incrementing in Tcl
+Increments the value stored in the variable whose name is @var{varname}.
+The value of the variable must be an integer.  If @var{n} is supplied
+then its value (which must also be an integer) is added to the value of
+variable @var{varname}; otherwise 1 is added to @var{varname}.  The new
+value is stored as a decimal string in variable @var{varname} and also
+returned as result.
+
+@node info
+@subsection Report on state of Tcl interpreter: @code{info}
+
+@cindex @code{info} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+info @var{op} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex information about Tcl state
+@cindex Tcl interpreter state
+This command provides information about various internals of the Tcl
+interpreter.  Recognized values for @var{op} (which may be abbreviated)
+are:
+
+@ftable @code
+@item info args @var{procname}
+@cindex argument names, for Tcl procedure
+Returns a list containing the names of the arguments to procedure
+@var{procname}, in order.  @var{procname} must be the name of a Tcl
+command procedure.
+
+@item info body @var{procname}
+@cindex body, of Tcl procedure
+Returns the body of procedure @var{procname}.  @var{procname} must be
+the name of a Tcl command procedure.
+
+@item info cmdcount
+@cindex count of commands, Tcl
+Returns a count of the total number of commands that have been invoked
+in this interpreter.
+
+@item info commands @r{[} @var{ptn} @r{]}
+@cindex command list, Tcl
+@cindex list of command names, Tcl
+If @var{ptn} isn't specified, returns a list of names of all the Tcl
+commands, including both the built-in commands written in C and the
+command procedures defined using the @code{proc} command.  If @var{ptn}
+is specified, only those names matching @var{ptn} are returned.
+Matching is determined using the same rules as for @samp{string match}.
+
+@item info complete @var{cmd}
+@cindex complete command, Tcl
+Returns @code{1} if @var{cmd} is a complete Tcl command in the sense of
+having no unclosed quotes, braces, brackets or array element names.  If
+the command doesn't appear to be complete then @code{0} is returned.
+This command is typically used in line-oriented input environments to
+allow users to type in commands that span multiple lines; if the command
+isn't complete, the script can delay evaluating it until additional
+lines have been typed to complete the command.
+
+@item info default @var{procname} @var{arg} @var{varname}
+@cindex default arguments, Tcl
+@var{procname} must be the name of a Tcl command procedure and @var{arg}
+must be the name of an argument to that procedure.  If @var{arg} doesn't
+have a default value then the command returns @code{0}.  Otherwise it
+returns @code{1} and places the default value of @var{arg} into variable
+@var{varname}.
+
+@item info exists @var{varname}
+@cindex existence of variable, Tcl
+@cindex visibility of variable, Tcl
+Returns @code{1} if the variable named @var{varname} exists in the
+current context (either as a global or local variable); returns @code{0}
+otherwise.
+
+@item info globals @r{[} @var{ptn} @r{]}
+@cindex global variables, Tcl
+@cindex variables, Tcl global
+@cindex Tcl global variables
+If @var{ptn} isn't specified, returns a list of all the names of
+currently-defined global variables.  If pattern is specified, only those
+names matching @var{ptn} are returned.  Matching is determined using the
+same rules as for @samp{string match}.
+
+@item info level @r{[} @var{n} @r{]}
+@cindex Tcl stack level
+@cindex level of Tcl stack
+@cindex stack, level of in Tcl
+If @var{n} is not specified, this command returns a number giving the
+stack level of the invoking procedure, or @code{0} if the command is
+invoked at top-level.  If @var{n} (a number) is specified, then the
+result is a list consisting of the name and arguments for the procedure
+call at level @var{n} on the stack.  If @var{n} is positive then it
+selects a particular stack level (@code{1} refers to the top-most active
+procedure, @code{2} to the procedure it called, and so on); otherwise it
+gives a level relative to the current level (@code{0} refers to the
+current procedure, @code{-1} to its caller, and so on).  @xref{uplevel,,
+Different stack frame: @code{uplevel}}, for more information on what
+stack levels mean.
+
+@item info library
+@cindex library directory, Tcl
+Returns the name of the library directory in which standard Tcl scripts
+are stored.  The default value for the library is compiled into Tcl, but
+it may be overridden by setting the @code{TCL_LIBRARY} environment
+variable.  If there is no @code{TCL_LIBRARY} variable and no compiled-in
+value then an error is generated.  @xref{Tcl Library,, Tcl standard
+library}, for details of the facilities provided by the Tcl script
+library.  Normally each application will have its own
+application-specific script library in addition to the Tcl script
+library; I suggest that each application set a global variable with a
+name like @code{@var{app}_library} (where @var{app} is the application's
+name) to hold the location of that application's library directory.
+
+@item info locals @r{[} @var{ptn} @r{]}
+@cindex local variables, Tcl
+@cindex variables, Tcl local
+@cindex Tcl local variables
+If @var{ptn} isn't specified, returns a list of all the names of
+currently-defined local variables, including arguments to the current
+procedure, if any.  Variables defined with the @code{global} and
+@code{upvar} commands will not be returned.  If @var{ptn} is specified,
+only those names matching @var{ptn} are returned.  Matching is
+determined using the same rules as for @samp{string match}.
+
+@item info patchlevel
+@cindex patch level for Tcl
+@cindex Tcl release, identifying uniquely
+@cindex release, Tcl, identifying
+Returns a decimal integer giving the current patch level for Tcl.  The
+patch level is incremented for each new release or patch, and it
+uniquely identifies an official version of Tcl.
+
+@item info procs @r{[} @var{ptn} @r{]}
+@cindex defined procedures, Tcl
+@cindex list of procedures, Tcl
+@cindex procedure list, Tcl
+If @var{ptn} isn't specified, returns a list of all the names of Tcl
+command procedures (only those defined with @code{proc}; not built-in
+commands).  If @var{ptn} is specified, only those names matching
+@var{ptn} are returned.  Matching is determined using the same rules as
+for @samp{string match}.
+
+@item info script
+@cindex script file name, Tcl
+@cindex Tcl script file name
+@cindex file name of Tcl script
+If a Tcl script file is currently being evaluated, then this command
+returns the name of the innermost file being processed.  Otherwise the
+command returns an empty string.
+
+@item info tclversion
+@cindex Tcl version
+@cindex version of Tcl
+Returns the version number for this version of Tcl in the form
+@samp{@var{x}.@var{y}}, where changes to @var{x} represent major changes
+with probable incompatibilities and changes to @var{y} represent small
+enhancements and bug fixes that retain backward compatibility.
+
+@item info vars @r{[} @var{ptn} @r{]}
+@cindex variable list, Tcl
+@cindex Tcl variables, listing
+If @var{ptn} isn't specified, returns a list of all the names of
+currently-visible variables, including both locals and currently-visible
+globals.  If @var{ptn} is specified, only those names matching @var{ptn}
+are returned.  Matching is determined using the same rules as for
+@samp{string match}.
+@end ftable
+
+@node join
+@subsection Join together list elements: @code{join}
+
+@cindex @code{join} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+join @var{lst} @r{[} @var{delim} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex string from list, Tcl
+@cindex list to string, Tcl
+The @var{lst} argument must be a valid Tcl list.  This command returns
+the string formed by joining all of the elements of @var{lst} together
+with the string @var{delim} separating each adjacent pair of elements.
+The @var{delim} argument defaults to a space character.
+
+@node lappend
+@subsection Append list elements: @code{lappend}
+
+@cindex @code{lappend} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+lappend @var{varname} @var{val} @r{[} @var{val} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex append to list, in Tcl
+@cindex list, appending to (Tcl))
+@cindex Tcl, appending to list
+This command treats the variable given by @var{varname} as a list and
+appends each of the @var{val} arguments to that list as a separate
+element, with spaces between elements.  If @var{varname} doesn't exist,
+it is created as a list with elements given by the @var{val} arguments.
+@code{lappend} is similar to @code{append} except that the values are
+appended as list elements rather than raw text.  This command provides a
+relatively efficient way to build up large lists.  For example,
+@samp{lappend a $b} is much more efficient than @samp{set a [concat $a
+[list $b]]} when @samp{$a} is long.
+
+@node lindex
+@subsection Retrieve an element from a list: @code{lindex}
+
+@cindex @code{lindex} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+lindex @var{lst} @var{ix}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex subscripting lists, Tcl
+@cindex indexing lists, Tcl
+@cindex list indexing, Tcl
+@cindex element of list, Tcl
+This command treats @var{lst} as a Tcl list and returns the element
+indexed by @var{ix} from it (@code{0} refers to the first element of the
+list).  In extracting the element, @code{lindex} observes the same rules
+concerning braces and quotes and backslashes as the Tcl command
+interpreter; however, variable substitution and command substitution do
+not occur.  If @var{ix} is negative or greater than or equal to the
+number of elements in @var{lst}, then an empty string is returned.
+
+@node linsert
+@subsection Insert elements into a list: @code{linsert}
+
+@cindex @code{linsert} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+linsert @var{lst} @var{ix} @var{elt} @r{[} @var{elt} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex inserting in lists, Tcl
+@cindex list insertion, Tcl
+@cindex elements, inserting in list, Tcl
+This command produces a new list from @var{lst} by inserting all of the
+@var{elt} arguments just before the element at position @var{ix} of
+@var{lst}.  Each @var{elt} argument will become a separate element of
+the new list.  If @var{ix} is less than or equal to zero, then the new
+elements are inserted at the beginning of the list.  If @var{ix} is
+greater than or equal to the number of elements in @var{lst}, then the
+new elements are appended to the list.
+
+@node list
+@subsection Create a list: @code{list}
+
+@cindex @code{list} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+list @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex building lists, Tcl
+This command returns a list composed of all the @var{arg} values, or an
+empty string if no @var{arg} is specified.  Braces and backslashes get
+added as necessary, so that the @code{index} command may be used on the
+result to re-extract the original arguments, and also so that
+@code{eval} may be used to execute the resulting list, with the first
+@var{arg} comprising the command's name and the other args comprising
+its arguments.  @code{list} produces slightly different results than
+@code{concat}: @code{concat} removes one level of grouping before
+forming the list, while @code{list} works directly from the original
+arguments.  For example, the command
+
+@example
+list a b @{c d e@} @{f @{g h@}@}
+@end example
+
+@noindent
+will return
+
+@example
+a b @{c d e@} @{f @{g h@}@}
+@end example
+
+@noindent
+while @code{concat} with the same arguments will return
+
+@example
+a b c d e f @{g h@}
+@end example
+
+@node llength
+@subsection Number of elements in a list: @code{llength}
+
+@cindex @code{llength} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+llength @var{lst}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex count elements in list, Tcl
+@cindex element count of list, Tcl
+@cindex length of list, Tcl
+@cindex size of list, Tcl
+@cindex list size, Tcl
+Treats @var{lst} as a list and returns a decimal string giving the
+number of elements in it.
+
+@node lrange
+@subsection Adjacent elements from a list: @code{lrange}
+
+@cindex @code{lrange} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+lrange @var{lst} @var{first} @var{last}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex range of elements in list, Tcl
+@cindex adjacent elements from list, Tcl
+@cindex element range from list, Tcl
+@var{lst} must be a valid Tcl list.  This command will return a new list
+consisting of elements @var{first} through @var{last}, inclusive.
+@var{last} may be @samp{end} (or any abbreviation of it) to refer to the
+last element of the list.  If @var{first} is less than zero, it is
+treated as if it were zero.  If @var{last} is greater than or equal to
+the number of elements in the list, then it is treated as if it were
+@samp{end}.  If @var{first} is greater than @var{last} then an empty
+string is returned.  Note: @samp{lrange @var{lst} @var{first}
+@var{first}} does not always produce the same result as @samp{lindex
+@var{lst} @var{first}} (although it often does for simple fields that
+aren't enclosed in braces); it does, however, produce exactly the same
+results as @samp{list [lindex @var{lst} @var{first}]}.
+
+@node lreplace
+@subsection Replace elements in a list: @code{lreplace}
+
+@cindex @code{lreplace} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+lreplace @var{lst} @var{first} @var{last} @r{[} @var{elt} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@code{lreplace} returns a new list formed by replacing one or more
+elements of @var{lst} with the @var{elt} arguments.  @var{first} gives
+the index in @var{lst} of the first element to be replaced.  If
+@var{first} is less than zero then it refers to the first element of
+@var{lst}; the element indicated by @var{first} must exist in the list.
+@var{last} gives the index in @var{lst} of the last element to be
+replaced; it must be greater than or equal to @var{first}.  @var{last}
+may be end (or any abbreviation of it) to indicate that all elements
+between @var{first} and the end of the list should be replaced.  The
+@var{elt} arguments specify zero or more new arguments to be added to
+the list in place of those that were deleted.  Each @var{elt} argument
+will become a separate element of the list.  If no @var{elt} arguments
+are specified, then the elements between @var{first} and @var{last} are
+simply deleted.
+
+@node lsearch
+@subsection Search for element in list: @code{lsearch}
+
+@cindex @code{lsearch} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+lsearch @r{[} @var{mode} @r{]} @var{lst} @var{ptn}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex first match in list, Tcl
+@cindex searching lists, Tcl
+@cindex list search, Tcl
+This command searches the elements of the list @var{lst} to see if one
+of them matches @var{ptn}.  If so, the command returns the index of the
+first matching element.  If not, the command returns @code{-1}.  The
+@var{mode} argument indicates how the elements of the list are to be
+matched against @var{ptn} and it must have one of the following values:
+
+@table @code
+@item -exact                                                      
+The list element must contain exactly the same string as @var{ptn}.
+
+@item -glob                                                       
+@var{ptn} is a glob-style pattern which is matched against each list
+element using the same rules as the @samp{string match} command.
+
+@item -regexp                                                     
+@var{ptn} is treated as a regular expression and matched against each
+list element using the same rules as the @code{regexp} command.
+@end table
+
+If @var{mode} is omitted then it defaults to @samp{-glob}.
+
+@node lsort
+@subsection Sort the elements of a list: @code{lsort}
+
+@cindex @code{lsort} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+lsort @r{[} @var{opts} @r{]} @var{lst}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex sorting lists, Tcl
+@cindex list sorting, Tcl
+@cindex ordering lists, Tcl
+This command sorts the elements of a list @var{lst}, returning a new
+list in sorted order.  By default @sc{ascii} sorting is used with the
+result returned in increasing order.  However, any of the following
+options may be specified before @var{lst} to control the sorting process
+(unique abbreviations are accepted):
+
+@table @code
+@item -ascii                                                      
+Use string comparison with @sc{ascii} collation order.  This is the
+default.
+
+@item -integer                                                    
+Convert list elements to integers and use integer comparison.
+
+@item -real                                                       
+Convert list elements to floating-point values and use floating
+comparison.
+
+@item -command @var{cmd}                                            
+Use @var{cmd} as a comparison command.  To compare two elements,
+evaluate a Tcl script consisting of @var{cmd} with the two elements
+appended as additional arguments.  The script should return an integer
+less than, equal to, or greater than zero if the first element is to be
+considered less than, equal to, or greater than the second,
+respectively.
+
+@item -increasing                                     
+Sort the list in increasing order (``smallest'' items first).  This is
+the default.
+
+@item -decreasing                                     
+Sort the list in decreasing order (``largest'' items first).
+@end table
+
+@node open
+@subsection Open a file: @code{open}
+
+@cindex @code{open} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+open @var{fname} @r{[} @var{access} @r{]}   @r{[} @var{perm} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex file, opening, in Tcl
+This command opens a file and returns an identifier that may be used in
+future invocations of commands like @code{read}, @code{puts}, and
+@code{close}.  @var{fname} gives the name of the file to open; if it
+starts with a tilde then tilde substitution is performed (@pxref{cd,,
+Change working directory: @code{cd}}).  If the first character of
+@var{fname} is @samp{|} then the remaining characters of @var{fname} are
+treated as a command pipeline to invoke, in the same style as for
+@code{exec}.  In this case, the identifier returned by @code{open} may
+be used to write to the command's input pipe or read from its output
+pipe.
+
+The @var{access} argument indicates the way in which the file (or
+command pipeline) is to be accessed.  It may take two forms, either a
+string in the form that would be passed to the @code{fopen} library
+procedure or a list of @sc{posix} access flags.  It defaults to
+@samp{r}.  In the first form @var{access} may have any of the following
+values:
+
+@table @code
+@item r
+Open the file for reading only; the file must already exist.
+
+@item r+
+Open the file for both reading and writing; the file must already exist.
+
+@item w
+Open the file for writing only.  Truncate it if it exists.  If it
+doesn't exist, create a new file.
+
+@item w+
+Open the file for reading and writing.  Truncate it if it exists.  If it
+doesn't exist, create a new file.
+
+@item a
+Open the file for writing only.  The file must already exist, and the
+file is positioned so that new data is appended to the file.
+
+@item a+
+Open the file for reading and writing.  If the file doesn't exist,
+create a new empty file.  Set the initial access position to the end of
+the file.
+@end table
+
+In the second form, @var{access} consists of a list of any of the
+following flags, all of which have the standard @sc{posix} meanings.
+One of the flags must be either @code{RDONLY}, @code{WRONLY} or
+@code{RDWR}.
+
+@table @code
+@item RDONLY                                                      
+Open the file for reading only.              
+
+@item WRONLY                                                      
+Open the file for writing only.              
+
+@item RDWR                                                        
+Open the file for both reading and writing.  
+
+@item APPEND                                                      
+Set the file pointer to the end of the file prior to each write.
+
+@item CREAT                                                       
+Create the file if it doesn't already exist (without this flag it is an
+error for the file not to exist).
+
+@item EXCL                                                        
+If @code{CREAT} is specified also, an error is returned if the file
+already exists.
+
+@item NOCTTY                                                      
+If the file is a terminal device, this flag prevents the file from
+becoming the controlling terminal of the process.
+
+@item NONBLOCK                                        
+Prevents the process from blocking while opening the file.  For details
+refer to your system documentation on the @code{open} system call
+@code{O_NONBLOCK} flag.
+
+@item TRUNC                                                       
+If the file exists it is truncated to zero length.
+@end table
+
+If a new file is created as part of opening it, @var{perm} (an integer)
+is used to set the permissions for the new file in conjunction with the
+process's file mode creation mask.  @var{perm} defaults to @code{0666}.
+
+If a file is opened for both reading and writing then @code{seek} must be
+invoked between a read and a write, or vice versa (this restriction does
+not apply to command pipelines opened with @code{open}).  When @var{fname}
+specifies a command pipeline and a write-only access is used, then
+standard output from the pipeline is directed to the current standard
+output unless overridden by the command.  When @var{fname} specifies a
+command pipeline and a read-only access is used, then standard input
+from the pipeline is taken from the current standard input unless
+overridden by the command.
+
+@node pid
+@subsection Retrieve process ids: @code{pid}
+
+@cindex @code{pid} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+pid @r{[} @var{fileid} @r{]} 
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex process id, Tcl
+@cindex processes in pipeline
+@cindex pipeline processes
+If the @var{fileid} argument is given then it should normally refer to a
+process pipeline created with the open command.  In this case the
+@code{pid} command will return a list whose elements are the process
+identifiers of all the processes in the pipeline, in order.  The list
+will be empty if @var{fileid} refers to an open file that isn't a
+process pipeline.  If no @var{fileid} argument is given then @code{pid}
+returns the process identifier of the current process.  All process
+identifiers are returned as decimal strings.
+
+@node proc
+@subsection Create a Tcl procedure: @code{proc}
+
+@cindex @code{proc} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+proc @var{pname} @var{arglist} @var{body}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex user-defined commands, Tcl
+@cindex defining procedures, Tcl
+@cindex procedures, defining in Tcl
+@cindex argument lists, Tcl procedures
+@cindex default argument values, Tcl procs
+The @code{proc} command creates a new Tcl procedure named @var{pname},
+replacing any existing command or procedure there may have been by that
+name.  Whenever the new command is invoked, the contents of @var{body} will be
+executed by the Tcl interpreter.  @var{arglist} specifies the formal
+arguments to the procedure.  It consists of a list, possibly empty, each
+of whose elements specifies one argument.  Each argument specifier is
+also a list, with either one or two fields.  If there is only a single
+field in the specifier then it is the name of the argument; if there are
+two fields, then the first is the argument name and the second is its
+default value.
+
+@cindex localization, in Tcl procs
+When @var{pname} is invoked a local variable will be created for each of the
+formal arguments to the procedure; its value will be the value of
+corresponding argument in the invoking command or the argument's default
+value.  Arguments with default values need not be specified in a
+procedure invocation.  However, there must be enough actual arguments
+for all the formal arguments that don't have defaults, and there must
+not be any extra actual arguments.  There is one special case to permit
+procedures with variable numbers of arguments.  If the last formal
+argument has the name @code{args}, then a call to the procedure may contain
+more actual arguments than the procedure has formals.  In this case, all
+of the actual arguments starting at the one that would be assigned to
+@code{args} are combined into a list (as if the list command had been used);
+this combined value is assigned to the local variable @code{args}.
+
+@cindex variable scope, in Tcl procs
+When @var{body} is being executed, variable names normally refer to local
+variables, which are created automatically when referenced and deleted
+when the procedure returns.  One local variable is automatically created
+for each of the procedure's arguments.  Global variables can only be
+accessed by invoking the @code{global} command or the @code{upvar} command.
+
+@cindex procedures, result of, Tcl
+The @code{proc} command returns an empty string.  When a procedure is
+invoked, the procedure's result is the value specified in a
+@code{return} command.  If the procedure doesn't execute an explicit
+@code{return}, then its result is the value of the last command executed
+in the procedure's body.  If an error occurs while executing the
+procedure body, then the procedure as a whole will return that same
+error.
+
+@node puts
+@subsection Write to a file: @code{puts}
+
+@cindex @code{puts} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+puts @r{[} -nonewline @r{]}  @r{[} @var{fileid} @r{]} @var{str}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex writing in files, Tcl
+@cindex files, writing in, Tcl
+@cindex output to files, Tcl
+Writes the characters given by @var{str} to the file given by
+@var{fileid}.  @var{fileid} must have been the return value from a
+previous call to @code{open}, or it may be @code{stdout} or
+@code{stderr} to refer to one of the standard I/O channels; it must
+refer to a file that was opened for writing.  If no @var{fileid} is
+specified then it defaults to @code{stdout}.  @code{puts} normally
+outputs a newline character after @var{str}, but this feature may be
+suppressed by specifying the @samp{-nonewline} switch.  Output to files
+is buffered internally by Tcl; the @code{flush} command may be used to
+force buffered characters to be output.
+
+@node pwd
+@subsection Current working directory: @code{pwd}
+
+@cindex @code{pwd} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+pwd
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex working directory in Tcl
+@cindex current directory in Tcl
+@cindex directory, current, in Tcl
+Returns the path name of the current working directory.
+
+@node read
+@subsection Read from a file: @code{read}
+
+@cindex @code{read} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+read @r{[} -nonewline @r{]} @var{fileid}
+read @var{fileid} @var{numbytes}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex file reading, Tcl
+@cindex reading files, Tcl
+In the first form, all of the remaining bytes are read from the file
+given by @var{fileid}; they are returned as the result of the command.
+If the @samp{-nonewline} option is specified then the last character of
+the file is discarded if it is a newline.  In the second form, the extra
+argument specifies how many bytes to read; exactly this many bytes will
+be read and returned, unless there are fewer than @var{numbytes} bytes
+left in the file; in this case, all the remaining bytes are returned.
+@var{fileid} must be @code{stdin} or the return value from a previous
+call to @code{open}; it must refer to a file that was opened for
+reading.  Any existing end-of-file or error condition on the file is
+cleared at the beginning of the read command.
+
+@node regexp
+@subsection Match a regular expression: @code{regexp}
+
+@cindex @code{regexp} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+regexp @r{[} @var{opts} @r{]} @var{rexp} @var{str}  @r{[} @var{mvar} @r{]} @r{[} @var{subvar} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex regular expression matching, Tcl
+Determines whether the regular expression @var{rexp} matches part or all
+of the string @var{str} and returns @code{1} if it does, @code{0} if it
+doesn't.
+
+@cindex string matching w/regexps, Tcl
+If additional arguments are specified after @var{str} then they are
+treated as the names of variables in which to return information about
+which parts of @var{str} matched @var{rexp}.  @var{mvar} will be set to
+the range of @var{str} that matched all of @var{rexp}.  The first
+@var{subvar} will contain the characters in @var{str} that matched the
+leftmost parenthesized subexpression within @var{rexp}, the next
+@var{subvar} will contain the characters that matched the next
+parenthesized subexpression to the right in @var{rexp}, and so on.
+
+If the initial arguments to @code{regexp} start with @samp{-} then they
+are treated as options.  The following options are currently supported:
+
+@table @code
+@item -nocase                                                     
+Causes upper-case characters in @var{str} to be treated as lower case
+during the matching process.
+
+@item -indices                                                    
+Changes what is stored in each @var{subvar}.  Instead of storing the
+matching characters from @var{str}, each variable will contain a list of
+two decimal strings giving the indices in @var{str} of the first and last
+characters in the matching range of characters.
+
+@item --                                                          
+Marks the end of @var{opts}.  The argument following this one will be
+treated as @var{rexp} even if it starts with a @samp{-}.
+@end table
+
+If there are more names in the @var{subvar} list than there are
+parenthesized subexpressions within @var{rexp}, or if a particular
+subexpression in @var{rexp} doesn't match the string (e.g. because it
+was in a portion of the expression that wasn't matched), then the
+corresponding @var{subvar} will be set to @samp{-1 -1} if
+@samp{-indices} has been specified or to an empty string otherwise.
+
+@menu
+* Regular Expressions::
+* Choosing Matches::
+@end menu
+
+@node Regular Expressions
+@subsubsection Regular expressions
+
+@cindex Spencer, Henry
+Regular expressions are implemented using Henry Spencer's package
+(thanks, Henry!), and much of the description of regular expressions
+below is copied verbatim from his reference manual entry.
+
+@cindex regular expressions explained
+A regular expression is zero or more branches, separated by @samp{|}.
+It matches anything that matches one of the branches.
+
+A branch is zero or more pieces, concatenated.  It matches a match for
+the first, followed by a match for the second, etc.
+
+A piece is an atom possibly followed by @samp{*}, @samp{+}, or @samp{?}.
+An atom followed by @samp{*} matches a sequence of 0 or more matches of
+the atom.  An atom followed by @samp{+} matches a sequence of 1 or more
+matches of the atom.  An atom followed by @samp{?} matches a match of
+the atom, or the empty string.
+
+An atom is a regular expression in parentheses (matching a match for the
+regular expression), a range (see below), @samp{.} (matching any single
+character), @samp{^} (matching the empty string at the beginning of the
+input string), @samp{$} (matching the empty string at the end of the
+input string), a @samp{\} followed by a single character (matching that
+character), or a single character with no other significance (matching
+that character).
+
+A range is a sequence of characters enclosed in @samp{[]}.  It normally
+matches any single character from the sequence.  If the sequence begins
+with @samp{^}, it matches any single character not from the rest of the
+sequence.  If two characters in the sequence are separated by @samp{-},
+this is shorthand for the full list of @sc{ascii} characters between
+them (e.g.  @samp{[0-9]} matches any decimal digit).  To include a
+literal @samp{]} in the sequence, make it the first character (following
+a possible @samp{^}).  To include a literal @samp{-}, make it the first
+or last character.
+
+@node Choosing Matches
+@subsubsection Choosing among matches
+
+In general there may be more than one way to match a regular expression
+to an input string.  For example, consider the command
+
+@example
+regexp (a*)b* aabaaabb x y
+@end example
+
+Considering only the rules given so far, @code{x} and @code{y} could end
+up with the values @samp{aabb} and @samp{aa}, @samp{aaab} and
+@samp{aaa}, @samp{ab} and @samp{a}, or any of several other
+combinations.  To resolve this potential ambiguity regexp chooses among
+alternatives using the rule ``first then longest''.  In other words, it
+consders the possible matches in order working from left to right across
+the input string and the pattern, and it attempts to match longer pieces
+of the input string before shorter ones.  More specifically, the
+following rules apply in decreasing order of priority:
+
+@enumerate
+@item
+If a regular expression could match two different parts of an input
+string then it will match the one that begins earliest.
+
+@item
+If a regular expression contains @samp{|} characters then the leftmost
+matching sub-expression is chosen.
+
+@item
+In @samp{*}, @samp{+}, and @samp{?} constructs, longer matches are
+chosen in preference to shorter ones.
+
+@item
+In sequences of expression  components  the  components
+are considered from left to right.
+@end enumerate
+
+In the example above, @samp{(a*)b*} matches @samp{aab}: the @samp{(a*)}
+portion of the pattern is matched first and it consumes the leading
+@samp{aa}; then the @samp{b*} portion of the pattern consumes the next
+@samp{b}.  Or consider the following example:
+
+@example
+regexp  (ab|a)(b*)c  abc  x  y  z
+@end example
+
+After this command @code{x} will be @samp{abc}, @code{y} will be
+@samp{ab}, and @code{z} will be an empty string.  Rule 4 specifies that
+@samp{(ab|a)} gets first shot at the input string and Rule 2 specifies
+that the @samp{ab} subexpression is checked before the @samp{a}
+sub-expression.  Thus the @samp{b} has already been claimed before the
+@samp{(b*)} component is checked and @samp{(b*)} must match an empty
+string.
+
+@node regsub
+@subsection Regular expression substitutions: @code{regsub}
+
+@cindex @code{regsub} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+regsub @r{[} @var{opts} @r{]} @var{rexp} @var{str} @var{repl} @var{varname}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex regular expression replacement, Tcl
+@cindex replacement, of regular expressions in Tcl
+@cindex substitution of regular expressions in Tcl
+This command matches the regular expression @var{rexp} against
+@var{str}, and it copies @var{str} to the variable whose name is given
+by @var{varname}.  The command returns @code{1} if there is a match and
+@code{0} if there isn't.  If there is a match, then while copying
+@var{str} to @var{varname} the portion of @var{str} that matched
+@var{rexp} is replaced with @var{repl}.  If @var{repl} contains a
+@samp{&} or @samp{\0}, that character or string is replaced in the
+substitution with the portion of @var{str} that matched @var{rexp}.  If
+@var{repl} contains a @samp{\@var{n}}, where @var{n} is a digit between
+1 and 9, then it is replaced in the substitution with the portion of
+@var{str} that matched the @var{n}th parenthesized subexpression of
+@var{rexp}.  Additional backslashes may be used in @var{repl} to prevent
+special interpretation of @samp{&} or @samp{\0} or @samp{\@var{n}} or
+backslash.  The use of backslashes in @var{repl} tends to interact badly
+with the Tcl parser's use of backslashes, so it's generally safest to
+enclose @var{repl} in braces if it includes backslashes.
+
+If the initial arguments to @code{regsub} start with @samp{-} then they
+are treated as options.  The following options are currently supported:
+
+@table @code
+@item -all                                                        
+All ranges in @var{str} that match @var{rexp} are found and substitution
+is performed for each of these ranges.  Without this option only the
+first matching range is found and substituted.  If @samp{-all} is
+specified, then @samp{&} and @samp{\n} sequences are handled for each
+substitution using the information from the corresponding match.
+
+@item -nocase                                                     
+Upper-case characters in @var{str} will be converted to lower-case
+before matching against @var{rexp}; however, substitutions specified by
+@var{repl} use the original unconverted form of @var{str}.
+
+@item --                                                          
+Marks the end of @var{opts}.  The argument following this one will be
+treated as @var{rexp} even if a @samp{-} is its first character.
+@end table
+
+@xref{regexp,,Match a regular expression: @code{regexp}}, for details on
+the interpretation of regular expressions.
+
+@node rename
+@subsection Rename or delete a command: @code{rename}
+
+@cindex @code{rename} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+rename @var{oldname} @var{newname}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex renaming Tcl commands
+@cindex deleting Tcl commands
+@cindex changing Tcl command names
+@cindex command names, changing in Tcl
+Rename the command that used to be called @var{oldname} so that it is
+now called @var{newname}.  If @var{newname} is an empty string then
+@var{oldname} is deleted.  The @code{rename} command returns an empty
+string as result.
+
+@node return
+@subsection Return from a procedure: @code{return}
+
+@cindex @code{return} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+return @r{[} -code @var{c} @r{]}  @r{[} -errorinfo @var{i} @r{]}  @r{[} -errorcode @var{e} @r{]}  @r{[} @var{str} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex result of Tcl procedure
+Return immediately from the current procedure (or top-level command or
+source command), with @var{str} as the return value.  If @var{str} is not
+specified then an empty string will be returned as result.
+
+@cindex exceptions as results, Tcl
+@emph{Exceptional returns.} In the usual case where the @samp{-code}
+option isn't specified the procedure will return normally (its
+completion code will be @code{TCL_OK}).  However, the @samp{-code
+@var{c}} option may be used to generate an exceptional return from the
+procedure.  @var{c} may have any of the following values:
+
+@table @code
+@item ok                                                          
+Normal return: same as if the option is omitted.
+
+@item error                                                       
+Error return: same as if the @code{error} command were used to terminate
+the procedure, except for handling of @code{errorInfo} and
+@code{errorCode} variables (see below).
+
+@item return                      
+@cindex @code{TCL_RETURN} return code
+The current procedure will return with a completion code of
+@code{TCL_RETURN}, so that the procedure that invoked it will return
+also.
+
+@item break                          
+@cindex @code{TCL_BREAK} return code
+The current procedure will return with a completion code of
+@code{TCL_BREAK}, which will terminate the innermost nested loop in the
+code that invoked the current procedure.
+
+@item continue                      
+@cindex @code{TCL_CONTINUE} return code
+The current procedure will return with a completion code of
+@code{TCL_CONTINUE}, which will terminate the current iteration of the
+innermost nested loop in the code that invoked the current procedure.
+
+@item @var{val}                                                       
+@var{val} must be an integer; it will be returned as the completion code
+for the current procedure.
+@end table
+
+The @samp{-code} option is rarely used.  It is provided so that
+procedures that implement new control structures can reflect exceptional
+conditions back to their callers.
+
+Two additional options, @samp{-errorinfo} and @samp{-errorcode}, may be
+used to provide additional information during error returns.  These
+options are ignored unless you specify @samp{-code error}.
+
+@cindex @code{errorInfo} and @code{return}
+The @samp{-errorinfo @var{i}} option specifies an initial stack trace
+for the @code{errorInfo} variable; if it is not specified then the stack
+trace left in @code{errorInfo} will include the call to the procedure
+and higher levels on the stack but it will not include any information
+about the context of the error within the procedure.  Typically the
+@var{i} value is supplied from the value left in @code{errorInfo} after
+a @code{catch} command trapped an error within the procedure.
+
+@cindex @code{errorCode} and @code{return}
+If the @samp{-errorcode @var{e}} option is specified then @var{e}
+provides a value for the @code{errorCode} variable.  If the option is
+not specified then @code{errorCode} will default to @samp{NONE}.
+
+@node scan
+@subsection Parse string like @code{sscanf}: @code{scan}
+
+@cindex @code{scan} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+scan @var{str} @var{fmt} @var{varname} @r{[} @var{varname} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex parsing input like @code{sscanf}, in Tcl
+@cindex input fields, scanning in Tcl
+This command parses fields from an input string in the same fashion as
+the @sc{ansi} C @code{sscanf} procedure and returns a count of the
+number of fields sucessfully parsed.  @var{str} gives the input to be
+parsed and @var{fmt} indicates how to parse it, using @samp{%}
+conversion specifiers as in @code{sscanf}.  Each @var{varname} gives the
+name of a variable; when a field is scanned from @var{str} the result is
+converted back into a string and assigned to the corresponding variable.
+
+@emph{Details on scanning.} @code{scan} operates by scanning @var{str}
+and @var{fmt} together.  If the next character in @var{fmt} is a blank
+or tab then it is ignored.  Otherwise, if it isn't a @samp{%} character
+then it must match the next non-white-space character of @var{str}.
+When a @samp{%} is encountered in @var{fmt}, it indicates the start of a
+conversion specifier.  A conversion specifier contains up to three
+fields after the @samp{%}: a @samp{*}, which indicates that the
+converted value is to be discarded instead of assigned to a variable; a
+number indicating a maximum field width; and a conversion character.
+All of these fields are optional except for the conversion character.
+
+When scan finds a conversion specifier in @var{fmt}, it first skips any
+white-space characters in @var{str}.  Then it converts the next input
+characters according to the conversion specifier and stores the result
+in the variable given by the next argument to @code{scan}.  The
+following conversion characters are supported:
+
+@table @code
+@item d
+The input field must be a decimal integer.  It is read in and the value
+is stored in the variable as a decimal string.
+
+@item o
+The input field must be an octal integer.  It is read in and the value
+is stored in the variable as a decimal string.
+
+@item x
+The input field must be a hexadecimal integer.  It is read in and the
+value is stored in the variable as a decimal string.
+
+@item c
+A single character is read in and its binary value is stored in the
+variable as a decimal string.  Initial white space is not skipped in
+this case, so the input field may be a white-space character.  This
+conversion is different from the @sc{ansi} standard in that the input field
+always consists of a single character and no field width may be
+specified.
+
+@item s
+The input field consists of all the characters up to the next
+white-space character; the characters are copied to the variable.
+
+@item e
+@itemx f
+@itemx g
+The input field must be a floating-point number consisting of an
+optional sign, a string of decimal digits possibly containing a decimal
+point, and an optional exponent consisting of an @samp{e} or @samp{E}
+followed by an optional sign and a string of decimal digits.  It is read
+in and stored in the variable as a floating-point string.
+
+@item [@var{chars}]
+The input field consists of any number of the characters in @var{chars}.
+The matching string is stored in the variable.  If the first character
+between the brackets is a @samp{]} then it is treated as part of chars
+rather than the closing bracket for the set.
+
+@item [^@var{chars}]
+The input field consists of any number of characters not in @var{chars}.
+The matching string is stored in the variable.  If the character
+immediately following the @samp{^} is a @samp{]} then it is treated as
+part of the set rather than the closing bracket for the set.
+@end table
+
+The number of characters read from the input for a conversion is the
+largest number that makes sense for that particular conversion (e.g.  as
+many decimal digits as possible for @samp{%d}, as many octal digits as
+possible for @samp{%o}, and so on).  The input field for a given
+conversion terminates either when a white-space character is encountered
+or when the maximum field width has been reached, whichever comes first.
+If a @samp{*} is present in the conversion specifier then no variable is
+assigned and the next scan argument is not consumed.
+
+@emph{Differences from @sc{ansi} @code{sscanf}.}
+The behavior of the @code{scan} command is the same as the behavior of the
+@sc{ansi} C @code{sscanf} function except for these differences:
+
+@enumerate
+@item
+@samp{%p} and @samp{%n} conversion specifiers are not currently supported.
+
+@item
+For @samp{%c} conversions a single character value is converted to a decimal
+string, which is then assigned to the corresponding @var{varname}; no field
+width may be specified for this conversion.
+
+@item
+The @samp{l}, @samp{h}, and @samp{L} modifiers are ignored; integer
+values are always converted as if there were no modifier present and
+real values are always converted as if the @samp{l} modifier were
+present (i.e. type @code{double} is used for the internal
+representation).
+@end enumerate
+
+@node seek
+@subsection Access position for an open file: @code{seek}
+
+@cindex @code{seek} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+seek @var{fileid} @var{offset} @r{[} @var{origin} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex access position for file, Tcl
+@cindex file, access position, Tcl
+Change the current access position for @var{fileid}.  @var{fileid} must
+be the return value from a previous call to @code{open}, or it may be
+@code{stdin}, @code{stdout}, or @code{stderr} to refer to one of the
+standard I/O channels.  The @var{offset} and @var{origin} arguments
+specify the position at which the next read or write will occur for
+@var{fileid}.  @var{offset} must be an integer (which may be negative)
+and @var{origin} must be one of the following:
+
+@table @code
+@item start
+The new access position will be @var{offset} bytes from the start of the
+file.
+
+@item current
+The new access position will be @var{offset} bytes from the current
+access position; a negative @var{offset} moves the access position
+backwards in the file.
+
+@item end
+The new access position will be @var{offset} bytes from the end of the
+file.  A negative @var{offset} places the access position before the
+end-of-file, and a positive @var{offset} places the access position
+after the end-of-file.
+@end table
+
+The @var{origin} argument defaults to @code{start}.  This command
+returns an empty string.
+
+
+@node set
+@subsection Read and write variables: @code{set}
+
+@cindex @code{set} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+set @var{varname} @r{[} @var{val} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Returns the value of variable @var{varname}.  If @var{val} is specified,
+then set the value of @var{varname} to @var{val}, creating a new
+variable if one doesn't already exist, and return its value.  If
+@var{varname} contains an open parenthesis and ends with a close
+parenthesis, then it refers to an array element: the characters before
+the first open parenthesis are the name of the array, and the characters
+between the parentheses are the index within the array.  Otherwise
+@var{varname} refers to a scalar variable.  If no procedure is active,
+then @var{varname} refers to a global variable.  If a procedure is
+active, then @var{varname} refers to a parameter or local variable of
+the procedure unless the global command has been invoked to declare
+@var{varname} to be global.
+
+@node source
+@subsection Evaluate a file as a Tcl script: @code{source}
+
+@cindex @code{source} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+source @var{fname}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex script evaluation from file, Tcl
+@cindex file of Tcl commands, evaluating
+@cindex commands in file, evaluating, Tcl
+Read file @var{fname} and pass the contents to the Tcl interpreter as a
+script to evaluate in the normal fashion.  The return value from source
+is the return value of the last command executed from the file.  If an
+error occurs in evaluating the contents of the file then the source
+command will return that error.  If a return command is invoked from
+within the file then the remainder of the file will be skipped and the
+source command will return normally with the result from the return
+command.  If @var{fname} starts with a tilde, then it is tilde-substituted
+as described in @ref{cd,, Change working directory: @code{cd}}.
+
+@node split
+@subsection Split a string into a Tcl list: @code{split}
+
+@cindex @code{split} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+split @var{str} @r{[} @var{splitchars} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex list, build from string, Tcl
+@cindex string, convert to list, Tcl
+Returns a list created by splitting a string @var{str} at each character
+that is in the @var{splitchars} argument.  Each element of the result
+list will consist of the characters from @var{str} that lie between
+instances of the characters in @var{splitchars}.  Empty list elements
+will be generated if @var{str} contains adjacent characters in
+@var{splitchars}, or if the first or last character of @var{str} is in
+@var{splitchars}.  If @var{splitchars} is an empty string then each
+character of @var{str} becomes a separate element of the result list.
+@var{splitchars} defaults to the standard white-space characters.  For
+example,
+
+@example
+split "comp.unix.misc" .
+@end example
+
+@noindent
+returns @samp{comp unix misc} and
+
+@example
+split "Hello world" @{@}
+@end example
+
+@noindent
+returns @samp{H e l l o @{ @} w o r l d}.
+
+@node string
+@subsection Manipulate strings: @code{string}
+
+@cindex @code{string} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+string @var{op} @var{arg} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+Performs one of several string operations, depending on @var{op}.  The
+recognized alternatives for @var{op} (which may be abbreviated) are:
+
+@table @code
+@cindex lexicographic comparison, Tcl
+@cindex compare lexicographically, Tcl
+@item string compare @var{str1} @var{str2}
+Perform a character-by-character comparison of strings @var{str1} and
+@var{str2} in the same way as the C @code{strcmp} procedure.  Return
+@code{-1}, @code{0}, or @code{1}, depending on whether @var{str1} is
+lexicographically less than, equal to, or greater than @var{str2}.
+
+@item string first @var{str1} @var{str2}
+Search the string @var{str2} for a sequence of characters that exactly
+match the characters in the string @var{str1}.  If found, return the
+index of the first character in the first such match within @var{str2}.
+If not found, return @code{-1}.
+
+@item string index @var{str} @var{charix}
+@cindex string indexing, Tcl
+@cindex indexing strings, Tcl
+Returns the character number @var{charix} from the string @var{str}.
+A @var{charix} of 0 corresponds to the first character of the string.
+If @var{charix} is less than 0 or greater than or equal to the length of
+the string then an empty string is returned.
+
+@item string last @var{str1} @var{str2}
+@cindex string search, Tcl
+Search the string @var{str2} for a sequence of characters that exactly
+match the characters in the string @var{str1}.  If found, return the
+index of the first character in the last such match within @var{str2}.
+If there is no match, then return @code{-1}.
+
+@cindex string length, Tcl
+@cindex length of string, Tcl
+@item string length @var{str}
+Returns a decimal string giving the number of characters in @var{str}.
+
+@cindex string pattern matching, Tcl
+@cindex pattern match w/string, Tcl
+@item string match @var{ptn} @var{str}
+See if the pattern @var{ptn} matches the string @var{str}; return
+@code{1} if it does, @code{0} if it doesn't.  Matching is done in a
+fashion similar to that used by the C-shell.  For the two strings to
+match, their contents must be identical except that the following
+special sequences may appear in @var{ptn}:
+
+@table @code
+@item *
+Matches any sequence of characters in @var{str}, including a null string.
+
+@item ?
+Matches any single character in @var{str}.
+
+@item [@var{chars}]
+Matches any character in the string @var{chars}.  If a sequence of the
+form @code{@var{x}-@var{y}} appears in @var{chars}, then any character
+between @var{x} and @var{y}, inclusive, will match.
+
+@item \@var{x}
+Matches the single character @var{x}.  This provides a way of avoiding the
+special interpretation of the characters @samp{*?[]\} in @var{ptn}.
+@end table
+
+@cindex substring selection, Tcl
+@item string range @var{str} @var{first} @var{last}
+Returns a range of consecutive characters from @var{str}, starting with
+the character whose index is @var{first} and ending with the character
+whose index is @var{last}.  An index of @code{0} refers to the first
+character of the string.  @var{last} may be @code{end} (or any
+abbreviation of it) to refer to the last character of the string.  If
+@var{first} is less than zero then it is treated as if it were zero, and
+if @var{last} is greater than or equal to the length of the string then
+it is treated as if it were @code{end}.  If @var{first} is greater than
+@var{last} then an empty string is returned.
+
+@cindex case conversion, Tcl
+@item string tolower @var{str}
+Returns a value equal to @var{str} except that all upper case letters have
+been converted to lower case.
+
+@item string toupper @var{str}
+Returns a value equal to @var{str} except that all lower case letters have
+been converted to upper case.
+
+@item string trim @var{str} @r{[} @var{chars} @r{]}
+Returns a value equal to @var{str} except that any leading or trailing
+characters from the string @var{chars} are removed.  If @var{chars} is
+not specified then white space is removed (spaces, tabs, newlines, and
+carriage returns).
+
+@item string trimleft @var{str} @r{[} @var{chars} @r{]}
+Returns a value equal to @var{str} except that any leading characters
+from the string @var{chars} are removed.  If @var{chars} is not
+specified then white space is removed (spaces, tabs, newlines, and
+carriage returns).
+
+@item string trimright @var{str} @r{[} @var{chars} @r{]}
+Returns a value equal to @var{str} except that any trailing characters
+from the string @var{chars} are removed.  If @var{chars} is not
+specified then white space is removed (spaces, tabs, newlines, and
+carriage returns).
+@end table
+
+@node switch
+@subsection Choose a case to execute: @code{switch}
+
+@cindex @code{switch} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+switch @r{[} @var{opts} @r{]} @var{str} @var{ptn} @var{body} @r{[} @var{ptn} @var{body} @dots{} @r{]}
+switch @r{[} @var{opts} @r{]} @var{str} @{@var{ptn} @var{body} @r{[} @var{ptn} @var{body} @dots{} @r{]} @}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex case statement, Tcl
+The @code{switch} command matches its @var{str} argument against each of
+the patterns in the @var{ptn} arguments, in the order specified.  As
+soon as it finds a pattern that matches @var{str} it evaluates the
+following @var{body} argument by passing it recursively to the Tcl
+interpreter and returns the result of that evaluation.  If the last
+@var{ptn} argument is @code{default} then it matches anything.  If no
+@var{ptn} argument matches @var{str} and no @code{default} is given,
+then the @code{switch} command returns an empty string.
+
+If the initial arguments to @code{switch} start with @samp{-} then they
+are treated as options.  The following options are currently recognized:
+
+@table @code
+@item -exact
+Use exact matching when comparing @var{str} to a pattern.  This is the
+default.
+
+@item -glob
+When matching @var{str} to the patterns, use glob-style matching (i.e.
+the same as implemented by the @samp{string match} command).
+
+@item -regexp
+When matching @var{str} to the patterns, use regular expression matching
+(i.e. the same as implemented by the @code{regexp} command).
+
+@item --
+Marks the end of @var{opts}.  The argument following this one will be
+treated as @var{str} even if a @samp{-} is its first character.
+@end table
+
+Two syntaxes are provided for the @var{ptn} and @var{body} arguments.
+The first uses a separate argument for each of the patterns and
+commands; this form is convenient if substitutions are desired on some
+of the patterns or commands.  The second form places all of the patterns
+and commands together into a single argument; the argument must have
+proper list structure, with the elements of the list being the patterns
+and commands.  The second form makes it easy to construct multi-line
+@code{switch} commands, since the braces around the whole list make it
+unnecessary to include a backslash at the end of each line.  Since the
+@var{ptn} arguments are in braces in the second form, no command or
+variable substitutions are performed on them; this makes the behavior of
+the second form different than the first form in some cases.
+
+If a @var{body} is specified as @samp{-} it means that the body for the
+next pattern should also be used as the body for this pattern (if the
+next pattern also has a @var{body} of @samp{-} then the body after that
+is used, and so on).  This feature makes it possible to share a single
+body among several patterns.
+
+Below are some examples of @code{switch} commands:
+
+@smallexample
+switch abc a - b @{format 1@} abc @{format 2@} default @{format 3@}
+@end smallexample
+
+@noindent
+will return 2,
+
+@smallexample
+switch -regexp aaab @{
+  ^a.*b$ -
+  b @{format 1@}
+  a* @{format 2@}
+  default @{format 3@}
+@}
+@end smallexample
+
+@noindent
+will return 1, and
+
+@smallexample
+switch xyz @{
+  a
+    -
+  b
+    @{format 1@}
+  a*
+    @{format 2@}
+  default
+    @{format 3@}
+@}
+@end smallexample
+
+@noindent
+will return 3.
+
+@node tell
+@subsection Access position for an open file: @code{tell}
+
+@cindex @code{tell} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+tell @var{fileid}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex file access position, Tcl
+@cindex access position, Tcl file
+Returns a decimal string giving the current access position in
+@var{fileid}.  @var{fileid} must be the return value from a previous
+call to @code{open}, or it may be @code{stdin}, @code{stdout}, or
+@code{stderr} to refer to one of the standard I/O channels.
+
+@node time
+@subsection Measure elapsed time: @code{time}
+
+@cindex @code{time} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+time @var{script} @r{[} @var{n} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex elapsed time, Tcl
+This command will call the Tcl interpreter @var{n} times to evaluate
+@var{script} (or once if @var{n} isn't specified).  It will then return
+a string of the form
+
+@example
+     503 microseconds per iteration
+@end example
+
+@noindent
+which indicates the average amount of time required per iteration, in
+microseconds.  Time is measured in elapsed time, not CPU time.
+
+@node trace
+@subsection Monitor variable use: @code{trace}
+
+@cindex @code{trace} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+trace @var{option} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex variables, tracing in Tcl
+This command causes Tcl commands to be executed whenever certain
+operations are invoked.  At present, only variable tracing is
+implemented. The recognized options (which may be abbreviated) are:
+
+@table @code
+@item trace variable @var{name} @var{ops} @var{cmd}
+Arrange for @var{cmd} to be executed whenever variable @var{name} is
+accessed in one of the ways given by @var{ops}.  @var{name} may refer to
+a normal variable, an element of an array, or to an array as a whole
+(i.e. @var{name} may be just the name of an array, with no parenthesized
+index).  If @var{name} refers to a whole array, then @var{cmd} is
+invoked whenever any element of the array is manipulated.
+
+@var{ops} indicates which operations are of interest, and consists of one or
+more of the following letters:
+
+@table @code
+@item r
+Invoke @var{cmd} whenever the variable is read.
+
+@item w
+Invoke @var{cmd} whenever the variable is written.
+
+@item u
+Invoke @var{cmd} whenever the variable is unset.  Variables can be unset
+explicitly with the @code{unset} command, or implicitly when procedures
+return (all of their local variables are unset).  Variables are also
+unset when interpreters are deleted, but traces will not be invoked then
+because there is no interpreter in which to execute them.
+@end table
+
+When the trace triggers, three arguments are appended to @var{cmd} so
+that the actual command is as follows:
+
+@example
+@var{cmd} @var{name1} @var{name2} @var{op}
+@end example
+
+@var{name1} and @var{name2} give the name(s) for the variable being
+accessed: if the variable is a scalar then @var{name1} gives the
+variable's name and @var{name2} is an empty string; if the variable is
+an array element then @var{name1} gives the name of the array and
+@var{name2} gives the index into the array; if an entire array is being
+deleted and the trace was registered on the overall array, rather than a
+single element, then @var{name1} gives the array name and @var{name2} is
+an empty string.  @var{op} indicates what operation is being performed
+on the variable, and is one of @samp{r}, @samp{w}, or @samp{u} as
+defined above.
+
+@var{cmd} executes in the same context as the code that invoked the
+traced operation: if the variable was accessed as part of a Tcl
+procedure, then @var{cmd} will have access to the same local variables
+as code in the procedure.  This context may be different than the
+context in which the trace was created.  If @var{cmd} invokes a
+procedure (which it normally does) then the procedure will have to use
+@code{upvar} or @code{uplevel} if it wishes to access the traced
+variable.  Note also that @var{name1} may not necessarily be the same as
+the name used to set the trace on the variable; differences can occur if
+the access is made through a variable defined with the @code{upvar}
+command.
+
+For read and write traces, @var{cmd} can modify the variable to affect the
+result of the traced operation.  If @var{cmd} modifies the value of a
+variable during a read or write trace, then the new value will be
+returned as the result of the traced operation.  The return value from
+@var{cmd} is ignored except that if it returns an error of any sort then
+the traced operation also returns an error with the same error message
+returned by the @code{trace} command (this mechanism can be used to implement
+read-only variables, for example).  For write traces, @var{cmd} is invoked
+after the variable's value has been changed; it can write a new value
+into the variable to override the original value specified in the write
+operation.  To implement read-only variables, @var{cmd} will have to
+restore the old value of the variable.
+                                                       
+While @var{cmd} is executing during a read or write trace, traces on the
+variable are temporarily disabled.  This means that reads and writes
+invoked by @var{cmd} will occur directly, without invoking @var{cmd} (or any
+other traces) again.  However, if @var{cmd} unsets the variable then unset
+traces will be invoked.
+
+When an unset trace is invoked, the variable has already been deleted:
+it will appear to be undefined with no traces.  If an unset occurs
+because of a procedure return, then the trace will be invoked in the
+variable context of the procedure being returned to: the stack frame of
+the returning procedure will no longer exist.  Traces are not disabled
+during unset traces, so if an unset @code{trace} command creates a new trace
+and accesses the variable, the trace will be invoked.  Any errors in
+unset traces are ignored.
+
+If there are multiple traces on a variable they are invoked in order of
+creation, most-recent first.  If one trace returns an error, then no
+further traces are invoked for the variable.  If an array element has a
+trace set, and there is also a trace set on the array as a whole, the
+trace on the overall array is invoked before the one on the element.
+
+Once created, the trace remains in effect either until the trace is
+removed with the @samp{trace vdelete} command described below, until the
+variable is unset, or until the interpreter is deleted.  Unsetting an
+element of array will remove any traces on that element, but will not
+remove traces on the overall array.
+
+This command returns an empty string.
+
+@item trace vdelete @var{name} @var{ops} @var{cmd}
+If there is a trace set on variable @var{name} with the operations and
+command given by @var{ops} and @var{cmd}, then the trace is removed, so
+that @var{cmd} will never again be invoked.  Returns an empty string.
+
+@item trace vinfo @var{name}
+Returns a list containing one element for each trace currently set on
+variable @var{name}.  Each element of the list is itself a list
+containing two elements, which are the ops and command associated with
+the trace.  If @var{name} doesn't exist or doesn't have any traces set,
+then the result of the command will be an empty string.
+@end table
+
+@node unknown
+@subsection Handle non-existent commands: @code{unknown}
+
+@cindex @code{unknown} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+unknown @var{cmd} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex tomb of the unknown command, Tcl
+@cindex error, preventing for unknown cmds, Tcl
+@cindex command abbreviations, Tcl
+@cindex abbreviating commands, Tcl
+@cindex expanding abbreviations, Tcl
+This command doesn't actually exist as part of Tcl, but Tcl will invoke
+it if it does exist.  If the Tcl interpreter encounters a command name
+for which there is not a defined command, then Tcl checks for the
+existence of a command named @code{unknown}.  If there is no such
+command, then the interpreter returns an error.  If the @code{unknown}
+command exists, then it is invoked with arguments consisting of the
+fully-substituted name and arguments for the original non-existent
+command.  The @code{unknown} command typically does things like
+searching through library directories for a command procedure with the
+name @var{cmd}, or expanding abbreviated command names to full-length,
+or automatically executing unknown commands as sub-processes.  In some
+cases (such as expanding abbreviations) @code{unknown} will change the
+original command slightly and then (re-)execute it.  The result of the
+@code{unknown} command is used as the result for the original
+non-existent command.
+
+@node unset
+@subsection Delete variables: @code{unset}
+
+@cindex @code{unset} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+unset @var{varname} @r{[} @var{varname} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex removing variables, Tcl
+@cindex erasing variables, Tcl
+@cindex variables, erasing, Tcl
+This command removes one or more variables.  Each @var{varname} is a
+variable name, specified in any of the ways acceptable to the @code{set}
+command.  If a @var{varname} refers to an element of an array then that
+element is removed without affecting the rest of the array.  If a
+@var{varname} consists of an array name with no parenthesized index,
+then the entire array is deleted.  The @code{unset} command returns an
+empty string as result.  An error occurs if any of the variables doesn't
+exist, and any variables after the non-existent one are not deleted.
+
+@node uplevel
+@subsection Execute in another stack frame: @code{uplevel}
+
+@cindex @code{uplevel} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+uplevel @r{[} @var{lev} @r{]}  @var{arg} @r{[} @var{arg} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex stack frame in Tcl, selecting
+@cindex context, changing in Tcl
+All of the @var{arg} arguments are concatenated as if they had been
+passed to @code{concat}; the result is then evaluated in the variable
+context indicated by @var{lev}.  @code{uplevel} returns the result of
+that evaluation.
+
+If @var{lev} is an integer then it gives a distance (up the procedure
+calling stack) to move before executing the command.  If @var{lev}
+consists of @samp{#} followed by a number then the number gives an
+absolute level number.  If @var{lev} is omitted then it defaults to 1.
+@var{lev} cannot be defaulted if the first command argument starts with
+a digit or @samp{#}.
+
+For example, suppose that procedure @code{a} was invoked from top-level,
+and that it called @code{b}, and that @code{b} called @code{c}.  Suppose
+that @code{c} invokes the @code{uplevel} command.  If @var{lev} is
+@code{1} or @code{#2} or omitted, then the command will be executed in
+the variable context of @code{b}.  If @var{lev} is @code{2} or @code{#1}
+then the command will be executed in the variable context of @code{a}.
+If @var{lev} is @code{3} or @code{#0} then the command will be executed
+at top-level (only global variables will be visible).
+
+The @code{uplevel} command causes the invoking procedure to disappear
+from the procedure calling stack while the command is being executed.
+In the above example, suppose @code{c} invokes the command
+
+@example
+uplevel 1 @{set x 43; d@}
+@end example
+
+@noindent
+where @code{d} is another Tcl procedure.  The @code{set} command will
+modify the variable @code{x} in the context of @code{b}, and @code{d}
+will execute at level 3, as if called from @code{b}.  If it in turn
+executes the command
+
+@example
+uplevel @{set x 42@}
+@end example
+
+@noindent
+then the @code{set} command will modify the same variable @code{x} in
+the context of @code{b}: the procedure @code{c} does not appear to be on
+the call stack when @code{d} is executing.  The command @samp{info
+level} may be used to obtain the level of the current procedure.
+
+@code{uplevel} makes it possible to implement new control constructs as
+Tcl procedures (for example, @code{uplevel} could be used to implement
+the @code{while} construct as a Tcl procedure).
+
+@node upvar
+@subsection Link to different stack frame: @code{upvar}
+
+@cindex @code{upvar} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+upvar @r{[} @var{lev} @r{]} @var{other} @var{mine} @r{[} @var{other} @var{mine} @dots{} @r{]}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex variables, linking across Tcl stack
+@cindex linking variables across Tcl stack
+This command arranges for one or more local variables in the current
+procedure to refer to variables in an enclosing procedure call or to
+global variables.  @var{lev} may have any of the forms permitted for the
+@code{uplevel} command, and may be omitted if the first letter of the
+first @var{other} isn't @samp{#} or a digit (it defaults to 1).  For
+each @var{other} argument, @code{upvar} makes the variable by that name
+in the procedure frame given by @var{lev} (or at global level, if
+@var{lev} is #0) accessible in the current procedure by the name given
+in the corresponding @var{mine} argument.  The variable named by
+@var{other} need not exist at the time of the call; it will be created
+the first time @var{mine} is referenced, just like an ordinary variable.
+@code{upvar} may only be invoked from within procedures.  @var{mine} may
+not refer to an element of an array, but @var{other} may refer to an
+array element.  @code{upvar} returns an empty string.
+                                                            
+The @code{upvar} command simplifies the implementation of call-by-name
+procedure calling and also makes it easier to build new control
+constructs as Tcl procedures.  For example, consider the following
+procedure:
+                                                            
+@example
+proc add2 name @{                                       
+    upvar $name x                                      
+    set x [expr $x+2]                                  
+@} 
+@end example                                                     
+
+@code{add2} is invoked with an argument giving the name of a variable,
+and it adds two to the value of that variable.  Although @code{add2}
+could have been implemented using @code{uplevel} instead of
+@code{upvar}, @code{upvar} makes it simpler for @code{add2} to access
+the variable in the caller's procedure frame.
+                                                            
+If an @code{upvar} variable is unset (e.g. @code{x} in @code{add2}
+above), the unset operation affects the variable it is linked to, not
+the @code{upvar} variable.  There is no way to unset an @code{upvar}
+variable except by exiting the procedure in which it is defined.
+However, it is possible to retarget an @code{upvar} variable by
+executing another @code{upvar} command.
+
+@node while
+@subsection Execute script repeatedly: @code{while}
+
+@cindex @code{while} (Tcl command)
+
+@iftex
+@begingroup
+@let@nonarrowing=@comment
+@end iftex
+@example
+while @var{tst} @var{body}
+@end example
+@iftex
+@endgroup
+@end iftex
+
+@cindex looping with @code{while}, Tcl
+The @code{while} command evaluates @var{tst} as an expression
+(@pxref{Tcl Expressions,,Writing expressionf in Tcl}).  The value of the
+expression must a proper Boolean value; if it is a true value then
+@var{body} is executed by passing it to the Tcl interpreter.  Once
+@var{body} has been executed then @var{tst} is evaluated again, and the
+process repeats until eventually @var{tst} evaluates to a false Boolean
+value.  @code{continue} commands may be executed inside @var{body} to
+terminate the current iteration of the loop, and @code{break} commands
+may be executed inside @var{body} to cause immediate termination of the
+@code{while} command.  The @code{while} command always returns an empty
+string.
+
+
+@node Tcl Variables
+@section Variables built into Tcl
+
+@cindex Tcl variables
+@cindex variables, Tcl
+The following global variables are created and managed automatically by
+Tcl.  Except where noted below, these variables should normally be
+treated as read-only by application-specific code and by users.
+
+@ftable @code
+@item env
+@cindex environment variables, from Tcl
+This variable is maintained by Tcl as an array whose elements are the
+environment variables for the process.  Reading an element will return
+the value of the corresponding environment variable.  Setting an element
+of the array will modify the corresponding environment variable or
+create a new one if it doesn't already exist.  Unsetting an element of
+@code{env} will remove the corresponding environment variable.  Changes
+to the @code{env} array will affect the environment passed to children
+by commands like @code{exec}.  If the entire @code{env} array is unset
+then Tcl will stop monitoring @code{env} accesses and will not update
+environment variables.
+
+@item errorCode
+@cindex information about errors, in Tcl
+After an error has occurred, this variable will be set to hold
+additional information about the error in a form that is easy to process
+with programs.  @code{errorCode} consists of a Tcl list with one or more
+elements.  The first element of the list identifies a general class of
+errors, and determines the format of the rest of the list.  The
+following formats for @code{errorCode} are used by the Tcl core;
+individual applications may define additional formats.
+
+@cindex format of @code{errorCode}, Tcl
+@table @code
+@item ARITH @var{code} @var{msg}
+This format is used when an arithmetic error occurs (e.g.  an attempt to
+divide by zero in the @code{expr} command).  @var{code} identifies the
+precise error and @var{msg} provides a human-readable description of the
+error.  @var{code} will be either @code{DIVZERO} (for an attempt to
+divide by zero), @code{DOMAIN} (if an argument is outside the domain of
+a function, such as @samp{acos(-3)}), @code{IOVERFLOW} (for integer
+overflow), @code{OVERLFLOW} (for a floating-point overflow), or
+@code{UNKNOWN} (if the cause of the error cannot be determined).
+
+@item CHILDKILLED @var{pid} @var{signame} @var{msg}
+This format is used when a child process has been killed because of a
+signal.  The second element of @code{errorCode} will be the process
+identifier (in decimal).  The third element will be the symbolic name of
+the signal that caused the process to terminate; it will be one of the
+names from the include file @file{signal.h}, such as @code{SIGPIPE}.
+The fourth element will be a short human-readable message describing the
+signal, such as @samp{write on pipe with no readers} for @code{SIGPIPE}.
+
+@item CHILDSTATUS @var{pid} @var{code}
+This format is used when a child process has exited with a non-zero exit
+status.  The second element of @code{errorCode} will be the process
+identifier (in decimal) and the third element will be the exit code
+returned by the process (also in decimal).
+
+@item CHILDSUSP @var{pid} @var{signame} @var{msg}
+This format is used when a child process has been suspended because of a
+signal.  The second element of @code{errorCode} will be the process
+identifier, in decimal.  The third element will be the symbolic name of
+the signal that caused the process to suspend; this will be one of the
+names from the include file @file{signal.h}, such as @code{SIGTTIN}.
+The fourth element will be a short human-readable message describing the
+signal, such as @samp{background tty read} for @code{SIGTTIN}.
+
+@item NONE
+This format is used for errors where no additional information is
+available for an error besides the message returned with the error.  In
+these cases @code{errorCode} will consist of a list containing a single
+element whose contents are @code{NONE}.
+
+@item POSIX @var{errname} @var{msg}
+If the first element of @code{errorCode} is @code{POSIX}, then the error
+occurred during a @code{POSIX} kernel call.  The second element of the
+list will contain the symbolic name of the error that occurred, such as
+@code{ENOENT}; this will be one of the values defined in the include
+file @file{errno.h}.  The third element of the list will be a
+human-readable message corresponding to @var{errname}, such as @samp{no
+such file or directory} for the @code{ENOENT} case.
+@end table
+
+To set @code{errorCode}, applications may invoke the @code{error}
+command (or an equivalent Tcl library subroutine).  Otherwise the Tcl
+interpreter will reset the variable to @code{NONE} after the next error.
+
+@item errorInfo
+@cindex stack trace on error, Tcl
+After an error has occurred, this string will contain one or more lines
+identifying the Tcl commands and procedures that were being executed
+when the most recent error occurred.  Its contents take the form of a
+stack trace showing the various nested Tcl commands that had been
+invoked at the time of the error.
+
+@item tcl_precision
+If this variable is set, it must contain a decimal number giving the
+number of significant digits to include when converting floating-point
+values to strings.  If this variable is not set then 6 digits are
+included.  17 digits is ``perfect'' for @sc{ieee} floating-point in that
+it allows double-precision values to be converted to strings and back to
+binary with no loss of precision.
+@end ftable
+
+@node Tcl Library
+@section Tcl standard library
+
+@cindex application libraries, Tcl
+@cindex @code{@var{app}_library}
+@cindex library of Tcl procedures
+Tcl includes a library of Tcl procedures for commonly-needed functions.
+The procedures defined in the Tcl library are generic ones suitable for
+use by many different applications.  The location of the Tcl library is
+returned by the @samp{info library} command.  In addition to the Tcl
+library, each application will normally have its own library of support
+procedures as well; the location of this library is normally given by
+the value of the @code{@var{app}_library} global variable, where
+@var{app} is the name of the application.  For example, the location of
+the Tk library is kept in the variable @code{tk_library}.
+
+@cindex initializing Tcl library procedures
+@cindex @file{init.tcl} file
+@cindex access to Tcl library
+To access the procedures in the Tcl library, an application should run
+the file @file{init.tcl} in the library, for example with the Tcl
+command
+
+@example
+source [info library]/init.tcl
+@end example
+
+This will define the @code{unknown} procedure and arrange for the other
+procedures to be loaded on demand using the auto-load mechanism defined
+below.
+
+@menu
+* Tcl Lib Procedures::
+* Tcl Lib Variables::
+@end menu
+
+@node Tcl Lib Procedures
+@subsection Procedures
+
+@cindex procedures in Tcl library
+@noindent
+The following procedures are provided in the Tcl library:
+
+@ftable @code
+@item auto_execok @var{cmd}
+@cindex executable, cached search for, Tcl
+@cindex @code{PATH} env var, and Tcl libs
+Determines whether there is an executable file by the name @var{cmd}.
+This command examines the directories in the current search path (given
+by the @code{PATH} environment variable) to see if there is an
+executable file named @var{cmd} in any of those directories.  If so, it
+returns @code{1}; if not it returns @code{0}.  @code{auto_execok}
+remembers information about previous searches in an array named
+@code{auto_execs}; this avoids the path search in future calls for the
+same @var{cmd}.  The command @code{auto_reset} may be used to force
+@code{auto_execok} to forget its cached information.
+
+@item auto_load @var{cmd}
+@cindex @code{auto_path} Tcl variable
+@cindex loading Tcl command defs automatically
+@cindex @file{tclIndex} file
+This command attempts to load the definition for a Tcl command named
+@var{cmd}.  To do this, it searches an autoload path, which is a list of
+one or more directories.  The auto-load path is given by the global
+variable @code{auto_path} if it exists.  If there is no @code{auto_path}
+variable, then the @code{TCLLIBPATH} environment variable is used, if it
+exists.  Otherwise the auto-load path consists of just the Tcl library
+directory.  Within each directory in the auto-load path there must be a
+file @file{tclIndex} that describes one or more commands defined in that
+directory and a script to evaluate to load each of the commands.  The
+@file{tclIndex} file should be generated with the @code{auto_mkindex}
+command.  If @var{cmd} is found in an index file, then the appropriate
+script is evaluated to create the command.  The @code{auto_load} command
+returns @code{1} if @var{cmd} was successfully created.  The command
+returns @code{0} if there was no index entry for @var{cmd} or if the
+script didn't actually define @var{cmd} (e.g. because index information
+is out of date).  If an error occurs while processing the script, then
+that error is returned.  @code{auto_load} only reads the index
+information once and saves it in the array @code{auto_index}; future
+calls to @code{auto_load} check for @var{cmd} in the array rather than
+rereading the index files.  The cached index information may be deleted
+with the command @code{auto_reset}.  This will force the next
+@code{auto_load} command to reload the index database from disk.
+
+@item auto_mkindex @var{dir} @var{ptn} @r{[} @var{ptn} @dots{} @r{]}
+Generates an index suitable for use by @code{auto_load}.  The command
+searches @var{dir} for all files whose names match any of the @var{ptn}
+arguments (matching is done with the @code{glob} command), generates an
+index of all the Tcl command procedures defined in all the matching
+files, and stores the index information in a file named @file{tclIndex}
+in @var{dir}.  For example, the command
+
+@example
+auto_mkindex foo *.tcl
+@end example
+
+@noindent
+will read all the @samp{.tcl} files in subdirectory @file{foo} and
+generate a new index file @file{foo/tclIndex}.
+
+@cindex spaces before @code{proc}, avoid
+@code{auto_mkindex} parses the Tcl scripts in a relatively
+unsophisticated way: if any line contains the word @code{proc} as its
+first characters then it is assumed to be a procedure definition and the
+next word of the line is taken as the procedure's name.  Procedure
+definitions that don't appear in this way (e.g. they have spaces before
+the @code{proc}) will not be indexed.
+
+@item auto_reset
+Destroys all the information cached by @code{auto_execok} and
+@code{auto_load}.  This information will be re-read from disk the next
+time it is needed.  @code{auto_reset} also deletes any procedures listed
+in the auto-load index, so that fresh copies of them will be loaded the
+next time that they're used.
+
+@item parray @var{arrayname}
+Prints on standard output the names and values of all the elements in
+the array @var{arrayname}.  @var{arrayname} must be an array accessible
+to the caller of @code{parray}.  It may be either local or global.
+
+@item unknown @var{cmd} @r{[} @var{arg} @dots{} @r{]}
+This procedure is invoked automatically by the Tcl interpreter whenever
+the name of a command doesn't exist.  The unknown procedure receives as
+its arguments the name and arguments of the missing command.  Unknown
+first calls @code{auto_load} to load the command.  If this succeeds,
+then it executes the original command with its original arguments.  If
+the auto-load fails then unknown calls @code{auto_execok} to see if
+there is an executable file by the name @var{cmd}.  If so, it invokes
+the Tcl @code{exec} command with @var{cmd} and all the instances of
+@var{arg} as arguments.  If @var{cmd} can't be auto-executed,
+@code{unknown} checks to see if the command was invoked at top-level and
+outside of any script.  If so, then @code{unknown} takes takes two
+additional steps.  First, it sees if @var{cmd} has one of the following
+three forms: @samp{!!}, @samp{!@var{event}}, or
+@samp{^@var{old}^@var{new}@r{[}^@r{]}}.  If so, then @code{unknown}
+carries out history substitution in the same way that @code{csh} would
+for these constructs.  Second, and last, @code{unknown} checks to see if
+@var{cmd} is a unique abbreviation for an existing Tcl command.  If so,
+it expands the command name and executes the command with the original
+arguments.  If none of the above efforts is able to execute the command,
+@code{unknown} generates an error return.  If the global variable
+@code{auto_noload} is defined, then the auto-load step is skipped.  If
+the global variable @code{auto_noexec} is defined then the auto-exec
+step is skipped.  Under normal circumstances the return value from
+@code{unknown} is the return value from the command that was eventually
+executed.
+@end ftable
+
+@node Tcl Lib Variables
+@subsection Variables
+
+@cindex variables in Tcl library
+@noindent
+The following global variables are defined or used by the procedures in
+the Tcl library:
+
+@ftable @code
+@item auto_execs
+Used by @code{auto_execok} to record information about whether
+particular commands exist as executable files.
+
+@item auto_index
+Used by @code{auto_load} to save the index information read from disk.
+
+@item auto_noexec
+If set to any value, then @code{unknown} will not attempt to auto-exec
+any commands.
+
+@item auto_noload
+If set to any value, then @code{unknown} will not attempt to auto-load
+any commands.
+
+@item auto_path
+If set, then it must contain a valid Tcl list giving directories to
+search during auto-load operations.
+
+@item env(TCL_LIBRARY)
+@cindex @code{TCL_LIBRARY} environment var
+If set, then it specifies the location of the directory containing
+library scripts (the value of this variable will be returned by the
+command info library).  If this variable isn't set then a default value
+is used.
+
+@item env(TCLLIBPATH)
+@cindex @code{TCLLIBPATH} environment var
+If set, then it must contain a valid Tcl list giving directories to
+search during auto-load operations.  This variable is only used if
+@code{auto_path} is not defined.
+
+@item unknown_active
+This variable is set by @code{unknown} to indicate that it is active.
+It is used to detect errors where @code{unknown} recurses on itself
+infinitely.  The variable is unset before @code{unknown} returns.
+@end ftable
+

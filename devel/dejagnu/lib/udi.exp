@@ -1,0 +1,229 @@
+#   Copyright (C) 1988, 1990, 1991, 1992 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-dejagnu@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+
+# these just need to be initialized
+set shell_id   	0
+
+#
+# set target variables only if needed.
+#
+global  targetname
+global connectmode
+global env
+
+if ![info exists targetname] then {
+    if [info exists env(TARGETNAME)] then {
+	set targetname $env(TARGETNAME)
+    } else {
+	puts stderr "ERROR: Need a target name for the udi target."
+	puts stderr "       Use the --name option\n"
+	exit 1
+    }
+}
+
+# the default connect program to use
+if ![info exists connectmode] then {
+    set connectmode	"mondfe"
+    warning "Using default of $connectmode for target communication."
+    if {[which mondfe] == 0} then {
+	perror "\"mondfe\" does not exist. Check your path."
+	exit 1
+    }
+}
+
+
+
+#
+# mondfe -- connect to udi using mondfe
+#
+proc mondfe { hostname } {
+    global verbose
+    global connectmode
+    global shell_prompt
+    global spawn_id
+    global shell_id
+    global spawn_id
+
+    set retries 0
+    set result  -1
+    spawn mondfe -D -TIP $hostname
+    set shell_id $spawn_id
+
+    expect {
+	"$shell_prompt"	{ 
+	    verbose "Got prompt"
+	    set result 0
+	}
+	"*server bind*failed: Address already in use*" {
+	    warning "Socket file already exists."
+	    incr retries
+	    if $retries<=2 then {
+		continue -expect
+	    }
+	}
+	timeout			{ 
+	    warning "Timed out trying to connect."
+	    set result -1
+	    incr retries
+	    if $retries<=2 then {
+		continue -expect
+	    }
+	}
+    }
+
+    if $result<0 then {
+	perror "Couldn't connect after $retries retries.\n"
+	return -1
+    } else {
+	return $spawn_id
+    }
+}
+
+#
+# mondfe_download -- downloads using the y (yank) command in mondfe.
+#                 arg - is a full path name to the file to download
+#                 returns 1 if an error occured, 0 otherwise
+#
+proc mondfe_download { arg } {
+    global verbose
+    global shell_id
+    global decimal
+    global shell_prompt
+    global expect_out
+    global connectmode
+
+    set result 1
+    if ![file exists $arg] then {
+	perror "$arg doesn't exist."
+	return 1
+    }
+
+    verbose "Downloading $arg..."
+    send -i $shell_id "y $arg\n"
+    expect {
+	-i $shell_id "y $arg*loading $arg*" {
+	    continue -expect
+	}
+	-i $shell_id "Loading*TEXT section from*\r" {
+	    verbose "."
+	    continue -expect
+	}
+	-i $shell_id "Loaded*TEXT section from*\n" {
+	    verbose "\nLoaded TEXT section"
+	    continue -expect
+	}
+	-i $shell_id "Loading*LIT section from*\r" {
+	    verbose "."
+	    continue -expect
+	}
+	-i $shell_id "Loaded*LIT section from*\n" {
+	    verbose "\nLoaded LIT section"
+	    continue -expect
+	}
+	-i $shell_id "Loading*DATA section from*\r" {
+	    verbose "."
+	    continue -expect
+	}
+	-i $shell_id "Loaded*DATA section from*\n" {
+	    verbose "\nLoaded DATA section"
+	    continue -expect
+	}
+	-i $shell_id -re "DFEWARNING: $decimal : EMMAGIC:  Bad COFF file magic number.*Command failed.*$shell_prompt$" {
+	    warning "Bad COFF file magic number"
+	    set result -1
+	}
+        -i $shell_id -re ".*Ignoring COMMENT section \($decimal bytes\).*$shell_prompt$" {
+            verbose "Ignoring COMMENT section"
+            verbose "Downloaded $arg successfully"
+            set result 0
+        }
+
+	-i $shell_id -re ".*Cleared.*BSS section from.*$shell_prompt$" {
+	    verbose "Cleared BSS section"
+	    verbose "Downloaded $arg successfully"
+	    set result 0
+	}
+	-i $shell_id timeout {
+	    perror "Timed out trying to download $arg."
+	    set result 1
+	}
+    }
+
+# FIXME: the following kepts the download from working
+#	"Could not read COFF section" {
+#	    perror "Couldn't read COFF section."
+#	    set result 1
+#	}
+    set timeout 10
+    if [info exists expect_out(buffer)] then {
+	send_log $expect_out(buffer)
+    }
+    return $result
+}
+
+#
+# exit_mondfe -- exit the remote shell
+#
+proc exit_mondfe {  } {
+    global verbose
+    global connectmode
+    global targetname
+    global shell_prompt
+    global shell_id
+
+    send -i $shell_id "q\n"
+    expect { 
+	-i $shell_id "Goodbye." {
+	    verbose "Exited mondfe $shell_id"
+	}
+	timeout {
+	    warning "$connectmode didn't exit cleanly"
+	}
+    }
+
+    catch "close -i $shell_id"
+    set shell_id 0
+    return 0
+}
+
+#
+# exit_montip -- exit the remote shell
+#
+proc exit_montip { } {
+    global verbose
+    global connectmode
+    global targetname
+    global shell_prompt
+    global shell_id
+
+    verbose "exiting mondtip $shell_id"
+
+    catch "close -i $shell_id"
+    set shell_id 0
+    return 0
+}
+
+
+
+
+
+
+

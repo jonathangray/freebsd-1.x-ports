@@ -1,0 +1,675 @@
+# Copyright (C) 1988, 1990, 1991, 1992, 1993 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+
+# Please email any bugs, comments, and/or additions to this file to:
+# bug-dejagnu@prep.ai.mit.edu
+
+# This file was written by Rob Savoye. (rob@cygnus.com)
+#
+
+proc mail_file { file to subject } {
+    if [file readable $file] then {
+	catch "exec mail -s \"$subject\" $to < $file"
+    }
+}
+
+#
+# open_logs -- open the output logs
+#
+proc open_logs { } {
+    global outdir
+    global tool
+    global sum_file
+    
+    catch "exec rm -f $outdir/$tool.sum"
+    set sum_file [open "$outdir/$tool.sum" w]
+    catch "exec rm -f $outdir/$tool.log"
+    log_file -a "$outdir/$tool.log"
+    verbose "Opening log files in $outdir"
+}
+
+
+#
+# close_logs -- close the output logs
+#
+proc close_logs { } {
+    global sum_file
+    
+    catch "close $sum_file"
+}
+
+#
+# ishost -- check  host triplet for pattern. With no arguments
+#             it returns the triplet string.
+#
+proc ishost { args } {
+    global host_triplet
+    
+    if [string match "" $args] then {
+	return $host_triplet
+    }
+    verbose "Checking pattern \"$args\" with $host_triplet"
+    
+    if [string match "$args" $host_triplet] then {
+	return 1
+    } else {
+	return 0
+    }
+}
+
+#
+# istarget -- check target triplet for pattern. With no arguments
+#             it returns the triplet string.
+#             returns 1 if the target looked for, or
+#                     0 if not.
+#
+proc istarget { args } {
+    global target_triplet
+    
+    # if no arg, return the config string
+    if [string match "" $args] then {
+	if [info exists target_triplet] then {
+	    return $target_triplet
+	} else {
+	    perror "No target configuration names found."
+	}
+    }
+
+    # now check against the cannonical name
+    if [info exists target_triplet] then {
+	verbose "Checking \"$args\" against \"$target_triplet\"" 2
+	if [string match "$args" $target_triplet] then {
+	    return 1
+	}
+    }
+
+    # nope, no match
+    return 0
+}
+
+#
+# isnative --	check to see if we're running the tests in a native
+#		environment.
+#		returns 1 if it is running native
+#			0 if on a target.
+#
+proc isnative { } {
+    global target_triplet
+    global host_triplet
+    
+    if [string match $host_triplet $target_triplet] then {
+	return 1
+    }
+    return 0
+}
+
+#
+# unknown -- called by expect if a proc is called that doesn't exist
+#
+proc unknown { args } {
+    global errorCode
+    global errorInfo
+    global exit_status
+    
+    clone_output "ERROR: (DejaGnu) proc \"$args\" does not exist"
+    if [info exists errorCode] then {
+        send_error "The error code is $errorCode\n"
+    }
+    if [info exists errorInfo] then {
+        send_error "The info on the error is: \n$errorInfo\n"
+    }
+    log_summary
+    close_logs
+    cleanup
+    exit $exit_status
+}
+
+#
+# clone_output -- print output to stdout and to log file
+#                 if the --all_flag (-a) option was used then all
+#                 messages go the the screen. Without this, all messages
+#                 that start with a keyword are written only to the detail
+#                 log file. All messages that go to the screen will also
+#                 appear in the detail log. This should only be used by
+#                 the framework itself using pass, fail, xfail, xpass,
+#                 warning, untested, unresolved, unsupported, or error
+#                 procedures.
+#
+proc clone_output { message } {
+    global sum_file
+    global all_flag
+    
+    case [lindex $message 0] in {
+	{"PASS:" "XFAIL:" "UNRESOLVED:" "UNSUPPORTED:" "UNTESTED:"}  {
+	    if $all_flag then {
+		send_user  "$message\n"
+	    } else {
+		send_log "$message\n"
+	    }
+	}
+	{"ERROR:" "WARNING:"} {
+	    send_error "$message\n"
+	}
+	default  {
+	    send_user  "$message\n"
+	}
+    }
+    puts $sum_file "$message"
+}
+
+#
+# reset_vars
+#	reset all globally used variables
+#
+proc reset_vars {} {
+    # test result counters
+    global failcnt
+    global passcnt
+    global testcnt
+    global xfailcnt
+    global xpasscnt
+    global untestedcnt
+    global unresolvedcnt
+    global unsupportedcnt
+    
+    # prms id number and test name variables
+    global prms_id
+    global test_name
+    
+    # reset all counters, prms_id and test_name 
+    set prms_id	0
+    set test_name	""
+    
+    set failcnt	0
+    set passcnt	0
+    set testcnt	0
+    set xfailcnt	0
+    set xpasscnt	0
+    set untestedcnt	0
+    set unresolvedcnt	0
+    set unsupportedcnt	0
+}
+
+#
+# log_summary -- print summary of all pass/fail counts. Calling this exits.
+#
+proc log_summary {} {
+    global tool
+    global sum_file
+    global exit_status
+    global failcnt
+    global passcnt
+    global testcnt
+    global xfailcnt
+    global xpasscnt
+    global untestedcnt
+    global unresolvedcnt
+    global unsupportedcnt
+    global mail_logs
+    global outdir
+    global tool.sum
+    global mailing_list
+    
+    if ![info exists totlcnt] then {
+	# total all the testcases reported
+	set totlcnt [expr $failcnt+$passcnt+$xfailcnt+$xpasscnt]
+	set totlcnt [expr $totlcnt+$untestedcnt+$unresolvedcnt+$unsupportedcnt]
+    }
+    
+    clone_output "\n\t\t=== $tool Summary ===\n"
+    
+    # compare reported number of testcases with expected number
+    if { $testcnt > 0 } then {
+	if { $testcnt>$totlcnt || $testcnt<$totlcnt } then {
+	    if { $testcnt > $totlcnt } then {
+		set mismatch "unreported  [expr $testcnt-$totlcnt]"
+	    }
+	    if { $testcnt < $totlcnt } then {
+		set mismatch "misreported [expr $totlcnt-$testcnt]"
+	    }
+	} else {
+	    verbose "# of testcases run         $testcnt"
+	}
+    }
+    if [info exists mismatch] then {
+	clone_output "### ERROR: totals do not equal number of testcases run"
+	clone_output "### ERROR: # of testcases expected    $testcnt"
+	clone_output "### ERROR: # of testcases reported    $totlcnt"
+	clone_output "### ERROR: # of testcases $mismatch\n"
+    }
+    if { $passcnt > 0 } then {
+	clone_output "# of expected passes       $passcnt"
+    }
+    if { $xfailcnt > 0 } then {
+	clone_output "# of expected failures     $xfailcnt"
+    }
+    if { $xpasscnt > 0 } then {
+	clone_output "# of unexpected successes  $xpasscnt"
+    }
+    if { $failcnt > 0 } then {
+	clone_output "# of unexpected failures   $failcnt"
+    }
+    if { $unresolvedcnt > 0 } then {
+	clone_output "# of unresolved testcases  $unresolvedcnt"
+    }
+    if { $untestedcnt > 0 } then {
+	clone_output "# of untested testcases    $untestedcnt"
+    }
+    if { $unsupportedcnt > 0 } then {
+	clone_output "# of unsupported tests     $unsupportedcnt"
+    }
+    # extract version number
+    if {[info procs ${tool}_version] != ""} then {
+	if {[catch "${tool}_version" output]} {
+	    warning "${tool}_version failed:\n$output"
+	}
+    }
+    close_logs
+    cleanup
+    if $mail_logs then {
+	mail_file $outdir/$tool.sum $mailing_list "Dejagnu Summary Log"
+    }
+    exit $exit_status
+}
+
+#
+# cleanup -- close all open files,
+#	     remove temp file and core files, and set exit status
+#
+proc cleanup {} {
+    global sum_file
+    global exit_status
+    global done_list
+    global base_dir
+    global subdir
+    
+    #catch "exec rm -f [glob xgdb core *.x *.o *_soc a.out]"
+    #catch "exec rm -f [glob -nocomplain $subdir/*.o $subdir/*.x $subdir/*_soc]"
+}
+
+#
+# pass -- prints the default test passed message
+#
+proc pass { arg } {
+    global passcnt
+    global prms_id
+    global bug_id
+    global xfail_flag
+    global xfail_prms
+    global errcnt
+    global warncnt
+    
+    if $xfail_flag then {
+	if $xfail_prms!=0 {
+	    set prms_id $xfail_prms
+	}
+	xpass $arg
+	set xfail_flag 0
+	if $xfail_prms!=0 {
+	    set prms_id 0
+	    set xfail_prms 0
+	}
+	return
+    }
+
+    incr passcnt
+    
+    set format "PASS:\t$arg"
+
+    # if we have too many warnings or errors, the output of the test can't be considered correct
+    if $warncnt>3 then {
+	unresolved $format
+	set warncnt 0
+	set errcnt  0
+	return
+    }
+    if $errcnt>1 then {
+	unresolved $format
+	set errcnt 0
+	set warncnt 0
+	return
+    }
+    
+    # reset these so they're ready for the next test case
+    set warncnt 0
+    set errcnt 0
+
+    if $prms_id then {
+	set format [concat $format "\t(PRMS $prms_id)"]
+    }
+    if $bug_id then {
+	set format [concat $format "\t(BUG $bug_id)"]
+    }
+    
+    clone_output "$format"
+}
+
+#
+# xpass -- print the the default test passed unlike expected message
+#
+proc xpass { arg } {
+    global xpasscnt
+    global prms_id
+    global bug_id
+    
+    incr xpasscnt
+
+    set exit_status 1
+    
+    set format "XPASS:\t$arg"
+    if $prms_id then {
+	set format [concat $format "\t(PRMS $prms_id)"]
+    }
+    if $bug_id then {
+	set format [concat $format "\t(BUG $bug_id)"]
+    }
+    
+    clone_output "$format"
+}
+
+#
+# xfail -- print the the default test failed like expected message
+#
+proc xfail { arg } {
+    global xfailcnt
+    global prms_id
+    global bug_id
+    
+    incr xfailcnt
+
+    set exit_status 1
+    
+    set format "XFAIL:\t$arg"
+    if $prms_id then {
+	set format [concat $format "\t(PRMS $prms_id)"]
+    }
+    if $bug_id then {
+	
+	set format [concat $format "\t(BUG $bug_id)"]
+    }
+    
+    clone_output "$format"
+}
+
+#
+# setup_xfail -- setup a flag to control whether a failure
+#                is expected or not.`
+#
+# Multiple target triplet patterns can be specified for targets
+# for which the test fails.  A decimal number can be specified,
+# which is the PRMS number.
+#
+proc setup_xfail { args } {
+    global xfail_flag
+    global xfail_prms
+    global decimal
+    
+    set argc [ llength $args ]
+    for { set i 0 } { $i < $argc } { incr i } {
+	set sub_arg [ lindex $args $i ]
+	# is a prms number. we assume this is a number with no characters
+	if [regexp "^\[0-9\]+$" $sub_arg] then { 
+	    set xfail_prms $sub_arg
+	    continue
+	}
+	if [istarget $sub_arg] then {
+	    set xfail_flag 1
+	    continue
+	}
+    }
+}
+
+#
+# clear_xfail -- clear the xfail flag for a particular target.
+#
+proc clear_xfail { args } {
+    global xfail_flag
+    global xfail_prms
+    global decimal
+    
+    set argc [ llength $args ]
+    for { set i 0 } { $i < $argc } { incr i } {
+	set sub_arg [ lindex $args $i ]
+	case $sub_arg in {
+	    "*-*-*" {			# is a configuration triplet
+		if [istarget $sub_arg] then {
+		    set xfail_flag 0
+		    set xfail_prms 0
+		}
+		continue
+	    }
+	}
+    }
+}
+
+#
+# fail -- prints the default test failed message
+#
+proc fail { arg } {
+    global failcnt
+    global prms_id
+    global bug_id
+    global exit_status
+    global xfail_flag
+    global xfail_prms
+    global errcnt
+    global warncnt
+
+    if $xfail_flag then {
+	if $xfail_prms!=0 {
+	    set prms_id $xfail_prms
+	}
+	xfail $arg
+	set xfail_flag 0
+	if $xfail_prms!=0 {
+	    set prms_id 0
+	    set xfail_prms 0
+	}
+	return
+    }
+    
+    incr failcnt
+
+    set exit_status 1
+
+    set format "FAIL:\t$arg"
+
+    # if we have too many warnings or errors, the output of the test can't be considered correct
+    if $warncnt>3 then {
+	unresolved $format
+	set warncnt 0
+	set errcnt  0
+	return
+    }
+    if $errcnt>1 then {
+	unresolved $format
+	set errcnt  0
+	set warncnt 0
+	return
+    }
+    
+    # reset these so they're ready for the next test case
+    set warncnt 0
+    set errcnt 0
+
+    if $prms_id then {
+	set format [concat $format "\t(PRMS $prms_id)"]
+    }
+    if $bug_id then {
+	set format [concat $format "\t(BUG $bug_id)"]
+    }
+
+    clone_output "$format"
+}
+
+#
+# warning -- prints a warning messages. These are warnings from the framework,
+#            not from the tools being tested.
+#
+proc warning { message } {
+    global verbose
+    global warncnt
+    
+    incr warncnt
+    clone_output "WARNING: $message"
+    if [info exists errorInfo] then {
+	unset errorInfo
+    }
+}
+
+#
+# perror -- prints a error messages. These are errors from the framework,
+#          not from the tools being tested.
+#
+proc perror { message } {
+    global verbose
+    global errcnt
+    
+    incr errcnt
+    clone_output "ERROR: $message"
+    if [info exists errorInfo] then {
+	unset errorInfo
+    }
+}
+
+#
+# untested -- For some reason this test case is untested.
+#
+proc untested { arg } {
+    global untestedcnt
+    global prms_id
+    global bug_id
+    global exit_status
+    global xfail_flag
+    global xfail_prms
+    
+    if $xfail_flag then {
+        if $xfail_prms!=0 {
+	    set prms_id $xfail_prms
+	}
+        xfail $arg
+        set xfail_flag 0
+        if $xfail_prms!=0 {
+	    set prms_id 0
+	    set xfail_prms 0
+	}
+        return
+    }
+    
+    incr untestedcnt
+
+    set exit_status 1
+    
+    set format "UNTESTED:\t$arg"
+    if $prms_id then {
+        set format [concat $format "\t(PRMS $prms_id)"]
+    }
+    if $bug_id then {
+        set format [concat $format "\t(BUG $bug_id)"]
+    }
+    
+    clone_output "$format"
+}
+
+#
+# unresolved -- The test vcase has an unresolved outcome.
+#
+proc unresolved { arg } {
+    global unresolvedcnt
+    global prms_id
+    global bug_id
+    global exit_status
+    global xfail_flag
+    global xfail_prms
+    
+    if $xfail_flag then {
+        if $xfail_prms!=0 {
+	    set prms_id $xfail_prms
+	}
+        xfail $arg
+        set xfail_flag 0
+        if $xfail_prms!=0 {
+	    set prms_id 0
+	    set xfail_prms 0
+	}
+        return
+    }
+    
+    incr unresolvedcnt
+
+    set exit_status 1
+    
+    set format "UNRESOLVED:\t$arg"
+    if $prms_id then {
+        set format [concat $format "\t(PRMS $prms_id)"]
+    }
+    if $bug_id then {
+        set format [concat $format "\t(BUG $bug_id)"]
+    }
+    
+    clone_output "$format"
+}
+
+#
+# unsupported -- The test case is unsupported. Usually this is used for a test
+#                that is missing OS support.
+#
+proc unsupported { arg } {
+    global unsupportedcnt
+    global prms_id
+    global bug_id
+    global exit_status
+    global xfail_flag
+    global xfail_prms
+ 
+    if $xfail_flag then {
+        if $xfail_prms!=0 {
+	    set prms_id $xfail_prms
+	}
+        xfail $arg
+        set xfail_flag 0
+        if $xfail_prms!=0 {
+	    set prms_id 0
+	    set xfail_prms 0
+	}
+        return
+    }
+    
+    incr unsupportedcnt
+
+    set exit_status 1
+    
+    set format "UNSUPPORTED:\t$arg"
+    if $prms_id then {
+        set format [concat $format "\t(PRMS $prms_id)"]
+    }
+    if $bug_id then {
+        set format [concat $format "\t(BUG $bug_id)"]
+    }
+    
+    clone_output "$format"
+}
+
+#
+# exp_continue -- create this if it doesn't exist. For compatablity
+#                 with old versions.
+#
+global argv0
+if ![info exists argv0] then {
+    proc exp_continue { } {
+	continue -expect
+    }
+}

@@ -1,0 +1,495 @@
+#!/bin/sh
+
+#
+# test-target -- tests a Cygnus tool chain. Run this in the top level directory
+# of the object tree. See below for command line options. This will use fresh copies
+# the tools if they exist, a "make clean" is recommended. Set your path so the tools
+# you want to test are first. Do a "which" to be safe.
+#
+
+#
+# written by <rob@cygnus.com>
+#
+
+#
+# Since this can be executed as a child shell, we need to get the
+# real path as to where we're at.
+#
+PWD=`pwd`
+
+#
+# make the log dir if it doesn't exist
+#
+outdir=$PWD/logs
+if [ ! -d $PWD/logs ] ; then
+  mkdir $outdir
+fi
+
+#
+# initialize a few variables
+#
+defaultflags="--outdir $outdir"
+make="make"
+makeflags="-i"
+verbose=true
+process=
+tmpfiles=
+cur=
+prev=
+
+#
+# parse the command line
+#
+for a in "$@" ; do
+    case $a in        
+        -x)       set -x ; shift ;;
+	-v)	  verbose= ;;
+	-p)	  process=true ;;
+	-t)	  tmpfiles=true ;;
+        -h)       echo "USAGE: configure-target -[t name] -[xlh]"
+		  echo "     -x        = turn on shell debugging" ;
+		  echo "     -v        = turn OFF verbose !" ;
+		  echo "     -p        = Only process the logs" ;
+		  echo "     -t        = Save all tmp files" ;
+		  echo "     -h        = display help" ;
+		  exit ;;
+    esac
+done
+
+#
+# setup a few environment variables
+#
+if [ x"$CC" = x ] ; then
+    CC=gcc ; export CC
+fi
+
+#
+# time to actually test
+#
+time=
+if [ -f /bin/time ] ; then 
+  time=/bin/time
+fi
+
+if [ x"$process" = x ] ; then
+  test -n "$verbose" && echo "Invoking make check with $makeflags RUNTESTFLAGS=$defaultflags"
+  $time $make CC=$CC check $makeflags RUNTESTFLAGS="$defaultflags" 2>&1 | tee conf.log
+else
+  test -n "$verbose" && echo "Not running tests, just processing results"
+fi
+
+#
+# process each summary file. Many thanks to Mike Stump <mrs@cygnus.com>
+# whom I stole the majority of text processing steps from.
+# (from dejagnu/test-tool)
+#
+for i in `ls $outdir/*.sum` ; do
+	# setup the file names
+  tool=`echo $i | sed -e 's/\.sum.*//' -e 's/^.*\///`
+  stamp=`date '+%y%m%d-%H%M'`
+  cur=${i}-${stamp}
+  results=$outdir/${tool}-results-${stamp}
+  mailmsg=$outdir/$tool-mail-${stamp}
+  test -n "$verbose" && echo "Current file is $cur"
+  test -n "$verbose" && echo "Results in $results"
+
+#
+# get the previous run
+#
+  test -n "$verbose" && echo "Looking for previous run for \"$tool\""
+  prev=`ls $i-??????-???? 2> /dev/null| head -1`
+  if [ x"$prev" = x ] ; then
+    test -n "$verbose" && echo "Need a previous test run to compare against"
+  else
+    test -n "$verbose" && echo "Using $prev as the previous test run"
+  fi
+
+#
+# Change X states to their regular state
+#
+  rm -f $cur
+  sed -e 's/^XFAIL/FAIL/' -e 's/^XPASS/PASS/' $i > $cur
+
+#
+# sort the test run
+#
+  test -n "$verbose" && echo "Sorting files"
+  rm -f $outdir/*-sorted
+  if [ x"$prev" = x ] ; then
+    prev=$cur
+  fi
+  sort +0.4 $prev > ${prev}-sorted	
+  sort +0.4 $cur > ${cur}-sorted
+
+#
+# get the config info so we can add it to the results
+#
+  native=`grep "^Native configuration is " $i`
+  host=`grep "^Host   is " $i`
+  target=`grep "Target is " $i`
+  if [ x"$native" != x ] ; then
+    host=`echo $native | sed 's/Native configuration is //'`
+    target=`echo $native | sed 's/Native configuration is //'`
+  else
+    host=`echo $host | sed 's/Host *is //'`
+    target=`echo $target | sed 's/Target is //'`
+  fi
+
+	# set the header for the results file
+  test -n "$verbose" && echo "Getting test header..."
+  echo > $results
+  grep "^Test Run By" $i | sed 's/^/	/' >> $results
+  grep ' version.*[0-9.-]*' $i | sed 's/^/	/' >> $results
+  echo "	Host is $host" >> $results
+  echo "	Target is $target" >> $results
+  echo >> $results
+  test -n "$verbose" && cat $results
+
+#
+# for a sanity check, grab the totals too
+#
+  rm -f $outdir/.tmp
+  grep '^# of ' $i > $outdir/.tmp
+  if [ -s $outdir/.tmp ] ; then
+    test -n "$verbose" && echo "Test totals:"
+    test -n "$verbose" && echo
+    test -n "$verbose" && sed 's/^/	/' $outdir/.tmp
+    test -n "$verbose" && echo
+    echo "Test totals:" >> $results
+    echo >> $results
+    sed 's/^/	/' $outdir/.tmp >> $results
+    echo >> $results
+  else
+    test -n "$verbose" && echo "NOTE: no tests were run for $tool"
+    test -n "$verbose" && echo
+    echo "NOTE: no tests were run for $tool" >> $results
+    echo >> $results
+  fi
+  rm -f $outdir/.tmp
+
+#
+# start building the mail message as a seperate file
+#
+cp $results $mailmsg
+
+#
+# look for unsupported messages so we know the test results are bogus
+#
+  test -n "$verbose" && echo "Looking for unsupported architectures"
+  rm -f $outdir/.${tool}-missed
+  egrep "^(UNSUPPORTED|[N].*support.*(arch|cpu))" ${cur} | sed 's/^ERROR: //' > $outdir/.${tool}-arch
+
+  if [ -s $outdir/.${tool}-arch ] ; then
+    test -n "$verbose" && echo "Unsupported architecture:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-arch | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Unsupported architecture:" >> $results
+    echo >> $results
+    cat $outdir/.${tool}-arch | sed 's/^/	/' >> $results
+    echo >> $results
+	# we don't want to send thes to the mailing lists
+    continue
+  fi
+
+#
+# look for errors in the test suite
+#
+  test -n "$verbose" && echo "Looking for errors in the testsuite"
+  rm -f $outdir/.${tool}-errors
+  grep '^ERROR' ${cur} | sed 's/^ERROR: //' > $outdir/.${tool}-errors
+  if [ -s $outdir/.${tool}-errors ] ; then
+    test -n "$verbose" && echo "Test suite errors:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-errors | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Test suite errors:" >> $results
+    echo >> $results
+    cat $outdir/.${tool}-errors | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the errors 
+    echo "Test suite errors:	`wc -l $outdir/.${tool}-errors|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No test suite errors"
+    echo "No test suite errors" >> $results
+    echo >> $results
+  fi
+
+#
+# look for warnings in the test suite
+#
+  test -n "$verbose" && echo "Looking for warnings in the testsuite"
+  rm -f $outdir/.${tool}-warnings
+  grep '^WARNING' ${cur} | sed 's/^WARNING: //' > $outdir/.${tool}-warnings
+  if [ -s $outdir/.${tool}-warnings ] ; then
+    test -n "$verbose" && echo "Test suite warnings:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-warnings | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Test suite warnings:" >> $results
+    echo >> $results
+    cat $outdir/.${tool}-warnings | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the warnings
+    echo "Test suite warnings:	`wc -l $outdir/.${tool}-warnings|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No test suite warnings"
+    echo "No test suite warnings" >> $results
+    echo >> $results
+  fi
+
+#
+# look for Tcl errors that DejaGnu or the test suite missed
+#
+  test -n "$verbose" && echo "Looking for simple uncaught Tcl errors"
+  rm -f $outdir/.${tool}-missed1
+  egrep "^Can.t (find|run)" ${cur} | sed 's/^ERROR: //' > $outdir/.${tool}-missed1
+
+  if [ -s $outdir/.${tool}-missed1 ] ; then
+    test -n "$verbose" && echo "Uncaught simple Tcl errors:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-missed | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Uncaught simple Tcl errors:" >> $results
+    echo >> $results
+    cat $outdir/.${tool}-missed1 | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the missed Tcl errors
+    echo "Uncaught simple Tcl errors:	`wc -l $outdir/.${tool}-missed1|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No uncaught simple Tcl errors"
+    echo "No uncaught simple Tcl errors" >> $results
+    echo >> $results
+  fi
+
+#
+# look for tests that used to work
+#
+  test -n "$verbose" && echo "Looking for tests that used to work..."
+  rm -f $outdir/.$tool-didwork?
+  grep '^FAIL' ${cur}-sorted | sed 's/^....:	//' > $outdir/.${tool}-didwork1
+  grep '^PASS' ${prev}-sorted | sed 's/^....:	//' | comm -12 - $outdir/.${tool}-didwork1 > $outdir/.${tool}-didwork2
+
+  # see if we got any output
+  if [ -s $outdir/.${tool}-didwork2 ]; then
+    test -n "$verbose" && echo "Tests that now fail, but worked before:"
+    test -n "$verbose" && echo
+    test -n "$verbose" && cat $outdir/.${tool}-didwork2 | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Tests that now fail, but worked before:" >> $results
+    echo >> $results 
+    cat $outdir/.${tool}-didwork2 | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the tests that used to work
+    echo "Tests that now fail, but worked before:	`wc -l $outdir/.${tool}-didwork2|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No new unexpected failures among the old tests"
+    echo "No new unexpected failures among the old tests" >> $results
+    echo >> $results
+  fi
+
+#
+# look for tests that used to fail
+#
+  test -n "$verbose" && echo "Looking for tests that shouldn't pass but did..."
+  rm -f $outdir/.${tool}-didpass?
+  grep '^PASS' ${cur}-sorted | sed 's/^....:	//' > $outdir/.${tool}-didpass1
+  grep '^FAIL' ${prev}-sorted | sed 's/^....:	//' | comm -12 - $outdir/.${tool}-didpass1 > $outdir/.${tool}-didpass2
+
+  # see if we got any output
+  if [ -s $outdir/.${tool}-didpass2 ]; then
+    test -n "$verbose" && echo "Tests that now work, but didn't before:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-didpass2 | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Tests that now work, but didn't before:" >> $results
+    echo >> $results 
+    cat $outdir/.${tool}-didpass2 | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the tests that used to fail
+    echo "Tests that now work, but didn't before:	`wc -l $outdir/.${tool}-didpass2|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No new unexpected failures among the old tests"
+    echo "No new unexpected passes among the old tests" >> $results
+    echo >> $results
+  fi
+
+#
+# look for new tests that fail
+#
+  test -n "$verbose" && echo "Looking for new tests that fail..."
+  rm -f $outdir/.${tool}-newfail?
+  grep '^FAIL' ${cur}-sorted | sed 's/^....:	//' > $outdir/.${tool}-newfail1
+  grep '^[PF]A[SI][SL]' ${prev}-sorted | sed 's/^....:	//' | comm -13 - $outdir/.${tool}-newfail1 > $outdir/.${tool}-newfail2
+ 
+  # see if we got any output
+  if [ -s $outdir/.${tool}-newfail2 ]; then
+    test -n "$verbose" && echo "New tests that FAIL:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-newfail2 | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "New tests that FAIL:" >> $results
+    echo >> $results 
+    cat $outdir/.${tool}-newfail2 | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the new tests that fail
+    echo "New tests that FAIL:	`wc -l $outdir/.${tool}-newfail2|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No new tests that FAIL:"
+    echo "No new tests that failed were found" >> $results
+    echo >> $results
+  fi
+
+#
+# look for new tests that pass
+#
+  test -n "$verbose" && echo "Looking for new tests that pass..."
+  rm -f $outdir/.${tool}-newpass?
+  grep '^PASS' ${cur}-sorted | sed 's/^....:	//' > $outdir/.${tool}-newpass1
+  grep '^[PF]A[SI][SL]' ${prev}-sorted | sed 's/^....:	//' | comm -13 - $outdir/.${tool}-newpass1 > $outdir/.${tool}-newpass2
+
+  # see if we got any output
+  if [ -s $outdir/.${tool}-newpass2 ]; then
+    test -n "$verbose" && echo "New tests that PASS:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-newpass2 | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "New tests that PASS:" >> $results
+    echo >> $results 
+    cat $outdir/.${tool}-newpass2 | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the new tests that pass
+    echo "New tests that PASS:	`wc -l $outdir/.${tool}-newpass2|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No new tests that PASS:"
+    echo "No new tests that passed were found" >> $results
+    echo >> $results
+  fi
+
+#
+# look for new tests that passed that are missing
+#
+  test -n "$verbose" && echo "Looking for passing tests that have disappeared..."
+  rm -f $outdir/.${tool}-gonepass?
+  grep '^[PF]A[SI][SL]' ${cur}-sorted | sed 's/^....:	//' > $outdir/.${tool}-gonepass1
+  grep '^PASS' ${prev}-sorted | sed 's/^....:	//' | comm -23 - $outdir/.${tool}-gonepass1 > $outdir/.${tool}-gonepass2
+
+  # see if we got any output
+  if [ -s $outdir/.${tool}-gonepass2 ]; then
+    test -n "$verbose" && echo "Old tests that passed, that have disappeared:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-gonepass2 | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Old tests that passed, that have disappeared:" >> $results
+    echo >> $results 
+    cat $outdir/.${tool}-gonepass2 | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the new tests that passed that are missing
+    echo "Old tests that passed, that have disappeared:	`wc -l $outdir/.${tool}-gonepass2|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No old passing tests have disappeared"
+    echo "No old passing tests have disappeared" >> $results
+    echo >> $results
+  fi
+
+#
+# look for new tests that failed that are missing
+#
+  test -n "$verbose" && echo "Looking for failing tests that have disappeared..."
+  rm -f $outdir/.${tool}-gonefail?
+  grep '^[PF]A[SI][SL]' ${cur}-sorted | sed 's/^....:	//' > $outdir/.${tool}-gonefail1
+  grep '^FAIL' ${prev}-sorted | sed 's/^....:	//' | comm -23 - $outdir/.${tool}-gonefail1 > $outdir/.${tool}-gonefail2
+
+  # see if we got any output
+  if [ -s $outdir/.${tool}-gonefail2 ]; then
+    test -n "$verbose" && echo "Old tests that failed, that have disappeared:"
+    test -n "$verbose" && echo 
+    test -n "$verbose" && cat $outdir/.${tool}-gonefail2 | sed 's/^/	/'
+    test -n "$verbose" && echo 
+    echo "Old tests that failed, that have disappeared:" >> $results
+    echo >> $results 
+    cat $outdir/.${tool}-gonefail2 | sed 's/^/	/' >> $results
+    echo >> $results
+	# count the new tests that failed that are missing
+    echo "Old tests that failed, that have disappeared:	`wc -l $outdir/.${tool}-gonefail2|sed 's:/.*$::'`" >> $mailmsg
+  else
+    test -n "$verbose" && echo "=== No old failing tests have disappeared"
+    echo "No old failing tests have disappeared" >> $results
+    echo >> $results
+  fi
+
+#
+# do something interesting with the result logs, harass a few mailing lists.
+#
+	# sigh, find the right mail tool
+  if [ -f /usr/lib/sendmail ] ; then
+    mail=/usr/lib/sendmail
+  else
+    if [ -f "/usr/bin/mailx" ] ; then
+      mail=/usr/bin/mailx
+    else
+      mail=mail
+    fi
+  fi
+	# if there is no previous log, then email the full output instead
+  if [ "$prev" = "$cur" ] ; then
+    results=$i
+  fi
+	# figure out where the mail is going
+  flame="${tool}-local progressive"
+  case "$tool" in
+    runtest)		flame="rob" ;;
+    newlib)		flame="eichin" ;;
+    tcl)		flame="rob" ;;
+    expect)		flame="rob" ;;
+    binutils)		flame="djm" ;;
+    ld)			flame="ian djm" ;;
+    gas)		flame="raeburn" ;;
+    gdb)		flame="kingdon" ;;
+    gcc)		flame="dje" ;
+			case "$target" in
+			  sh-*|h8300-*)			flame="dje sac" ;;
+			  hppa*-*)			flame="dje law" ;;
+			  sparc*-*|mips-*|m68k-*)	flame="dje wilson" ;;
+			esac ;;
+    g++)		flame="mrs" ;
+			case "$target" in
+			  sh-*|h8300-*)			flame="mrs sac" ;;
+			  hppa*-*)			flame="mrs law" ;;
+			  sparc*-*|mips-*|m68k-*)	flame="mrs wilson" ;;
+			esac ;;
+  esac
+  if [ -f $results ] ; then
+	# create a mail header. this is more portable than the cmd line options
+    rm -f $outdir/.header
+    echo "To: $flame test-results@cygnus.com" >> $outdir/.header
+    echo "From: DejaGnu" >> $outdir/.header
+    echo "Subject: ${host}-x-${target} results for ${tool}" >> $outdir/.header
+    cat $mailmsg >> $outdir/.header
+    $mail -t < $outdir/.header
+#    $mail $flame rob test-results@cygnus.com < $outdir/.header
+  fi
+
+done
+echo "Done..."
+
+#
+# cleanup afterwards
+#
+if [ x"$tmpfiles" = x ] ; then
+  rm -f $outdir/*-sorted
+  rm -f $outdir/.*-didwork?
+  rm -f $outdir/.*-didpass?
+  rm -f $outdir/.*-newfail?
+  rm -f $outdir/.*-newpass?
+  rm -f $outdir/.*-gonefail?
+  rm -f $outdir/.*-gonepass?
+  rm -f $outdir/.*-errors
+  rm -f $outdir/.*-warnings
+  rm -f $outdir/.*-missed?
+  rm -f $outdir/.*-arch
+  rm -f $outdir/.tmp
+fi
+
+
+

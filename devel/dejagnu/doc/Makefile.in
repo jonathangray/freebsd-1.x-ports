@@ -1,0 +1,136 @@
+prefix = /usr/local
+exec_prefix = $(prefix)
+
+srcdir = .
+
+mandir = $(prefix)/man
+man1dir = $(mandir)/man1
+infodir = $(prefix)/info
+
+MAKEINFO = makeinfo
+TEXI2DVI = TEXINPUTS=$(TEXIDIR):$(srcdir):$$TEXINPUTS texi2dvi
+
+INSTALL	= install -c
+INSTALL_PROGRAM = $(INSTALL)
+INSTALL_DATA = $(INSTALL)
+
+# Where to find texinfo.tex to format docn with TeX
+TEXIDIR = $(srcdir)/../../texinfo
+
+MANPAGES= $(srcdir)/runtest.1
+
+all:
+
+info:	dejagnu.info 
+
+dvi:	dejagnu.dvi 
+
+ps:	dejagnu.ps 
+
+doc:	info dvi
+
+dejagnu: dejagnu.dvi dejagnu.info
+
+######################################################################
+# DOCUMENTATION TARGETS
+# TeX output
+dejagnu.dvi: $(srcdir)/dejagnu.texi $(srcdir)/expect.texi $(srcdir)/tcl.texi
+	$(TEXI2DVI) $(srcdir)/dejagnu.texi
+
+# info file for online browsing
+dejagnu.info: $(srcdir)/dejagnu.texi $(srcdir)/expect.texi $(srcdir)/tcl.texi
+	$(MAKEINFO) -I $(srcdir) -o dejagnu.info $(srcdir)/dejagnu.texi
+
+dejagnu.ps: dejagnu.dvi
+	dvips -f dejagnu.dvi > dejagnu.ps
+		
+#   different targets for -ms, -mm, -me
+# Try to use a recent texi2roff.  v2 was put on prep in jan91.
+# If you want an index, see texi2roff doc for postprocessing 
+# and add -i to texi2roff invocations below.
+# Workarounds for texi2roff-2 (probably fixed in later texi2roff's, delete
+#    correspondint -e lines when later texi2roff's are current)
+# + @ifinfo's deleted explicitly due to texi2roff-2 bug w nested constructs.
+# + @c's deleted explicitly because texi2roff sees texinfo commands in them
+# + @   (that's at-BLANK) not recognized by texi2roff, turned into blank
+# + @alphaenumerate is ridiculously new, turned into @enumerate
+
+# roff output (-ms)
+dejagnu.ms: $(srcdir)/dejagnu.texi
+	sed -e '/\\input texinfo/d' \
+		-e '/@c TEXI2ROFF-KILL/,/@c END TEXI2ROFF-KILL/d' \
+		-e '/^@ifinfo/,/^@end ifinfo/d' \
+		-e '/^@c/d' \
+		-e 's/{.*,,/{/' \
+		-e 's/@ / /g' \
+		-e 's/^@alphaenumerate/@enumerate/g' \
+		-e 's/^@end alphaenumerate/@end enumerate/g' \
+		$(srcdir)/dejagnu.texi | \
+	$(TEXI2ROFF) -ms | \
+	sed -e 's/---/\\(em/g' \
+	>dejagnu.ms 
+
+# roff output (-mm)
+# '@noindent's removed due to texi2roff-2 mm bug; if yours is newer, 
+#   try leaving them in
+dejagnu.mm: $(srcdir)/dejagnu.texi
+	sed -e '/\\input texinfo/d' \
+		-e '/@c TEXI2ROFF-KILL/,/@c END TEXI2ROFF-KILL/d' \
+		-e '/^@ifinfo/,/^@end ifinfo/d' \
+		-e '/^@c/d' \
+		-e 's/{.*,,/{/' \
+		-e '/@noindent/d' \
+		-e 's/@ / /g' \
+		-e 's/^@alphaenumerate/@enumerate/g' \
+		-e 's/^@end alphaenumerate/@end enumerate/g' \
+		$(srcdir)/dejagnu.texi | \
+	$(TEXI2ROFF) -mm | \
+	sed -e 's/---/\\(em/g' \
+		>dejagnu.mm
+
+# roff output (-me)
+dejagnu.me: $(srcdir)/dejagnu.texi
+	sed -e '/\\input texinfo/d' \
+		-e '/@c TEXI2ROFF-KILL/,/@c END TEXI2ROFF-KILL/d' \
+		-e '/^@ifinfo/,/^@end ifinfo/d' \
+		-e '/^@c/d' \
+		-e 's/{.*,,/{/' \
+		-e 's/@ / /g' \
+		-e 's/^@alphaenumerate/@enumerate/g' \
+		-e 's/^@end alphaenumerate/@end enumerate/g' \
+		$(srcdir)/dejagnu.texi | \
+	$(TEXI2ROFF) -me | \
+	sed -e 's/---/\\(em/g' \
+	>dejagnu.me 
+
+
+######################################################################
+
+clean:
+	-rm -f *.o *~ \#* core dejagnu.aux dejagnu.cp dejagnu.dvi \
+	dejagnu.fn dejagnu.ky dejagnu.log dejagnu.pg dejagnu.toc \
+	dejagnu.tp dejagnu.vr dejagnu.cps dejagnu.fns dejagnu.kys \
+	dejagnu.pgs dejagnu.tps dejagnu.vrs dejagnu.info* dejagnu.1 \
+	dejagnu.ps
+
+realclean: clean
+	-rm -f 
+
+install: all
+	for i in $(MANPAGES) ; do \
+		$(INSTALL_DATA) $$i $(man1dir)/$(program_prefix)`echo $$i |sed -e 's@^.*doc/@@'` ; \
+	done
+
+install-info: info
+	for i in *.info* ; do \
+		$(INSTALL_DATA) $$i $(infodir)/$$i ; \
+	done
+
+clean-info:
+	-rm -rf *.info*
+
+distclean:      clean
+	-rm -f Makefile config.status gdbme.c
+
+Makefile : $(srcdir)/Makefile.in $(host_makefile_frag) $(target_makefile_frag)
+	$(SHELL) ./config.status
