@@ -1,0 +1,246 @@
+		Syscons-0.2 ioctl functions
+
+
+Ioctl name	Function					Compatible to
+=============   =============================================   ==============
+
+KDGKBMODE 	Returns the current keyboard mode. Returns 	SYSV386 / SCO
+		either KD_XLATE which means the console driver 
+		processes keyboard scancodes to ascii values
+		defined by the current keyboard mapping,
+		or KD_RAW is which case the console returns
+		the raw keyboard scancodes (one on keypress
+		and another one on keyrelease).
+		
+KDSKBMODE 	Set keyboard mode to KD_RAW or KD_XLATE, see	SYSV386 / SCO
+		above KDGKBMODE.
+
+KDSBORDER	Set the border color for this virtual console.  SYSV386
+
+KDMKTONE	Sound the bell, with the pitch and duration	SYSV386
+		currently defined (may be changed with an
+		escape sequence, see emulator.doc).
+
+KDGETMODE	Get the current screen mode. Returns either	SYSV386 / SCO
+		KD_TEXT when in a text mode, or KD_GRAPHICS
+		when in a graphics or otherwise unknow mode.
+
+KDSETMODE	Set the screen mode. Possibilities is KD_TEXT 	SYSV386 / SCO
+		which switches to text mode and restores fonts,
+		palettes and clears the screen. KD_TEXT1 does
+		the same execpt it does not reload fonts and
+		palette. KD_GRAPHICS tells the console driver
+		that the video card will be programmed to a
+		(to the driver) unknown graphics mode.
+
+KDENABIO	Enable access to IO ports. This allows access	SYSV386 
+		to ALL IO ports so be carefull.
+		
+KDDISABIO	Disable access to IO ports.			SYSV386
+
+KIOCSOUND	Make tone (noise) with the built in speaker.	SYSV386 / SCO
+		The argument is the period in 840 ns of the
+		generated tone. An argument of 0 turns off
+		the noise.
+
+KDGKBTYPE	Get keyboard type. Currently returns 0.		SYSV386 / SCO
+
+KDGETLED	Get keyboard leds status, argument is set	SYSV386 / SCO
+		to the logical OR of LED_SCR, LED_NUM and
+		LED_CAP.
+
+KDSETLED	Set Keyboard leds, argument should be a 	SYSV386 / SCO
+		logical OR of LED_SCR, LED_NUM and LED_CAP.
+
+KDSETRAD	Set keyboard repeat, and delay parameters.	SYSV386 
+		The argument is defined as a byte:
+
+			0 DD RRRRR
+			  -- -------  	Repeat rate (0-31)
+                          |
+ 			  ----------    Delay (0-3)
+
+		The delay is settable in 4 steps, with 
+		delays in ms after this table:
+
+		 0=250,  1=500,  2=750,  3=1000
+
+		The repeat rate is settable in 32 steps
+		in ms after this table:
+
+ 		 0= 34,  1= 38,  2= 42,  3= 46,  4= 50
+		 5= 55,  6= 59,  7= 63,  8= 68,  9= 76
+		10= 84, 11= 92, 12=100, 13=110, 14=118
+		15=126, 16=136, 17=152, 18=168, 19=184
+		20=200, 21=220, 22=236, 23=252, 24=272
+		25=304, 26=336, 27=368, 28=400, 29=440
+		30=472, 31=504
+
+GETFKEY		Get the function key string. Argument		SYSV386 / SCO
+		is a pointer to a structure of type
+		fkeyarg_t, defined as this:
+
+			struct fkeyarg_t {
+				u_short	keynum;
+				char	keydef[MAXFK];
+				char	flen;
+			};
+		
+		The functionkey number is given i keynum
+		(zero based), and the string and length 
+		is returned.
+
+SETFKEY		Set the string output by a given function	SYSV386 / SCO
+		key. The argument is a pointer to a struct
+		fkeyarg_t (see above). keynum is set to
+		the number of the key (zero based) and 
+		keydef is set to the string for that key,
+		length should be set to the string length.
+		Remember that the string can max be MAXFK
+		characters long.
+
+GIO_SCRNMAP	Get the mapping relation between the cha-	SYSV386 / SCO
+		racterset internally and the character ROM 
+		on the video card. This is a one to one
+		mapping. Argument is of type:
+
+		struct scrmap_t {char scrmap[256];} 
+
+		and is the table describing the mapping.
+		This is mostly used on CGA & HGC video
+		cards as they do not support loading of
+		fonts. This allows some customizing of
+		the display font.
+
+PIO_SCRNMAP	Set the mapping relation between the cha-	SYSV386 / SCO
+		racterset internally and the character ROM 
+		on the video card. See above.
+
+GIO_KEYMAP 	Get the keyboard mapping. This is a map		SYSV386 / SCO
+		descriping how scancodes shall be converted
+		to ASCII values, and how special keys like
+		SHIFT, CTRL and ALT is to be interpreted.
+		Each key can have 8 states:
+
+		unshifted, shift, ctrl, shift+ctrl,
+		alt, shift+alt, alt+ctrl, alt+shift+ctrl.
+
+		For each key, the ASCII value for each of
+		the 8 combinations can be set individually.
+		Besides a key can have special function,
+		examples are SHIFT, CTRL, ALT, functionkey,
+		or screen switch sequence.
+		See the examples in the syscons/utils and
+		kbdmaps directories for sample mapping files
+		and usage.
+
+PIO_KEYMAP 	Set the keyboard mapping. see above.		SYSV386 / SCO
+
+GIO_FONT8x8	
+GIO_FONT8x14	
+GIO_FONT8x16	Get the current font in either of the 3		SYSV386 / SCO
+		formats 8, 10 or 16 scanline. The argument
+		is a structure in one of the formats:
+
+		struct fnt8_t {char fnt8x8[8*256];} 
+		struct fnt14_t {char fnt8x14[14*256];}
+		struct fnt16_t {char fnt8x16[16*256];}
+
+		The character array contains the dots of
+		each character starting with character 0,
+		scanline 0.
+
+PIO_FONT8x8	
+PIO_FONT8x14	
+PIO_FONT8x16	Set the current font in either of the 3		SYSV386 / SCO
+		formats 8, 10 or 16 scanline. See above.
+
+CONS_BLANKTIME	Set the timeout for the screensaver. The	SCO
+		argument is an int holding the timeout 
+		in seconds. An argument of 0 turns of
+		the screensaver.
+	
+CONS_GETINFO	Get info on the current virtual console.	SCO
+		The call returns info about screensize,
+		cursor position, colors and keyboard
+		state into a structure vid_info. 
+
+CONS_80x25TEXT	Set the screen resolution to 25 lines		--
+		by 80 characters (default).
+
+CONS_80x50TEXT	Set the screen resolution to 50 lines		--
+		by 80 characters (if supported by HW):
+
+VT_GETMODE	Get the current screen switcher mode.		SYSV386 / SCO
+		the argument is of type:
+
+			struct vt_mode {
+				char	mode;
+				char	waitv;	
+				short	relsig;
+				short	acqsig;
+				short	frsig;
+			};
+
+		The switcher can operate in 2 different
+		modes (the mode field in vt_mode):
+		VT_AUTO: 
+			All switching is automatic, but
+			only if the current virtual con-
+			sole is in KD_TEXT mode. If not
+			the switcher announces its failure
+			to switch with a beep.
+
+		VT_PROCESS:
+			Switching is controlled by the
+			user. When a switch has to occur
+			the switcher sends signal "relsig"
+			to the user process. When the user
+			process has put the screen in an
+			known (KD_TEXT) mode, the switcher
+			is notified with a VT_RELDISP ioctl.
+			Semilary when the switcher switches
+			back to our screen a signal "acqsig"
+			is sent. This has to be acknowledged
+			by a VT_RELDISP ioctl also.
+
+VT_SETMODE	Set the current screen switcher mode.		SYSV386 / SCO
+		See above.
+
+VT_RELDISP	Release display to the screen switcher.		SYSV386 / SCO
+		This ioctl tells the console driver if
+		the requested operation is completed. The
+		argument can be:
+
+		VT_FALSE:
+			The user process refuses to release
+			the screen.
+
+		VT_TRUE:
+			The user proceess has released the 
+			screen, and screen switching can
+			now continue.
+
+		VT_ACKACQ:
+			Acknowledge that we have take control
+			of the screen.
+
+VT_ACTIVATE	Activate the virtual console given in the 	SYSV386 / SCO
+		argument (one based), that means display
+		it on the screen.
+
+VT_WAITACTIVE	Wait for the virtual console given in the 	SYSV386
+		argument (one based) to be active, that
+		means displayed on screen. If argument is
+		0, wait for current virtual console.
+
+
+ioctls supported for backwards compatibility with the old (patched) pccons.
+
+CONSOLE_X_MODE_ON
+CONSOLE_X_MODE_OFF
+		Set / unset X mode. Temporarily switches
+		to the device that this ioctl is called
+		from (on), and back again (off).
+
+

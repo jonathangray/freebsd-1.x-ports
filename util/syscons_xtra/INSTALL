@@ -1,0 +1,101 @@
+** This file is part of the syscons-0.2 distribution **		930330 sos
+
+INSTALLATION
+============
+Be sure to have your system at least at patchkit-0.2.2 level.
+(if not you will miss the pg(...) function which got moved to cons.c)
+Add the following line to /sys/i386/conf/files.i386
+
+i386/isa/syscons.c		optional sc device-driver
+
+Extract the tarfile syscons-driver.tar in /sys, that will install the
+driver sources.
+
+To activate the driver, change the line descriping your console in your 
+CONFIG file from:
+
+device		pc0	at isa? port "IO_KBD" tty irq 1 vector pcrint
+
+- to the following:
+
+device		sc0	at isa? port "IO_KBD" tty irq 1 vector scintr
+
+If you want to configure the number of virtual consoles:
+
+options		"NCONS=N"	# N = number of virtual consoles
+				# default is 12 virtual consoles
+
+If you have a S3 card or otherwise don't what a blanking screensaver
+(MDA/CGA use this as well) define:
+
+options		"DONT_BLANK"	# use "snake" screensaver
+
+If you want the console to default to danish keyboard:
+
+options		"DKKEYMAP"	# default is US keyboard
+
+Then remake you kernel, et voila !!
+
+
+USING SYSCONS
+=============
+To use it you need to run the syscons.MAKEDEV script to add the needed devices,
+tty01-tty12 which are the virtual console devices. In order to log into those
+add them to your /etc/ttys file. It is recommended that you disable the
+"console" device and add "tty01" instead, both cannot be active at the same
+time in /etc/ttys. This is because all console output appears on tty01.
+
+You switch between the virtual consoles by pressing ALT+Fn, where Fn is a func-
+tion key from 1-12. This sequence can be changed to anything be changing the 
+keyboard mapping, infact you have total control over every key using the 
+mapkey facility (but be carefull, you can really mess up your keyboard layout).
+
+Scroll-lock, num-lock and caps-lock works individuably on each virtual console,
+
+If you want to use the "standard" Xserver (the pccons one) link /dev/vga to
+one of the virtual consoles eg. /dev/tty12.
+If you use the X patches that comes with syscons (its not fair to call it
+patches, all they do is reenable the features that was cribbled for standard
+pccons/codrv), you get the added functionality in X as well, including sound,
+programmable leds etc, and multiple consoles ! 
+To activate the patches define HAS_SYSCONS in your site.def file.
+When you are in X the switching sequence is CTRL+ALT+Fn, this is the X default,
+and can only be changed by recompiling the server, blame the Xserver, not me :-)
+
+The escape sequencies supported (almost complete SCO ANSI color console 
+emulation) is documented in the file emulator.doc.
+
+The ioctl's supported are documented in ioctls.doc.
+
+The file syscons-utils.tar contains the following programs:
+
+	mapkbd <mapfile>  		change keyboard mapping 
+					(US, UK, german, swedish and danish).
+
+	setfont size <fontfile> 	change video fonts 
+					(iso8859.1, codepage850, codepage865). 
+
+	keyrate -d delay -r rate	change the keyboard delay & repeatrate.
+	
+	setfkey # string		set function key # to send string
+
+	80x25				set 80 chars by 25 lines display.
+
+	80x50				set 80 chars by 50 lines display.
+
+	blank n				set screensaver to timeout in n secs.
+					0 means turn off screensaver.
+
+	diverse test programs....
+
+The file syscons-libdgl.tar contains a graphics library for use with standard
+vga cards and ET4000 based SVGA cards.
+It supports programmable resolution (eg. 320x200, 640x480, 1024x768 ....)
+in 2, 16, 256, 32768 colors, depending on the VGA cards capabilities.
+Included is some demo programs and a gif viewer to show the use of libdgl.
+
+
+			have fun / sos
+
+BUGS, comments to: sos@kmd-ac.dk -or- baukno@login.dkuug.dk 
+
