@@ -48,7 +48,12 @@
  * twm menu code
  *
  * $Log: menus.c,v $
- * Revision 1.2  1994/05/18 18:50:50  asami
+ * Revision 1.3  1994/05/18 19:12:53  asami
+ * How come this compiles at my home machine but not on freefall?  Oh well....
+ * (Backing out change that took out #define MAX because of "multiply defined"
+ * warnings with sys/param.h)
+ *
+ * Revision 1.2  1994/05/18  18:50:50  asami
  * FreeBSD port (finally!).  Biggest hack (drum roll please) was defining
  * YY_INPUT macro in lex.l so that it can read the damn startup file, not
  * stdin!  (Thanks Guido van Rooij for the hint!)  Sorry for all the ! signs!
@@ -210,10 +215,8 @@ extern int GlobalMenuButton;
 extern int Click;
 int PieMenuWait = 100;
 
-#ifndef __FreeBSD__
 #define MAX(x,y) ((x)>(y)?(x):(y))
 #define MIN(x,y) ((x)<(y)?(x):(y))
-#endif /* !__FreeBSD__ */
 #define ABS(x) ((x)<0?-(x):(x))
 
 #define SHADOWWIDTH 5			/* in pixels */
