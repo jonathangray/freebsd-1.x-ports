@@ -72,7 +72,7 @@
 /* PATHPACKER and PACKEROPTS above.					*/
 /************************************************************************/
 
-#define	PATHUNPACK	"/usr/local/bin/gzip"
+#define	PATHUNPACK	"/usr/bin/gzip"
 #define	UNPACKOPTS	"-d"			/* Optional */
 
 /************************************************************************/
