@@ -1,4 +1,4 @@
-/* $Id: init.c,v 1.2 1993/07/26 19:12:29 nate Exp $
+/* $Id: init.c,v 1.3 1993/08/02 23:52:35 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -77,6 +77,9 @@ char *argv[];
 
     /* we have to know rnlib to look up global switches in %X/INIT */
 
+    homedir = getenv("HOME");
+    if (homedir == Nullch)
+	homedir = getenv("LOGDIR");
     lib = savestr(filexp(NEWSLIB));
     rnlib = savestr(filexp(PRIVLIB));
 

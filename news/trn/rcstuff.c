@@ -1,4 +1,4 @@
-/* $Id: rcstuff.c,v 1.2 1993/07/26 19:13:12 nate Exp $
+/* $Id: rcstuff.c,v 1.3 1993/08/02 23:52:41 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -191,7 +191,7 @@ rcstuff_init()
 	cleanup_rc();
 
 #ifdef HASHNG
-    rc_hash = hashcreate((int)nextrcline, rcline_cmp);
+    rc_hash = hashcreate((int)nextrcline+50, rcline_cmp);
     for (i = 0; i < nextrcline; i++)
 	if (toread[i] >= TR_UNSUB)
 	    sethash(i);

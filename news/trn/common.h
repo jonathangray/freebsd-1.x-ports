@@ -1,4 +1,4 @@
-/* $Id: common.h,v 1.2 1993/07/26 19:12:13 nate Exp $
+/* $Id: common.h,v 1.3 1993/08/02 23:52:28 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -62,6 +62,7 @@
 #else
 char	*malloc();
 char	*realloc();
+char	*getenv();
 #endif
 
 #ifdef I_STRING
@@ -733,11 +734,20 @@ typedef int		ART_LINE;	/* line position in article file */
 typedef long		ACT_POS;	/* char position in active file */
 typedef unsigned int	MEM_SIZE;	/* for passing to malloc */
 
-/* index/strchr slight-of-hand */
+/* some slight-of-hand for compatibility issues */
 
 #ifdef HAS_STRCHR
 #   define index strchr
 #   define rindex strrchr
+#endif
+#ifdef HAS_MEMCMP
+#   define bcmp(s,d,l) memcmp((s),(d),(l))
+#endif
+#ifdef HAS_MEMCPY
+#   define bcopy(s,d,l) memcpy((d),(s),(l))
+#endif
+#ifdef HAS_MEMSET
+#   define bzero(s,l) memset((s),0,(l))
 #endif
 
 /* *** end of the machine dependent stuff *** */
@@ -753,7 +763,6 @@ EXT struct stat filestat;
 #ifdef SUPPLIMENT_STRING_H
 char	*index();
 char	*rindex();
-char	*getenv();
 char	*strcat();
 char	*strcpy();
 #endif
@@ -836,6 +845,18 @@ EXT time_t actFetchTime					/* -z */
 	INIT(5*60);
 #else
 	INIT(0);
+#endif
+EXT bool try_ov						/* -Z */
+#ifdef USE_OV
+	INIT(TRUE);
+#else
+	INIT(FALSE);
+#endif
+EXT bool try_mt
+#ifdef USE_MT
+	INIT(TRUE);
+#else
+	INIT(FALSE);
 #endif
 
 #define NOMARKING 0

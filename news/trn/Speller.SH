@@ -4,7 +4,7 @@ esac
 echo "Extracting Speller (with variable substitutions)"
 $spitshell >Speller <<!GROK!THIS!
 $startsh
-# $Id: Speller.SH,v 1.2 1993/07/26 19:11:54 nate Exp $
+# $Id: Speller.SH,v 1.3 1993/08/02 23:52:15 nate Exp $
 #	Speller - a script to disassemble a posting; use ispell to spell-
 #	check the body along with the Subject, Keywords, and Summary lines;
 #	and put it all back together again.
@@ -14,7 +14,6 @@ $startsh
 
 export PATH || (echo "OOPS, this isn't sh.  Desperation time.  I will feed myself to sh."; sh \$0; kill \$\$)
 
-tmpdir="${TMPDIR-/tmp}"
 # what pager you use--if you have kernal paging use cat
 pager="\${PAGER-$pager}"
 # either the ispell program or "none"
@@ -31,6 +30,8 @@ diff=${diff-diff}
 ed=${ed-ed}
 !GROK!THIS!
 $spitshell >>Speller <<'!NO!SUBS!'
+
+tmpdir="${TMPDIR-/tmp}"
 
 # get us some temporary files.
 hdrs=$tmpdir/sp$$hdr

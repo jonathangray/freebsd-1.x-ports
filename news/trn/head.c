@@ -1,4 +1,4 @@
-/* $Id: head.c,v 1.2 1993/07/26 19:12:25 nate Exp $
+/* $Id: head.c,v 1.3 1993/08/02 23:52:34 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -299,7 +299,7 @@ int which_line;				/* type of line desired */
 
     /* Only return a cached subject line if it isn't the current article */
     if (which_line != SUBJ_LINE || parsed_art != artnum) {
-	s = fetchcache(artnum,which_line);
+	s = fetchcache(artnum,which_line,FILL_CACHE);
 	if (s)
 	    return savestr(s);
     }
@@ -325,88 +325,6 @@ int which_line;				/* type of line desired */
 
 /* prefetch a header line from one or more articles */
 
-#ifdef USE_NNTP
-char *
-prefetchlines(artnum,which_line,copy)	/* NNTP version */
-ART_NUM artnum;				/* article to get line from */
-int which_line;				/* type of line desired */
-bool_int copy;				/* do you want it savestr()ed? */
-{
-    register ARTICLE *ap;
-    register char *s, *t;
-    int size;
-    register ART_NUM num, priornum, lastnum;
-    bool cached = (htype[which_line].ht_flags & HT_CACHED);
-
-    /* find_article() returns a Nullart if the artnum value is invalid */
-    if (!(ap = find_article(artnum)) || (ap->flags & AF_MISSING))
-	s = nullstr;
-    else if (cached && (which_line != SUBJ_LINE || parsed_art != artnum))
-	s = get_cached_line(ap, which_line, untrim_cache);
-    else
-	s = Nullch;
-    if (s) {
-	if (copy)
-	    s = savestr(s);
-	return s;
-    }
-
-    spin(20);
-    if (copy)
-	s = safemalloc((MEM_SIZE)(size = LBUFLEN));
-    else {
-	s = cmd_buf;
-	size = sizeof cmd_buf;
-    }
-    *s = '\0';
-    priornum = artnum-1;
-    lastnum = artnum + PREFETCH_SIZE - 1;
-    if (lastnum > lastart)
-	lastnum = lastart;
-    if (cached)
-	sprintf(ser_line,"XHDR %s %ld-%ld",htype[which_line].ht_name,
-		artnum,lastnum);
-    else
-	sprintf(ser_line,"XHDR %s %ld",htype[which_line].ht_name,artnum);
-    nntp_command(ser_line);
-    if (nntp_check(TRUE) == NNTP_CLASS_OK) {
-	for (;;) {
-	    nntp_gets(ser_line, sizeof ser_line);
-# ifdef DEBUG
-	    if (debug & DEB_NNTP)
-		printf("<%s\n", ser_line) FLUSH;
-# endif
-	    if (ser_line[0] == '.')
-		break;
-	    if ((t = index(ser_line, '\r')) != Nullch)
-		*t = '\0';
-	    if (!(t = index(ser_line, ' ')))
-		continue;
-	    t++;
-	    num = atol(ser_line);
-	    if (num < artnum || num > lastnum)
-		continue;
-	    while (++priornum < num)
-		uncache_article(ap++,FALSE);
-	    if (which_line == SUBJ_LINE)
-		set_subj_line(ap++, t, strlen(t));
-	    else if (cached)
-		set_cached_line(ap++, which_line, savestr(t));
-	    if (num == artnum)
-		safecat(s,t,size);
-	}
-    } else {
-	fprintf(stderr,"\nUnexpected close of server socket.\n");
-	finalize(1);
-    }
-    while (priornum++ < lastnum)
-	uncache_article(ap++,FALSE);
-    if (copy)
-	s = saferealloc(s, (MEM_SIZE)strlen(s)+1);
-    return s;
-}
-
-#else  /* !USE_NNTP */
 char *
 prefetchlines(artnum,which_line,copy)
 ART_NUM artnum;				/* article to get line from */
@@ -418,22 +336,101 @@ bool_int copy;				/* do you want it savestr()ed? */
     register ART_POS lastpos;
     int size;
 
-    if (copy)
-	return fetchlines(artnum,which_line);
+#ifdef USE_NNTP
+    if (parsed_art != artnum) {
+	ARTICLE *ap;
+	int size;
+	register ART_NUM num, priornum, lastnum;
+	bool cached;
 
-    s = fetchcache(artnum,which_line);
-    if (s)
+	s = fetchcache(artnum,which_line,DONT_FILL_CACHE);
+	if (s) {
+	    if (copy)
+		s = savestr(s);
+	    return s;
+	}
+
+	spin(20);
+	if (copy)
+	    s = safemalloc((MEM_SIZE)(size = LBUFLEN));
+	else {
+	    s = cmd_buf;
+	    size = sizeof cmd_buf;
+	}
+	*s = '\0';
+	priornum = artnum-1;
+	lastnum = artnum + PREFETCH_SIZE - 1;
+	if (lastnum > lastart)
+	    lastnum = lastart;
+	if ((cached = (htype[which_line].ht_flags & HT_CACHED)) != 0)
+	    sprintf(ser_line,"XHDR %s %ld-%ld",htype[which_line].ht_name,
+		artnum,lastnum);
+	else
+	    sprintf(ser_line,"XHDR %s %ld",htype[which_line].ht_name,artnum);
+	nntp_command(ser_line);
+	if (nntp_check(TRUE) == NNTP_CLASS_OK) {
+	    for (ap = find_article(artnum); ; ) {
+		nntp_gets(ser_line, sizeof ser_line);
+# ifdef DEBUG
+		if (debug & DEB_NNTP)
+		    printf("<%s\n", ser_line) FLUSH;
+# endif
+		if (ser_line[0] == '.')
+		    break;
+		if ((t = index(ser_line, '\r')) != Nullch)
+		    *t = '\0';
+		if (!(t = index(ser_line, ' ')))
+		    continue;
+		t++;
+		num = atol(ser_line);
+		if (num < artnum || num > lastnum)
+		    continue;
+		while (++priornum < num)
+		    uncache_article(ap++,FALSE);
+		if (which_line == SUBJ_LINE)
+		    set_subj_line(ap++, t, strlen(t));
+		else if (cached)
+		    set_cached_line(ap++, which_line, savestr(t));
+		if (num == artnum)
+		    safecat(s,t,size);
+	    }
+	} else {
+	    fprintf(stderr,"\nUnexpected close of server socket.\n");
+	    finalize(1);
+	}
+	while (priornum++ < lastnum)
+	    uncache_article(ap++,FALSE);
+	if (copy)
+	    s = saferealloc(s, (MEM_SIZE)strlen(s)+1);
 	return s;
+    }
+#endif
+
+    /* Only return a cached subject line if it isn't the current article */
+    s = Nullch;
+    if (which_line != SUBJ_LINE || parsed_art != artnum)
+	s = fetchcache(artnum,which_line,FILL_CACHE);
     if ((firstpos = htype[which_line].ht_minpos) < 0)
-	return nullstr;
+	s = nullstr;
+    if (s) {
+	if (copy)
+	    s = savestr(s);
+	return s;
+    }
 
     firstpos += htype[which_line].ht_length + 1;
     lastpos = htype[which_line].ht_maxpos;
     size = lastpos - firstpos;
+    if (copy)
+	s = safemalloc((MEM_SIZE)size);
+    else {				/* hope this is okay--we're */
+	s = cmd_buf;			/* really scraping for space here */
+	if (size > sizeof cmd_buf)
+	    size = sizeof cmd_buf;
+    }
     t = headbuf + firstpos;
     while (*t == ' ' || *t == '\t') t++;
-    *cmd_buf = '\0';
-    safecat(cmd_buf,t,CBUFLEN);		/* hope this is okay--we're */
-    return cmd_buf;			/* really scraping for space here */
+    *s = '\0';
+    safecat(s,t,size);
+    return s;
 }
-#endif /* !USE_NNTP */

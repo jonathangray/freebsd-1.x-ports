@@ -1,4 +1,4 @@
-/* $Id: bits.c,v 1.2 1993/07/26 19:12:09 nate Exp $
+/* $Id: bits.c,v 1.3 1993/08/02 23:52:21 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -465,7 +465,7 @@ int markread;
     char *xref_buf, *curxref;
     char tmpbuf[128];
 
-    xref_buf = fetchcache(artnum, XREF_LINE);
+    xref_buf = fetchcache(artnum, XREF_LINE, FILL_CACHE);
     if (!xref_buf || !*xref_buf)
 	return 0;
 
@@ -585,7 +585,7 @@ int markread;
     char *xref_buf, *curxref;
     char tmpbuf[128];
 
-    xref_buf = fetchcache(artnum, NGS_LINE);
+    xref_buf = fetchcache(artnum, NGS_LINE, FILL_CACHE);
     if (!xref_buf || !*xref_buf)
 	return 0;
 

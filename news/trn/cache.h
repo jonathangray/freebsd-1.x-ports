@@ -1,4 +1,4 @@
-/* $Id: cache.h,v 1.2 1993/07/26 19:12:12 nate Exp $
+/* $Id: cache.h,v 1.3 1993/08/02 23:52:26 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -89,7 +89,7 @@ typedef struct rt_art {
 #define Nullart Null(ARTICLE*)
 #define Nullsubj Null(SUBJECT*)
 
-#define was_read(a)     (article_ptr(a)->flags & AF_READ)
+#define was_read(a)     ((a) >= absfirst && (article_ptr(a)->flags & AF_READ))
 
 /* These must never use their args more than once in the definition */
 #define article_num(ap)      (((ap)-article_list)+absfirst)
@@ -112,6 +112,9 @@ EXT ART_NUM last_cached;
 EXT bool cached_all_in_range;
 EXT ARTICLE *sentinel_artp;
 
+#define DONT_FILL_CACHE	0
+#define FILL_CACHE	1
+
 EXT struct rt_subj *first_subject INIT(0);
 EXT struct rt_subj *last_subject INIT(0);
 
@@ -129,7 +132,7 @@ void	close_cache _((void));
 void	cache_article _((ARTICLE*));
 void	check_poster _((ARTICLE*));
 void	uncache_article _((ARTICLE*,bool_int));
-char	*fetchcache _((ART_NUM,int));	/* return actual cache ptr */
+char	*fetchcache _((ART_NUM,int,bool_int));
 char	*get_cached_line _((ARTICLE*, int, bool_int));
 void	set_subj_line _((ARTICLE*, char*, int));
 void	set_cached_line _((ARTICLE*, int, char*));

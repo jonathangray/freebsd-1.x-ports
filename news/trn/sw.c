@@ -1,4 +1,4 @@
-/* $Id: sw.c,v 1.2 1993/07/26 19:13:39 nate Exp $
+/* $Id: sw.c,v 1.3 1993/08/02 23:52:54 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -479,6 +479,24 @@ register char *s;
 	    else
 		actFetchTime = upordown * 5L * 60L;
 	    break;
+	case 'Z':
+	    s++;
+	    if (*s == '=') s++;
+	    try_mt = FALSE;
+	    try_ov = FALSE;
+	    if (upordown) {
+		while (*s) {
+		    switch (*s++) {
+		    case 'o':
+			try_ov = TRUE;
+			break;
+		    case 't':
+			try_mt = TRUE;
+			break;
+		    }
+		}
+	    }
+	    break;
 	default:
 #ifdef VERBOSE
 	    IF(verbose)
@@ -561,6 +579,7 @@ pr_switches()
     else
 	printf("+S ");
 #endif
+    putchar('\n');
 #ifdef VERBOSE
 #ifdef TERSE
     printf("%ct ", mp[!verbose]);
@@ -584,6 +603,15 @@ pr_switches()
 	printf("-z%ld ",(long)actFetchTime / 60);
     else
 	printf("+z ");
+    if (try_mt || try_ov) {
+	printf("-Z");
+	if (try_ov)
+	    putchar('o');
+	if (try_mt)
+	    putchar('t');
+	putchar(' ');
+    } else
+	printf("+Z ");
     fputs("\n\n",stdout) FLUSH;
 #ifdef ONLY
     if (maxngtodo) {

@@ -22,9 +22,9 @@
 # package, which includes metaconfig.)
 #
 
-# $Id: Configure,v 1.2 1993/07/26 19:11:40 nate Exp $
+# $Id: Configure,v 1.3 1993/08/02 23:52:04 nate Exp $
 #
-# Generated on Sun Jul 25 09:51:39 PDT 1993 [metaconfig 2.9dev PL20]
+# Generated on Sat Jul 31 23:21:43 PDT 1993 [metaconfig 2.9dev PL20]
 
 cat >/tmp/c1$$ <<EOF
 ARGGGHHHH!!!!!
@@ -181,9 +181,6 @@ optimize=''
 contains=''
 cppminus=''
 cppstdin=''
-d_bcmp=''
-d_bcopy=''
-d_bzero=''
 d_ftime=''
 aphostcmd=''
 d_gethname=''
@@ -196,6 +193,9 @@ d_havetlib=''
 termlib=''
 d_ignoreorg=''
 d_internet=''
+d_memcmp=''
+d_memcpy=''
+d_memset=''
 d_newsadm=''
 newsadmin=''
 d_nntp=''
@@ -844,7 +844,6 @@ $eunicefix loc
 loclist="
 awk
 cat
-chmod
 echo
 expr
 grep
@@ -1084,6 +1083,8 @@ EOM
 		if $test -f $file.sh; then
 			. ./$file.sh
 			$cat $file.sh >> ../UU/config.sh
+		elif $test X$ans = X -o X$ans = Xnone ; then
+			:
 		else
 			echo "$file.sh does not exist -- ignored"
 		fi
@@ -1483,18 +1484,6 @@ EOM
 	esac
 esac
 
-: determine where manual pages are on this system
-echo " "
-case "$sysman" in
-'') sysman=`./loc . /local/man/man1 /usr/man/man1 /usr/man/man1 /usr/man/mann /usr/man/manl /usr/man/local/man1 /usr/man/u_man/man1 /usr/share/man/man1 /usr/catman/u_man/man1 /usr/man/l_man/man1 /usr/local/man/u_man/man1 /usr/local/man/l_man/man1 /usr/man/man.L1 /usr/man/man.L`
-	;;
-esac
-if $test -d "$sysman"; then
-	echo "System manual is in $sysman." >&4
-else
-	echo "Could not find manual pages in source form." >&4
-fi
-
 : make some quick guesses about what we are up against
 echo " "
 $echo $n "Hmm...  $c"
@@ -1574,6 +1563,90 @@ fi
 chmod +x bsd usg v7 eunice venix
 $eunicefix bsd usg v7 eunice venix
 $rm -f foo
+
+: find out how to find out full name
+case "$d_berknames" in
+"$define")
+	dflt=y;;
+"$undef")
+	dflt=n;;
+*)
+	if bsd; then
+		dflt=y
+	elif xenix; then
+		dflt=y
+	else
+		dflt=n
+	fi
+	;;
+esac
+$cat <<'EOM'
+
+Does your /etc/passwd file keep full names in Berkeley/V7 format (name first
+thing after ':' in GCOS field)?  In that case, a typical entry in the password
+file looks like this:
+
+    guest:**paswword**:10:100:Mister Guest User:/usr/users:/bin/sh
+                              ^^^^^^^^^^^^^^^^^
+EOM
+rp="Berkeley/V7 format for full name in /etc/password?"
+. ./myread
+case "$ans" in
+y*) d_passnames="$define"
+	d_berknames="$define"
+	d_usgnames="$undef"
+	nametype=bsd
+	;;
+*)
+	case "$d_usgnames" in
+	"$define") dflt=y;;
+	"$undef") dflt=n;;
+	*)
+		if usg; then
+			dflt=y
+		else
+			dflt=n
+		fi
+		;;
+	esac
+$cat <<'EOM'
+
+Does your passwd file keep full names in USG format (name sandwiched between a
+'-' and a '(')?  In that case, a typical entry in the password file looks like
+this:
+
+    guest:**paswword**:10:100:000-Mister Guest User(000):/usr/users:/bin/sh
+                                  ^^^^^^^^^^^^^^^^^
+EOM
+	rp="USG format for full name in /etc/passwd?"
+	. ./myread
+	case "$ans" in
+	n*) echo "Full name will be taken from ~/.fullname"
+		d_passnames="$undef"
+		d_berknames="$undef"
+		d_usgnames="$undef"
+		nametype=other
+		;;
+	*)
+		d_passnames="$define"
+		d_berknames="$undef"
+		d_usgnames="$define"
+		nametype=usg
+		;;
+	esac;;
+esac
+
+: determine where manual pages are on this system
+echo " "
+case "$sysman" in
+'') sysman=`./loc . /local/man/man1 /usr/man/man1 /usr/man/man1 /usr/man/mann /usr/man/manl /usr/man/local/man1 /usr/man/u_man/man1 /usr/share/man/man1 /usr/catman/u_man/man1 /usr/man/l_man/man1 /usr/local/man/u_man/man1 /usr/local/man/l_man/man1 /usr/man/man.L1 /usr/man/man.L`
+	;;
+esac
+if $test -d "$sysman"; then
+	echo "System manual is in $sysman." >&4
+else
+	echo "Could not find manual pages in source form." >&4
+fi
 
 : see if we need a special compiler
 echo " "
@@ -2009,12 +2082,9 @@ case "$optimize" in
 esac
 
 case "$ccflags" in
-'')	case "$cc" in
-	*gcc*) dflt='-fpcc-struct-return';;
-	*) dflt='';;
-	esac
-	case "$optimize" in
-	*-g*) dflt="$dflt -DDEBUG";;
+'')	case "$optimize" in
+	*-g*) dflt="-DDEBUG";;
+	*)    dflt='';;
 	esac
 	case "$cc" in
 	*gcc*)	if test -d /etc/conf/kconfig.d &&
@@ -2197,90 +2267,6 @@ yes)
 	*) echo "$sym() NOT found." >&4;;
 	esac;;
 esac'
-
-: see if memcmp exists
-set memcmp d_bcmp
-eval $inlibc
-
-: see if memcpy exists
-set memcpy d_bcopy
-eval $inlibc
-
-: find out how to find out full name
-case "$d_berknames" in
-"$define")
-	dflt=y;;
-"$undef")
-	dflt=n;;
-*)
-	if bsd; then
-		dflt=y
-	elif xenix; then
-		dflt=y
-	else
-		dflt=n
-	fi
-	;;
-esac
-$cat <<'EOM'
-
-Does your /etc/passwd file keep full names in Berkeley/V7 format (name first
-thing after ':' in GCOS field)?  In that case, a typical entry in the password
-file looks like this:
-
-    guest:**paswword**:10:100:Mister Guest User:/usr/users:/bin/sh
-                              ^^^^^^^^^^^^^^^^^
-EOM
-rp="Berkeley/V7 format for full name in /etc/password?"
-. ./myread
-case "$ans" in
-y*) d_passnames="$define"
-	d_berknames="$define"
-	d_usgnames="$undef"
-	nametype=bsd
-	;;
-*)
-	case "$d_usgnames" in
-	"$define") dflt=y;;
-	"$undef") dflt=n;;
-	*)
-		if usg; then
-			dflt=y
-		else
-			dflt=n
-		fi
-		;;
-	esac
-$cat <<'EOM'
-
-Does your passwd file keep full names in USG format (name sandwiched between a
-'-' and a '(')?  In that case, a typical entry in the password file looks like
-this:
-
-    guest:**paswword**:10:100:000-Mister Guest User(000):/usr/users:/bin/sh
-                                  ^^^^^^^^^^^^^^^^^
-EOM
-	rp="USG format for full name in /etc/passwd?"
-	. ./myread
-	case "$ans" in
-	n*) echo "Full name will be taken from ~/.fullname"
-		d_passnames="$undef"
-		d_berknames="$undef"
-		d_usgnames="$undef"
-		nametype=other
-		;;
-	*)
-		d_passnames="$define"
-		d_berknames="$undef"
-		d_usgnames="$define"
-		nametype=usg
-		;;
-	esac;;
-esac
-
-: see if memset exists
-set memset d_bzero
-eval $inlibc
 
 : function used to set $1 to $val
 setvar='var=$1; eval "was=\$$1"; td=$define; tu=$undef;
@@ -2839,6 +2825,18 @@ else
 	fi
 fi
 
+: see if memcmp exists
+set memcmp d_memcmp
+eval $inlibc
+
+: see if memcpy exists
+set memcpy d_memcpy
+eval $inlibc
+
+: see if memset exists
+set memset d_memset
+eval $inlibc
+
 : get news administrator name
 case "$newsadmin" in
 '')
@@ -3014,21 +3012,25 @@ eval $inlibc
 
 : see which of string.h or strings.h is needed
 echo " "
-strings=`./findhdr strings.h`
+strings=`./findhdr string.h`
 if $test "$strings" && $test -r "$strings"; then
-    echo "Using <strings.h> instead of <string.h>." >&4
-    val="$undef"
-else
+    echo "Using <string.h> instead of <strings.h>." >&4
     val="$define"
-    strings=`./findhdr string.h`
+else
+    val="$undef"
+    strings=`./findhdr strings.h`
     if $test "$strings" && $test -r "$strings"; then
-	echo "Using <string.h> instead of <strings.h>." >&4
+	echo "Using <strings.h> instead of <string.h>." >&4
     else
 	echo "No string header found -- You'll surely have problems." >&4
     fi
 fi
 set i_string
 eval $setvar
+case "$i_string" in
+"$undef") strings=`./findhdr strings.h`;;
+*)	  strings=`./findhdr string.h`;;
+esac
 
 : index or strchr
 echo " "
@@ -3058,11 +3060,16 @@ set d_strchr
 eval $setvar
 
 : see if strftime exists
+case "$strftimec" in
+'') ;;
+*) d_strftime="$undef";;
+esac
 set strftime d_strftime
 eval $inlibc
 case "$d_strftime" in
 "$undef")
 	case "$strftimec" in
+	' ') dflt='none';;
 	'') dflt="./strftime.c";;
 	*)  dflt="$strftimec";;
 	esac
@@ -3076,7 +3083,7 @@ EOM
 	rp="Where does the source for strftime(3) reside?"
 	. ./getfile
 	case "$ans" in
-	none)	strftimec=''
+	'')	strftimec=' '
 		strftimeo=''
 		;;
 	*)	strftimec="$ans"
@@ -3084,6 +3091,9 @@ EOM
 		d_strftime="$define"
 		;;
 	esac
+	;;
+*)	strftimec=''
+	strftimeo=''
 	;;
 esac
 
@@ -3102,7 +3112,44 @@ else
 	newsspool="$ans"
 fi
 
-: check on .thread/.overview file placement
+: find out what database support they want and any file placement details
+case "$d_useov$d_usemt" in
+"$undef$undef")  dflt=none;;
+"$undef$define") dflt=threads;;
+"$define$undef") dflt=overviews;;
+*) dflt=both;;
+esac
+$cat <<EOM
+
+$Package can take advantage of an mthreads or news overview database if
+one or both of these are available on your system.  Usually $package will
+figure out what's available for itself, but you can have support for
+one or both of these databases disabled by default, if desired.
+
+EOM
+rp="Default database support for 't'hreads, 'o'verviews, 'b'oth, or 'n'one?"
+. ./myread
+case "$ans" in
+t*)	databases=threads
+	d_useov="$undef"
+	d_usemt="$define"
+	xxx=thread
+	;;
+o*)	databases=overviews
+	d_useov="$define"
+	d_usemt="$undef"
+	xxx=overview
+	;;
+n*)	databases=none
+	d_useov="$undef"
+	d_usemt="$undef"
+	;;
+*)	databases=both
+	d_useov="$define"
+	d_usemt="$define"
+	xxx="thread or overview"
+	;;
+esac
 case "$threaddir" in
 '')	if $test "X$d_nntp" = "X$define" ; then
 		dflt="/usr/spool/threads"
@@ -3112,24 +3159,17 @@ case "$threaddir" in
 	;;
 *)	dflt="$threaddir";;
 esac
-case "$d_xdata" in
-define) ans="/tmp";;
-*)	$echo " "
-	$echo "$Package needs to know the base directory for the .thread or .overview files"
-	$echo "on your system.  Answer 'none' if there won't be any."
-	rp="Where do .thread/.overview files reside?"
+if $test "$d_xdata" = "$define" -o "$databases" = "none"; then
+	ans="/tmp"
+else
+	$echo " "
+	$echo "$Package needs to know the base directory for the $xxx files"
+	$echo "on your system."
+	rp="Where do $xxx files reside?"
 	. ./myread
-	;;
-esac
+fi
 threaddir="$ans"
 overviewdir="$ans"
-if $test "X$ans" = "X$none" ; then
-    d_useov=undef
-    d_usemt=undef
-else
-    d_useov=define
-    d_usemt=define
-fi
 
 : preserve RCS keywords in files with variable substitution, grrr
 Id='$Id'
@@ -3299,14 +3339,8 @@ installprivlib="$ans"
 
 : must not allow self reference
 case "$privlib" in
-  /*)
-	filexp=$privlib/filexp
-	;;
-  *)
-	cd ..
-	filexp=`pwd`/filexp
-	cd UU
-	;;
+/*)	filexp=$privlib/filexp ;;
+*)	filexp=Rnfilexp ;;
 esac
 
 : check for ispell spelling checker
@@ -3350,10 +3384,16 @@ y*)	dflt=$dflt_prg
 	rp='What is the full pathname of the executable?'
 	. ./getfile
 	ispell_prg=$ans
-	dflt=$dflt_options
+	case "$dflt_options" in
+	'') dflt=none;;
+	*) dflt=$dflt_options;;
+	esac
 	rp="What options should be used?"
 	. ./myread
-	ispell_options=$ans
+	case "$ans" in
+	none)	ispell_options='';;
+	*)	ispell_options=$ans;;
+	esac
 	;;
 *)	ispell_prg='none'
 	;;
@@ -3457,19 +3497,22 @@ esac
 : get organization name
 longshots='/local/src /usr/src/new /usr/src/local /usr/local/src'
 case "$orgname" in
-'') if xxx=`./loc news/src/defs.h x $longshots`; then
+'')	xxx=`./loc news/src/defs.h x $longshots`
+	if $test $xxx != x; then
 		dflt=`$sed -n 's/^.*MYORG[ 	]*"\(.*\)".*$/\1/p' $xxx`
 	else
 		if $test "$d_portable" = "$define"; then
 			if $test -f /usr/lib/news/organi[sz]ation; then
 				dflt=/usr/lib/news/organi[sz]ation
+			else
+				dflt=''
 			fi
 		else
 			dflt=''
 		fi
 	fi
 	;;
-*)  dflt="$orgname";;
+*)	dflt="$orgname";;
 esac
 $cat << 'EOH'
  
@@ -4039,9 +4082,6 @@ optimize='$optimize'
 contains='$contains'
 cppminus='$cppminus'
 cppstdin='$cppstdin'
-d_bcmp='$d_bcmp'
-d_bcopy='$d_bcopy'
-d_bzero='$d_bzero'
 d_ftime='$d_ftime'
 aphostcmd='$aphostcmd'
 d_gethname='$d_gethname'
@@ -4054,6 +4094,9 @@ d_havetlib='$d_havetlib'
 termlib='$termlib'
 d_ignoreorg='$d_ignoreorg'
 d_internet='$d_internet'
+d_memcmp='$d_memcmp'
+d_memcpy='$d_memcpy'
+d_memset='$d_memset'
 d_newsadm='$d_newsadm'
 newsadmin='$newsadmin'
 d_nntp='$d_nntp'

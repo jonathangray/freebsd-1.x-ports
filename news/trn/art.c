@@ -1,4 +1,4 @@
-/* $Id: art.c,v 1.2 1993/07/26 19:11:57 nate Exp $
+/* $Id: art.c,v 1.3 1993/08/02 23:52:19 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -182,8 +182,6 @@ do_article()
 	    if (firstline) {
 		interp(art_buf, (sizeof art_buf), firstline);
 		linenum += tree_puts(art_buf,linenum+topline,0);
-		artopen(art);		/* rewind article in case interp */
-					/* forced a header parse */
 	    } else 
             {
 		ART_NUM i;

@@ -3,7 +3,7 @@ case $CONFIG in
 esac
 echo "Extracting Makefile (with variable substitutions)"
 $cat >Makefile <<!GROK!THIS!
-# $Id: Makefile.SH,v 1.2 1993/07/26 19:11:47 nate Exp $
+# $Id: Makefile.SH,v 1.3 1993/08/02 23:52:09 nate Exp $
 #
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -32,6 +32,7 @@ ndirc = $ndirc
 ndiro = $ndiro
 strftimec = $strftimec
 strftimeo = $strftimeo
+filexp = $filexp
 
 libs = $libndir $termlib $jobslib -lm $libs
 !GROK!THIS!
@@ -118,15 +119,16 @@ $(h):
 install: $(public) $(private) $(manpages)
 # won't work with csh
 	export PATH || exit 1
-	- mv $(rnibin)/trn $(rnibin)/trn.old
-	- if test `pwd` != $(rnibin); then cp $(public) $(rnibin); fi
+	- (cd `./filexp $(rnibin)`; mv trn trn.old)
+	- if test `pwd` != `./filexp $(rnibin)`; then cp $(public) `./filexp $(rnibin)`; fi
+	- if test $(filexp) = Rnfilexp; then cp ./filexp `./filexp $(rnibin)/Rnfilexp`; fi
 	- ./makedir `./filexp $(rnilib)`
 	- if test `pwd` != `./filexp $(rnilib)`; then cp INIT filexp $(private) `./filexp $(rnilib)`; fi
 #NNTP	- if test `pwd` != `./filexp $(rnilib)`; then strip `./filexp $(rnilib)`/getactive ; fi
 	- if test ! -f `./filexp $(rnilib)/newsnews`; then cp newsnews `./filexp $(rnilib)`; fi
-	- if test "X`pwd`" != X$(mansrc) -a X$(mansrc) != X; then \
+	- if test "X$(mansrc)" != "X" -a "X`pwd`" != X`./filexp $(mansrc)`; then \
 for page in $(manpages); do \
-dest=$(mansrc)/`basename $$page .1`.$(manext); \
+dest=`./filexp $(mansrc)`/`basename $$page .1`.$(manext); \
 rm -f $$dest; cp $$page $$dest; chmod 444 $$dest; \
 done; \
 fi
@@ -170,7 +172,7 @@ define)	sed < Makefile -e '/^#NNTP/s/^#NNTP//' > Makefile.new ;;
 *)	sed < Makefile -e '/^#NNTP/d' > Makefile.new ;;
 esac
 case "$strftimec" in
-'')	sed < Makefile.new -e '/^#STRFTIME/d' > Makefile ;;
+''|' ')	sed < Makefile.new -e '/^#STRFTIME/d' > Makefile ;;
 *)	sed < Makefile.new -e '/^#STRFTIME/s/^#STRFTIME//' > Makefile ;;
 esac
 rm Makefile.new

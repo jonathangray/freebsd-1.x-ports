@@ -1,4 +1,4 @@
-/* $Id: cache.c,v 1.2 1993/07/26 19:12:11 nate Exp $
+/* $Id: cache.c,v 1.3 1993/08/02 23:52:23 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -287,9 +287,10 @@ bool_int remove_empties;
 /* get the header line from an article's cache or parse the article trying */
 
 char *
-fetchcache(artnum,which_line)
+fetchcache(artnum,which_line,fill_cache)
 ART_NUM artnum;
 int which_line;
+bool_int fill_cache;
 {
     register char *s;
     register ARTICLE *ap;
@@ -300,10 +301,12 @@ int which_line;
 	return nullstr;
     if (cached && (s=get_cached_line(ap,which_line,untrim_cache)) != Nullch)
 	return s;
+    if (!fill_cache)
+	return Nullch;
     if (!parseheader(artnum))
 	return nullstr;
-    if (cached && (s=get_cached_line(ap,which_line,untrim_cache)) != Nullch)
-	return s;
+    if (cached)
+	return get_cached_line(ap,which_line,untrim_cache);
     return Nullch;
 }
 
@@ -356,12 +359,15 @@ register int size;
 {
     HASHDATUM data;
     SUBJECT *sp;
-    char *newsubj, *subj_start = get_subject_start(subj);
+    char *newsubj, *subj_start;
     char *t, *f;
     int i;
 
-    if (subj != subj_start) {
-	size -= subj_start - subj;
+    while (*subj && *subj != '\n' && (unsigned char)*subj <= ' ')
+	subj++;
+    if (subj != (subj_start = get_subject_start(subj))) {
+	if ((size -= subj_start - subj) < 0)
+	    size = 0;
 	ap->flags |= AF_HAS_RE;
     }
     if (ap->subj && strnEQ(ap->subj->str+4, subj_start, size))
@@ -641,11 +647,9 @@ cache_all_arts()
 	cached_all_in_range = TRUE;
     }
     if (first_cached > absfirst) {
-#ifdef USE_OV
 	if (ov_opened)
 	    ov_data(absfirst, first_cached-1, TRUE);
 	else
-#endif
 	    art_data(absfirst, first_cached-1, TRUE, TRUE);
 	/* If we got interrupted, make a quick exit */
 	if (first_cached > absfirst)
@@ -745,14 +749,11 @@ ART_NUM last;
     setspin(SPIN_FOREGROUND);
 
     if (first < first_cached) {
-#ifdef USE_OV
 	if (ov_opened) {
 	    ov_data(absfirst,first_cached-1,FALSE);
 	    if ((success = (first_cached == absfirst)) != FALSE)
 		ov_close();
-	} else
-#endif
-	{
+	} else {
 	    success = art_data(first, first_cached-1, FALSE, all_arts);
 	    cached_all_in_range = (all_arts && success);
 	}

@@ -1,4 +1,4 @@
-/* $Id: rt-page.c,v 1.2 1993/07/26 19:13:21 nate Exp $
+/* $Id: rt-page.c,v 1.3 1993/08/02 23:52:48 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -448,7 +448,7 @@ try_again:
 	    if (!(ap->flags & AF_INCLUDED))
 		continue;
 	    sel = !!(ap->flags & sel_mask) + (ap->flags & AF_DEL);
-	    sel_items[sel_item_cnt].ptr = (void*)ap;
+	    sel_items[sel_item_cnt].ptr = (VOIDPTR*)ap;
 	    sel_items[sel_item_cnt].line = sel_line;
 	    sel_items[sel_item_cnt].sel = sel;
 	    sel_page_arts++;
@@ -490,7 +490,7 @@ try_again:
 		    /* If it doesn't fit, save it for the next page */
 		    if (sel_line + line_cnt > LINES - 3)
 			break;
-		    sel_items[sel_item_cnt].ptr = (void*)sp;
+		    sel_items[sel_item_cnt].ptr = (VOIDPTR*)sp;
 		    sel_items[sel_item_cnt].line = sel_line;
 		    sel_items[sel_item_cnt].sel = sel;
 		    sel_page_arts += sp->misc;

@@ -1,4 +1,4 @@
-/* $Id: respond.c,v 1.2 1993/07/26 19:13:15 nate Exp $
+/* $Id: respond.c,v 1.3 1993/08/02 23:52:43 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -168,6 +168,7 @@ Saving null articles is not very productive!  :-)\n\
 		    continue;	/* Ignore empty or initially-whitespace lines */
 #ifdef METAMAIL
 		if (mime_article) {
+		    char oldmode = mode;
 		    if (!custom_extract) {
 			printf("Extracting MIME article into %s:\n", s) FLUSH;
 			extractprog = savestr(filexp(getval("MIMESTORE",MIMESTORE)));
@@ -179,11 +180,13 @@ Saving null articles is not very productive!  :-)\n\
 		    interp(cmd_buf, sizeof cmd_buf,
 			   getval("EXMIMESAVER",EXMIMESAVER));
 		    termlib_reset();
+		    mode = 'x';
 		    resetty();		/* restore tty state */
 		    doshell(SH,cmd_buf);
 		    noecho();		/* revert to cbreaking */
 		    crmode();
 		    termlib_init();
+		    mode = oldmode;
 		    break;
 		}
 #endif
@@ -701,11 +704,13 @@ void
 invoke(cmd,dir)
 char *cmd,*dir;
 {
+    char oldmode = mode;
     if (chdir(dir)) {
 	printf(nocd,dir) FLUSH;
 	return;
     }
     termlib_reset();
+    mode = 'x';
 #ifdef VERBOSE
     IF(verbose)
 	printf("\n(leaving cbreak mode; cwd=%s)\nInvoking command: %s\n\n",
@@ -728,6 +733,7 @@ char *cmd,*dir;
 	fputs("\n(+cbreak)\n",stdout) FLUSH;
 #endif
     termlib_init();
+    mode = oldmode;
 #ifdef USE_NNTP
     if (chdir(spool)) {
 #else

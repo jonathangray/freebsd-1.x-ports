@@ -1,4 +1,4 @@
-/* $Id: rt-ov.c,v 1.2 1993/07/26 19:13:19 nate Exp $
+/* $Id: rt-ov.c,v 1.3 1993/08/02 23:52:46 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -22,8 +22,6 @@
 #include "rt-process.h"
 #include "rt-util.h"
 #include "overview.h"
-
-#ifdef USE_OV
 #include "INTERN.h"
 #include "rt-ov.h"
 
@@ -318,5 +316,3 @@ ov_close()
 	ov_opened = FALSE;
     }
 }
-
-#endif /* USE_OV */

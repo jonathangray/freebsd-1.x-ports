@@ -4,7 +4,7 @@ esac
 echo "Extracting Pnews (with variable substitutions)"
 $spitshell >Pnews <<!GROK!THIS!
 $startsh
-# $Id: Pnews.SH,v 1.2 1993/07/26 19:11:51 nate Exp $
+# $Id: Pnews.SH,v 1.3 1993/08/02 23:52:13 nate Exp $
 # 
 # This software is Copyright 1991 by Stan Barber. 
 #
@@ -103,12 +103,12 @@ newsgroups=${NEWSGROUPS-$lib/newsgroups}
 active=${NEWSACTIVE-$active}
 news_sig=${NEWSSIGNATURE-$dotdir/.news_sig}
 
-if $test ! -f $newsgroups -a -x $rnlib/getactive; then
+if $test ! -f "$newsgroups" -a -r "$rnlib/getactive"; then
     newsgroups="$tmp/Pnng.$$";
     rmlist="$newsgroups";
     cmdlist="$rnlib/getactive newsgroups $tmp/Pnng.$$ ; ";
 fi
-if $test ! -f $active -a -x $rnlib/getactive; then
+if $test ! -f "$active" -a -r "$rnlib/getactive"; then
     active="$tmp/Pnact.$$";
     rmlist="$rmlist $active";
     cmdlist="$cmdlist $rnlib/getactive active $tmp/Pnact.$$";

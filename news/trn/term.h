@@ -1,4 +1,4 @@
-/* $Id: term.h,v 1.2 1993/07/26 19:13:43 nate Exp $
+/* $Id: term.h,v 1.3 1993/08/02 23:52:59 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -27,7 +27,7 @@ EXT long iocount INIT(0);
 #  endif /* lint */
 # else /* FIONREAD */
 #  ifdef HAS_RDCHK
-#define input_pending() (rdchk(0) > 0)		/* boolean only */
+#define input_pending() (nextin!=nextout || rdchk(0))
 #  else /*  HAS_RDCHK */
 int circfill();
 EXT int devtty INIT(0);

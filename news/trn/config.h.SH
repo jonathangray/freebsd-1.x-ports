@@ -15,7 +15,7 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  * that running config.h.SH again will wipe out any changes you've made.
  * For a more permanent change edit config.sh and rerun config.h.SH.
  *
- * \$Id: config.h.SH,v 1.2 1993/07/26 19:12:15 nate Exp $
+ * \$Id: config.h.SH,v 1.3 1993/08/02 23:52:30 nate Exp $
  */
 
 /* Configuration time: $cf_time
@@ -40,24 +40,6 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #$d_eunice EUNICE		/**/
 #$d_eunice VMS		/**/
 
-/* bcmp:
- *	This symbol is maped to memcmp if the memcmp() routine is
- *	available to compare byte sequences.
- */
-#$d_bcmp bcmp(s,d,l) memcmp((s),(d),(l))	/* mapped to memcmp */
-
-/* bcopy:
- *	This symbol is maped to memcpy if the bcopy() routine is not
- *	available to copy strings.
- */
-#$d_bcopy bcopy(s,d,l) memcpy((d),(s),(l))		/* mapped to memcpy */
-
-/* bzero:
- *	This symbol is maped to memset if the bzero() routine is not
- *	available to set memory to 0.
- */
-#$d_bzero bzero(s,l) memset((s),0,(l))	/* mapped to memset */
-
 /* HAS_GETPWENT
  *	This symbol, if defined, indicates that the getpwent() routine
  *	should be used instead of the getpw() routine.
@@ -69,6 +51,24 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
  *	are available.  There is nothing to include.
  */
 #$d_havetlib	HAS_TERMLIB	/**/
+
+/* HAS_MEMCMP
+ *	This symbol, if defined, indicates that the memcmp routine is available
+ *	to compare blocks of memory.
+ */
+#$d_memcmp HAS_MEMCMP	/**/
+
+/* HAS_MEMCPY
+ *	This symbol, if defined, indicates that the memcpy routine is available
+ *	to copy blocks of memory.
+ */
+#$d_memcpy HAS_MEMCPY	/**/
+
+/* HAS_MEMSET
+ *	This symbol, if defined, indicates that the memset routine is available
+ *	to set blocks of memory.
+ */
+#$d_memset HAS_MEMSET	/**/
 
 /* NEWS_ADMIN
  *	This symbol, if defined, contains the login name of the news
@@ -411,16 +411,16 @@ sed <<!GROK!THIS! >config.h -e 's!^#undef!/\*#define!'
 #define PRIVLIB "$privlib"		/**/
 
 /* THREAD_DIR:
- *	This symbol indicates where the .thread files go.
+ *	This symbol indicates where the thread files go.
  */
 /* OVERVIEW_DIR:
- *	This symbol indicates where the .overview files go.
+ *	This symbol indicates where the overview files go.
  */
 /* USE_MT:
- *	This symbol indicates if .thread file support is desired.
+ *	This symbol indicates if thread file support is desired.
  */
 /* USE_OV:
- *	This symbol indicates if .overview file support is desired.
+ *	This symbol indicates if overview file support is desired.
  */
 #define THREAD_DIR	"$threaddir"		/**/
 #define OVERVIEW_DIR	"$overviewdir"		/**/

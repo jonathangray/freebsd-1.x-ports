@@ -1,4 +1,4 @@
-/* $Id: rthread.c,v 1.2 1993/07/26 19:13:33 nate Exp $
+/* $Id: rthread.c,v 1.3 1993/08/02 23:52:52 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -34,18 +34,13 @@
 
 HASHTABLE *msgid_hash = 0;
 
-bool try_ov = FALSE;
-bool try_mt = FALSE;
-
 void
 thread_init()
 {
-#ifdef USE_OV
-    try_ov = ov_init();
-#endif
-#ifdef USE_MT
-    try_mt = mt_init();
-#endif
+    if (try_ov)
+	try_ov = ov_init();
+    if (try_mt)
+	try_mt = mt_init();
 }
 
 /* Generate the thread data we need for this group.  We must call
@@ -71,12 +66,9 @@ thread_open()
     else
 	set_selector(sel_threadmode, sel_threadsort);
 
-#ifdef USE_MT
     if (try_mt && !first_subject)
 	if (!mt_data())
 	    return;
-#endif
-#ifdef USE_OV
     if (try_ov && first_cached > last_cached)
 	if (thread_always)
 	    (void) ov_data(absfirst, lastart, FALSE);
@@ -86,7 +78,6 @@ thread_open()
 	    first_cached = last_cached+1;
 	} else
 	    (void) ov_data(firstart, lastart, FALSE);
-#endif
 #ifdef USE_NNTP
     if (!ov_opened)
 	setmissingbits();
@@ -149,9 +140,7 @@ thread_close()
     sel_last_ap = 0;
     sel_last_sp = 0;
     selected_only = FALSE;
-#ifdef USE_OV
     ov_close();
-#endif
 }
 
 void
@@ -1290,7 +1279,7 @@ register SUBJECT **spp2;
     int eq;
     if ((eq = (int)((*spp1)->misc - (*spp2)->misc)) != 0)
 	return eq * sel_direction;
-    return (int)((*spp1)->date - (*spp2)->date) * sel_direction;
+    return (int)((*spp1)->date - (*spp2)->date);
 }
 
 int
@@ -1302,7 +1291,7 @@ SUBJECT **spp2;
     register ARTICLE *t2 = (*spp2)->thread;
     if (t1 != t2 && t1 && t2)
 	return strcasecmp(t1->subj->str+4, t2->subj->str+4) * sel_direction;
-    return (int)((*spp1)->date - (*spp2)->date) * sel_direction;
+    return (int)((*spp1)->date - (*spp2)->date);
 }
 
 int
@@ -1323,11 +1312,11 @@ SUBJECT **spp2;
 	    for (sp2=sp2->thread_link; sp2 != t2->subj; sp2=sp2->thread_link)
 		if (sp2->misc)
 		    break;
-	if ((eq = (int)(sp1->date - sp2->date) * sel_direction) != 0)
-	    return eq;
-	return strcasecmp(sp1->str+4, sp2->str+4) * sel_direction;
+	if (!(eq = (int)(sp1->date - sp2->date)))
+	    return strcasecmp(sp1->str+4, sp2->str+4);
+	return eq * sel_direction;
     }
-    return (int)((*spp1)->date - (*spp2)->date) * sel_direction;
+    return (int)((*spp1)->date - (*spp2)->date);
 }
 
 int

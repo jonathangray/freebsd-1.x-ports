@@ -1,4 +1,4 @@
-/* $Id: kfile.c,v 1.2 1993/07/26 19:12:33 nate Exp $
+/* $Id: kfile.c,v 1.3 1993/08/02 23:52:37 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -89,12 +89,14 @@ int entering;
     ART_UNREAD unread = toread[ng];
     int thread_kill_cnt = 0;
     int thread_select_cnt = 0;
+    char *cp;
 
     art = lastart+1;
     killfirst = firstart;
     fseek(kfp,0L,0);			/* rewind file */
     while (fgets(buf,LBUFLEN,kfp) != Nullch) {
-	buf[strlen(buf)-1] = '\0';
+	if (*(cp = buf + strlen(buf) - 1) == '\n')
+	    *cp = '\0';
 	if (strnEQ(buf,"THRU",4)) {
 	    killfirst = atol(buf+4)+1;
 	    if (killfirst < absfirst)
@@ -153,7 +155,7 @@ int entering;
 	}
 	else if (first_time && *buf == '<') {
 	    register ARTICLE *ap;
-	    char *cp = index(buf,' ');
+	    cp = index(buf,' ');
 	    if (!cp)
 		cp = "T,";
 	    else

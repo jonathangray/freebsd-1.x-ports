@@ -1,4 +1,4 @@
-/* $Id: rt-select.h,v 1.2 1993/07/26 19:13:27 nate Exp $
+/* $Id: rt-select.h,v 1.3 1993/08/02 23:52:50 nate Exp $
 */
 /* The authors make no claims as to the fitness or correctness of this software
  * for any use whatsoever, and it is provided as is. Any use of this software
@@ -32,8 +32,10 @@ EXT ART_UNREAD selected_count INIT(0);
 EXT int selected_subj_cnt INIT(0);
 EXT int added_articles INIT(0);
 
+#define VOIDPTR void
+
 struct sel_item {
-    void *ptr;
+    VOIDPTR *ptr;
     int line;
     int sel;
 };

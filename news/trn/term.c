@@ -1,4 +1,4 @@
-/* $Id: term.c,v 1.2 1993/07/26 19:13:41 nate Exp $
+/* $Id: term.c,v 1.3 1993/08/02 23:52:56 nate Exp $
  */
 /* This software is Copyright 1991 by Stan Barber. 
  *
@@ -1026,8 +1026,9 @@ reinp_in_answer:
 	putchar('\n') FLUSH;		/* if return from stop signal */
 	goto reask_in_answer;		/* give them a prompt again */
     }
-    if (!finish_command(TRUE))
-	goto reinp_in_answer;
+    if (*buf != ' ' && *buf != '\n') 
+	if (!finish_command(TRUE))
+	    goto reinp_in_answer;
     mode = oldmode;
 }
 
@@ -1245,29 +1246,32 @@ Signal_t
 winch_catcher(dummy)
 int dummy;
 {
-     /* Reset signal in case of System V dain bramage */
-     sigset(SIGWINCH, winch_catcher);
+    /* Reset signal in case of System V dain bramage */
+    sigset(SIGWINCH, winch_catcher);
 
-     /* Come here if window size change signal received */
+    /* Come here if window size change signal received */
 #ifdef TIOCGWINSZ
-     { struct winsize ws;
-       char lines[10], cols[10];
-       if (ioctl(0, TIOCGWINSZ, &ws) >= 0 && ws.ws_row > 0 && ws.ws_col > 0) {
-	 LINES = ws.ws_row;
-	 COLS = ws.ws_col;
-	 line_col_calcs();
-	 sprintf(lines, "%d", LINES);
-	 sprintf(cols, "%d", COLS);
-	 export("LINES",lines);
-	 export("COLUMNS",cols);
-	 forceme("\f");			/* cause a refresh */
+    {	struct winsize ws;
+	char lines[10], cols[10];
+	if (ioctl(0, TIOCGWINSZ, &ws) >= 0 && ws.ws_row > 0 && ws.ws_col > 0) {
+	    if (LINES != ws.ws_row || COLS != ws.ws_col) {
+		LINES = ws.ws_row;
+		COLS = ws.ws_col;
+		line_col_calcs();
+		sprintf(lines, "%d", LINES);
+		sprintf(cols, "%d", COLS);
+		export("LINES",lines);
+		export("COLUMNS",cols);
+		if (mode == 't' || mode == 'a' || mode == 'p')
+		    forceme("\f");	/* cause a refresh */
 					/* (defined only if TIOCSTI defined) */
-       }
-     }
+	    }
+	}
+    }
 #else
-     /* Well, if SIGWINCH is defined, but TIOCGWINSZ isn't, there's    */
-     /* almost certainly something wrong.  Figure it out for yourself, */
-     /* because I don't know how to deal with it :-)                   */
+    /* Well, if SIGWINCH is defined, but TIOCGWINSZ isn't, there's    */
+    /* almost certainly something wrong.  Figure it out for yourself, */
+    /* because I don't know how to deal with it :-)                   */
 #endif
 }
 #endif
