@@ -1,6 +1,6 @@
 /*
  * $XConsortium: charproc.c,v 1.176.1.1 93/11/03 17:24:20 gildea Exp $
- * $Id: charproc.c,v 1.1 1994/06/27 17:17:43 asami Exp $
+ * $Id: charproc.c,v 1.2 1994/06/27 17:29:35 asami Exp $
  */
 
 /*
@@ -65,6 +65,7 @@
 
 extern jmp_buf VTend;
 
+extern XtAppContext app_con;
 extern Widget toplevel;
 extern void exit();
 extern char *malloc();
@@ -1194,7 +1195,7 @@ static void VTparse()
 			Index(screen, 1);
 			if (term->flags & LINEFEED)
 				CarriageReturn(screen);
-			if (QLength(screen->display) > 0 ||
+			if (XtAppPending(app_con) ||
 			    GetBytesAvailable (ConnectionNumber(screen->display)) > 0)
 			  xevents();
 			parsestate = groundtable;
@@ -1682,7 +1683,7 @@ static void VTparse()
 		      if (!screen->instatus)
 #endif /* STATUSLINE */
 			Index(screen, 1);
-			if (QLength(screen->display) > 0 ||
+			if (XtAppPending(app_con) ||
 			    GetBytesAvailable (ConnectionNumber(screen->display)) > 0)
 			  xevents();
 			parsestate = groundtable;
@@ -1696,7 +1697,7 @@ static void VTparse()
 			Index(screen, 1);
 			CarriageReturn(screen);
 			
-			if (QLength(screen->display) > 0 ||
+			if (XtAppPending(app_con) ||
 			    GetBytesAvailable (ConnectionNumber(screen->display)) > 0)
 			  xevents();
 			parsestate = groundtable;
@@ -2053,15 +2054,26 @@ in_put()
 
 	XFlush(screen->display); /* always flush writes before waiting */
 
-	/* Update the masks and, unless X events are already in the queue,
-	   wait for I/O to be possible. */
+	/* 
+	 * Update the masks and, unless X events are already in the 
+	 * queue, wait for I/O to be possible. 
+	 */
 	select_mask = Select_mask;
 	write_mask = ptymask();
 	select_timeout.tv_sec = 0;
-	select_timeout.tv_usec = 0;
-	i = select(max_plus1, &select_mask, &write_mask, (int *)NULL,
-		   QLength(screen->display) ? &select_timeout
-		   : (struct timeval *) NULL);
+	/*
+	 * if there's either an XEvent or an XtTimeout pending, just take
+	 * a quick peek, i.e. timeout from the select() immediately.  If
+	 * there's nothing pending, let select() block a little while, but
+	 * for a shorter interval than the arrow-style scrollbar timeout.
+	 */
+	if (XtAppPending(app_con))
+		select_timeout.tv_usec = 0;
+	else
+		select_timeout.tv_usec = 50000;
+	i = select(max_plus1, 
+		   &select_mask, &write_mask, (int *)NULL,
+		   select_timeout);
 	if (i < 0) {
 	    if (errno != EINTR)
 		SysError(ERROR_SELECT);
@@ -2075,7 +2087,7 @@ in_put()
 
 	/* if there are X events already in our queue, it
 	   counts as being readable */
-	if (QLength(screen->display) || (select_mask & X_mask)) {
+	if (XtAppPending(app_con) || (select_mask & X_mask)) {
 	    xevents();
 	}
 
@@ -3195,7 +3207,6 @@ static void VTInitialize (wrequest, wnew, args, num_args)
    /* make sure that the resize gravity acceptable */
    if ( new->misc.resizeGravity != NorthWestGravity &&
         new->misc.resizeGravity != SouthWestGravity) {
-       extern XtAppContext app_con;
        Cardinal nparams = 1;
 
        XtAppWarningMsg(app_con, "rangeError", "resizeGravity", "XTermError",
@@ -3839,7 +3850,7 @@ VTReset(full)
 			        * (screen->max_row + 1) + 2 * screen->border,
 			    &junk, &junk);
 			XSync(screen->display, FALSE);	/* synchronize */
-			if(QLength(screen->display) > 0)
+			if(XtAppPending(app_con))
 				xevents();
 		}
 		CursorSet(screen, 0, 0, term->flags);

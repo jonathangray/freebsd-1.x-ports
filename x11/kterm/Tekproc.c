@@ -146,6 +146,8 @@ extern int Tplttable[];
 extern int Tpttable[];
 extern int Tspttable[];
 
+extern XtAppContext app_con;
+
 static int *curstate = Talptable;
 static int *Tparsestate = Talptable;
 
@@ -601,7 +603,7 @@ static void Tekparse()
 				TekGINoff();
 			TCursorDown();
 			if (!TekRefresh &&
-			    (QLength(screen->display) > 0 ||
+			    (XtAppPending(app_con) ||
 			     GetBytesAvailable (ConnectionNumber(screen->display)) > 0))
 			  xevents();
 			break;
@@ -704,7 +706,7 @@ again:
 				TCursorToggle(TOGGLE);
 				Ttoggled = FALSE;
 			}
-			if(QLength(screen->display))
+			if(XtAppPending(app_con) & XtIMXEvent)
 				Tselect_mask = X_mask;
 			else {
 				XFlush(screen->display);

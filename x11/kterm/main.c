@@ -1,6 +1,6 @@
 #ifndef lint
 static char *rid="$XConsortium: main.c,v 1.200.1.1 93/11/02 17:14:14 gildea Exp $";
-static char *ktermid = "$Id: main.c,v 1.1 1994/06/27 17:17:44 asami Exp $";
+static char *ktermid = "$Id: main.c,v 1.2 1994/06/27 17:29:37 asami Exp $";
 #endif /* lint */
 
 /*
@@ -194,6 +194,10 @@ static Bool IsPts = False;
 #ifdef linux
 #define ttyslot() 1
 #endif /* linux */
+
+#ifdef sun
+#include <sys/filio.h>
+#endif
 
 #include <utmp.h>
 #ifdef LASTLOG
@@ -3185,15 +3189,19 @@ int GetBytesAvailable (fd)
     int fd;
 {
 #ifdef FIONREAD
-    static long arg;
+    long arg;
     ioctl (fd, FIONREAD, (char *) &arg);
     return (int) arg;
+#else
+#ifdef FIORDCK
+    return (ioctl (fd, FIORDCHK, NULL));
 #else
     struct pollfd pollfds[1];
 
     pollfds[0].fd = fd;
     pollfds[0].events = POLLIN;
     return poll (pollfds, 1, 0);
+#endif
 #endif
 }
 

@@ -63,21 +63,33 @@ char *malloc();
 static void DoSpecialEnterNotify();
 static void DoSpecialLeaveNotify();
 
+extern XtAppContext app_con;
+
 xevents()
 {
 	XEvent event;
+	XtInputMask input_mask;
 	register TScreen *screen = &term->screen;
-	extern XtAppContext app_con;
 
 	if(screen->scroll_amt)
 		FlushScroll(screen);
-	if (!XPending (screen->display))
-	    /* protect against events/errors being swallowed by us or Xlib */
-	    return;
+	/*
+	 * process timeouts, relying on the fact that XtAppProcessEvent
+	 * will process the timeout and return without blockng on the 
+	 * XEvent queue.  Other sources i.e. the pty are handled elsewhere 
+	 * with select().
+	 */
+	while ((input_mask = XtAppPending(app_con)) & XtIMTimer)
+		XtAppProcessEvent(app_con, XtIMTimer);
+	/*
+	 * If there's no XEvents, don't wait around...
+	 */
+	if ((input_mask & XtIMXEvent) != XtIMXEvent)
+		return;
 	do {
 		if (waitingForTrackInfo)
 			return;
-		XNextEvent (screen->display, &event);
+		XtAppNextEvent (app_con, &event);
 		/*
 		 * Hack to get around problems with the toolkit throwing away
 		 * eventing during the exclusive grab of the menu popup.  By
@@ -103,7 +115,7 @@ xevents()
 		     (event.xany.type != ButtonPress) &&
 		     (event.xany.type != ButtonRelease)))
 		    XtDispatchEvent(&event);
-	} while (QLength(screen->display) > 0);
+	} while ((input_mask = XtAppPending(app_con)) & XtIMXEvent);
 }
 
 
@@ -321,7 +333,7 @@ Bell()
        the bell again? */
     if(screen->bellSuppressTime) {
 	if(screen->bellInProgress) {
-	    if (QLength(screen->display) > 0 ||
+	    if (XtAppPending(app_con) ||
 		GetBytesAvailable (ConnectionNumber(screen->display)) > 0)
 		xevents();
 	    if(screen->bellInProgress) { /* even after new events? */
