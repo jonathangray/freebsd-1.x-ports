@@ -53,11 +53,11 @@ MANN_DIR =	$(MAN_DIR)/mann
 # The directory containing the Tcl sources and headers appropriate
 # for this version of Tk ("." will be replaced or has already
 # been replaced by the configure script):
-TCL_DIR =	/usr/site/tcl7.3/include
+TCL_DIR =	/usr/local/include
 
 # The directory containing the Tcl library archive file appropriate
 # for this version of Tk:
-TCL_BIN_DIR =	/usr/site/tcl7.3/lib
+TCL_BIN_DIR =	/usr/local/lib
 
 # A "-I" switch that can be used when compiling to make all of the
 # X11 include files accessible (the configure script will try to
@@ -131,7 +131,7 @@ ${AC_FLAGS} ${PROTO_FLAGS} ${SECURITY_FLAGS} ${MEM_DEBUG_FLAGS} \
 
 WIDGOBJS = tkButton.o tkEntry.o tkFrame.o tkListbox.o \
 	tkMenu.o tkMenubutton.o tkMessage.o tkScale.o \
-	tkScrollbar.o tkFScale.o
+	tkScrollbar.o
 
 CANVOBJS = tkCanvas.o tkCanvArc.o tkCanvBmap.o tkCanvLine.o \
 	tkCanvPoly.o tkCanvPs.o tkCanvText.o tkCanvWind.o \
@@ -155,7 +155,7 @@ SOBJS = tk3d.so tkArgv.so tkAtom.so tkBind.so tkBitmap.so tkCmds.so \
 
 WIDGSOBJS = tkButton.so tkEntry.so tkFrame.so tkListbox.so \
 	tkMenu.so tkMenubutton.so tkMessage.so tkScale.so \
-	tkScrollbar.so tkFScale.so
+	tkScrollbar.so
 
 CANVSOBJS = tkCanvas.so tkCanvArc.so tkCanvBmap.so tkCanvLine.so \
 	tkCanvPoly.so tkCanvPs.so tkCanvText.so tkCanvWind.so \
