@@ -27,10 +27,6 @@
 
 #define CEIL(x,quantum) ((((int)(x))+(quantum)-1)&~((quantum)-1))
 
-#ifdef FreeBSD
-#undef BSD386
-#endif
-
 #ifdef MIPS
 #define N_DATADDR 0x10000000
 #define N_TXTADDR 0x400000 /* start of headers; text segment follows */
@@ -182,7 +178,11 @@ int export (filid)  /* nonzero return means error occurred, check errno */
 #  if defined(NS32)
     E.a_magic = NS32GMAGIC;
 #  else
-    E.a_magic = ZMAGIC;
+#    if defined(FreeBSD)
+      E.a_magic = QMAGIC;
+#    else
+      E.a_magic = ZMAGIC;
+#    endif
 #  endif
 #endif
 #endif
@@ -244,13 +244,6 @@ int export (filid)  /* nonzero return means error occurred, check errno */
 
     }
 #endif
-#ifdef FreeBSD
-    {int i, nzeros = getpagesize()-sizeof(E);
-	char zeros[__LDPGSZ];
-        for(i=0;i<nzeros;i++) zeros[i]=0;
-        bulletproofWrite(filid,zeros,nzeros);
-    }
-#endif
 #if sony_news || MORE
     {int i, nzeros = getpagesize()-bytcount;
      char zeros[4096];
@@ -264,7 +257,7 @@ int export (filid)  /* nonzero return means error occurred, check errno */
     lseek(filid,N_DATADDR(E),0);
     bulletproofWrite(filid,CEIL(ETEXT,getpagesize()),E.a_data);
 #else
-#if defined(SPARC) && defined(MACH) || defined(BSD386)
+#if defined(SPARC) && defined(MACH) || defined(BSD386) || defined(FreeBSD)
     bulletproofWrite(filid,textstart+sizeof(E),E.a_text-sizeof(E));
 #else
 # if defined(DYNIX)
