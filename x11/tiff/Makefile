@@ -3,7 +3,7 @@
 
 # -------------------------------------------------------------------------
 # Makefile generated from "Imake.tmpl" and <Imakefile>
-# $XFree86: mit/config/Imake.tmpl,v 2.9 1994/02/10 21:22:16 dawes Exp $
+# $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,25 +19,24 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.36 1994/02/12 13:10:13 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 2.38 1994/02/10 21:22:23 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 2.28 1993/10/21 15:48:52 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 2.9 1994/02/12 11:03:55 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 2.7 1993/10/08 16:11:07 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 2002
+# XFree86 version: 2000
 # -------------------------------------------------------------------------
 
-# $XFree86: mit/config/bsdLib.rules,v 2.1 1993/12/03 13:11:55 dawes Exp $
-# $XConsortium: sunLib.rules,v 1.7 91/12/20 11:19:47 rws Exp $
+# $XConsortium: bsdLib.rules,v 1.7 91/12/20 11:19:47 rws Exp $
 
 # operating system:  	FreeBSD
 
@@ -45,7 +44,7 @@
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.36 1994/02/12 13:10:13 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.23 1993/10/16 17:28:07 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -54,11 +53,10 @@
       CURRENT_DIR = .
 
                AR = ar clq
-  BOOTSTRAPCFLAGS = 	-D__FreeBSD__
+  BOOTSTRAPCFLAGS = 	-DFreeBSD
                CC = 		gcc
                AS = as
-              LEX = lex
-           LEXLIB =
+
              YACC = yacc
 
          COMPRESS = compress
@@ -85,8 +83,8 @@
             NROFF = nroff
              NEQN = neqn
      STD_INCLUDES =
-  STD_CPP_DEFINES = -traditional 		-D__FreeBSD__
-      STD_DEFINES = 		-D__FreeBSD__
+  STD_CPP_DEFINES = -traditional 		-DFreeBSD
+      STD_DEFINES = 		-DFreeBSD
  EXTRA_LOAD_FLAGS =
   EXTRA_LIBRARIES = 		-lgnumalloc
      OS_LIBRARIES =
@@ -115,9 +113,6 @@
         CCOPTIONS = -m486
     ANSICCOPTIONS =
 
-        LDRUNPATH =
-       LDLINKPATH = LdLinkPath
-
       ALLINCLUDES = $(INCLUDES) $(EXTRA_INCLUDES) $(TOP_INCLUDES) $(STD_INCLUDES)
        ALLDEFINES = $(ALLINCLUDES) $(STD_DEFINES) $(EXTRA_DEFINES) $(PROTO_DEFINES) $(DEFINES)
            CFLAGS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(ALLDEFINES)
@@ -125,7 +120,7 @@
 
            LDLIBS = $(OS_LIBRARIES) $(SYS_LIBRARIES) $(EXTRA_LIBRARIES)
 
-        LDOPTIONS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(LOCAL_LDFLAGS) -L$(USRLIBDIR) $(LDRUNPATH)
+        LDOPTIONS = $(ANSICCOPTIONS) $(CDEBUGFLAGS) $(CCOPTIONS) $(LOCAL_LDFLAGS) -L$(USRLIBDIR)
 
    LDCOMBINEFLAGS = -X -r
       DEPENDFLAGS =
@@ -142,7 +137,7 @@
 
 # -------------------------------------------------------------------------
 # X Window System Build Parameters
-# $XFree86: mit/config/Project.tmpl,v 2.4 1993/12/19 08:32:59 dawes Exp $
+# $XFree86: mit/config/Project.tmpl,v 2.1 1993/09/17 16:10:43 dawes Exp $
 # $XConsortium: Project.tmpl,v 1.138.1.1 92/11/11 09:49:19 rws Exp $
 
 _percentC_ = %C
@@ -206,7 +201,7 @@ _percentC_ = %C
        CONTRIBSRC = $(TOP)/../contrib
            DOCSRC = $(TOP)/doc
            RGBSRC = $(TOP)/rgb
-        DEPENDSRC = $(SCRIPTSRC)
+        DEPENDSRC = $(UTILSRC)/makedepend
          IMAKESRC = $(CONFIGSRC)
          XAUTHSRC = $(LIBSRC)/Xau
           XLIBSRC = $(LIBSRC)/X
@@ -226,7 +221,6 @@ _percentC_ = %C
         PEXLIBSRC = $(EXTENSIONSRC)/lib/PEXlib
       PHIGSLIBSRC = $(EXTENSIONSRC)/lib/PEX
 
-# $XFree86: mit/config/bsdLib.tmpl,v 2.1 1993/12/17 10:57:09 dawes Exp $
 # $XConsortium: sunLib.tmpl,v 1.14.1.2 92/11/11 09:52.02 rws Exp $
 
 SHLIBLDFLAGS = -Bshareable
@@ -311,7 +305,7 @@ _NULLCMD_ = @echo -n
            CC = 		gcc
     CCOPTIONS = -m486
 ANSICCOPTIONS =
-  STD_DEFINES = 		-D__FreeBSD__
+  STD_DEFINES = 		-DFreeBSD
   CDEBUGFLAGS = -O2
 
 DEFINES=-I. -Dunix ${MACH_DEFINES}
@@ -374,6 +368,14 @@ install:: libtiff.a
 	$(INSTALL) -c $(INSTLIBFLAGS) libtiff.a $(DESTDIR)$(USRLIBDIR)
 	$(RANLIB) $(RANLIBINSTFLAGS) $(DESTDIR)$(USRLIBDIR)/libtiff.a
 
+install:: tiff.h
+	$(INSTALL) -c $(INSTDATFLAGS) tiff.h $(DESTDIR)$(INCDIR)
+
+install:: tiffio.h
+	$(INSTALL) -c $(INSTDATFLAGS) tiffio.h $(DESTDIR)$(INCDIR)
+
+all:: depend
+
 tif_compress.o: Imakefile
 
 g3states.h: mkg3states.c t4.h
@@ -382,6 +384,9 @@ g3states.h: mkg3states.c t4.h
 	./mkg3states > g3states.h || rm g3states.h
 
 depend:: g3states.h
+
+package: install pkg/+ONELINE pkg/+PLIST pkg/+DESC
+	pkg_create -d pkg/+DESC -c pkg/+ONELINE -f pkg/+PLIST tiff_lib
 
 depend::
 	$(DEPEND) $(DEPENDFLAGS) -s "# DO NOT DELETE" -- $(ALLDEFINES) -- $(SRCS)
