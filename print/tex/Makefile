@@ -65,7 +65,7 @@ PSOUT=
 
 ### For TeX: The formats to make by default, why not just leave it
 ### unchanged? 
-FORMATS=tex.fmt latex.fmt
+FORMATS=tex.fmt latex.fmt slitex.fmt
 
 ### For METAFONT: The base(s) to make by default, I feel no need of
 ### having an extra cm.base, since mftopk calls only for mf (plain)
@@ -77,7 +77,7 @@ BASES=mf.base
 ###	dvialw	dvibit	dvican	dvie72	dvieps	dvigd	dviimp
 ###	dvijep	dvijet	dvil3p	dvil75	dvim72	dvimac	dvimpi
 ###	dvioki  dviprx	dvitos	dvio72  all     none
-BEEBEDRV=dvieps dvil3p
+### BEEBEDRV=dvieps dvil3p
 
 ### INTERNATIONAL TeX:
 ### comment out if you don't want multilingual TeX, currently there is
@@ -333,7 +333,7 @@ Xdvi:
 
 dvidrv: stamp-port
 	cd $(dvidrv) ;\
-	make $(makedef) $(BEEBEDRV)
+	make $(makedef)
 
 dviutils: stamp-port
 	cd $(dviutils) ;\
