@@ -9,6 +9,7 @@ SUBDIR += blt
 SUBDIR += ghostscript
 SUBDIR += ghostview
 SUBDIR += jpeg
+SUBDIR += tiff
 SUBDIR += pbmplus
 SUBDIR += ups
 SUBDIR += urt
