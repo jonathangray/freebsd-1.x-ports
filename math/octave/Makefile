@@ -15,6 +15,7 @@ install:
 	gmake install
 clean:
 	cd octave; \
+	rm -f *.a; \
 	gmake clean
 
 package:	all install pkg/+ONELINE pkg/+PLIST
