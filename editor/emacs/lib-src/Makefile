@@ -21,8 +21,8 @@ ALLOCA=
 C_SWITCH_SYSTEM= 
 LOADLIBES= -lutil 
 YACC=yacc
-version=19.21
-configname=i386--freebsd1.1.0
+version=19.22
+configname=i386--freebsd
 
 # ==================== Where To Install Things ====================
 
@@ -31,7 +31,7 @@ configname=i386--freebsd1.1.0
 # the variables below are expressed in terms of this one, so you may
 # not need to change them.  This is set with the --prefix option to
 # `../configure'.
-prefix=/usr/local
+prefix=/usr/gnu
 
 # Like `prefix', but used for architecture-specific files.  This is
 # set with the --exec-prefix option to `../configure'.
@@ -131,13 +131,6 @@ ${archlibdir}: all
 	    chmod 755 ${archlibdir}/$$file ; \
 	  done ; \
 	fi
-	@echo
-	@echo "Changing the owner and group of Emacs's utility programs to \`bin'."
-	@echo "(You may ignore errors here if you don't care about this.)"
-	-for file in ${UTILITIES} ${SCRIPTS} ; do \
-	  chgrp bin ${archlibdir}/$${file} ; \
-	  chown bin ${archlibdir}/$${file} ; \
-	done
 
 # We don't need to install `wakeup' explicitly, because it will be copied when
 # this whole directory is copied.
@@ -164,8 +157,11 @@ uninstall:
 	(cd ${archlibdir}; \
 	 rm -f ${UTILITIES} ${INSTALLABLES} ${SCRIPTS} ${INSTALLABLE_SCRIPTS})
 
-clean mostlyclean:
-	-rm -f ${INSTALLABLES} ${UTILITIES} core *.o
+mostlyclean:
+	-rm -f core *.o
+
+clean: mostlyclean
+	-rm -f ${INSTALLABLES} ${UTILITIES}
 
 distclean: clean
 	-rm -f ../etc/DOC* *.tab.c *.tab.h aixcc.c TAGS

@@ -322,7 +322,7 @@ main (argc, argv, envp)
 
   clearerr (stdin);
 
-#ifdef BSD
+#if defined(BSD) && !defined(__NetBSD__) && !defined(__FreeBSD__)
   {
     inherited_pgroup = EMACS_GETPGRP (0);
     setpgrp (0, getpid ());

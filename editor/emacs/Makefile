@@ -52,11 +52,11 @@ YACC=yacc
 
 ### This should be the number of the Emacs version we're building,
 ### like `18.59' or `19.0'.
-version=19.21
+version=19.22
 
 ### This should be the name of the configuration we're building Emacs
 ### for, like `mips-dec-ultrix' or `sparc-sun-sunos'.
-configuration=i386--freebsd1.1.0
+configuration=i386--freebsd
 
 ### Libraries which should be edited into lib-src/Makefile.
 libsrc_libs= -lutil 
@@ -67,7 +67,7 @@ libsrc_libs= -lutil
 # subdirectories of this directory.  The default values for many of
 # the variables below are expressed in terms of this one, so you may
 # not need to change them.  This defaults to /usr/local.
-prefix=/usr/local
+prefix=/usr/gnu
 
 # Like `prefix', but used for architecture-specific files.
 exec_prefix=${prefix}
@@ -280,7 +280,7 @@ do-install: mkdir
 	   [ -d $${dir} ] \
 	   && [ `(cd $${dir} && /bin/pwd)` != `(cd $${dest} && /bin/pwd)` ] \
 	   && (echo "Copying $${dir}..." ; \
-	       (cd $${dir}; tar -cf - . )|(cd $${dest};umask 0; tar -xvf - ); \
+	       (cd $${dir}; tar -cf - . )|(cd $${dest};umask 022; tar -xvf - ); \
 	       for subdir in `find $${dest} -type d ! -name RCS -print` ; do \
 		 rm -rf $${subdir}/RCS ; \
 		 rm -rf $${subdir}/CVS ; \

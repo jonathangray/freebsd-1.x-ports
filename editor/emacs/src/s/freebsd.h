@@ -19,10 +19,6 @@
 #define A_TEXT_OFFSET(x) (sizeof (struct exec))
 #define A_TEXT_SEEK(hdr) (N_TXTOFF(hdr) + A_TEXT_OFFSET(hdr))
 
-#define HAVE_SETSID
-
-#define LD_SWITCH_SYSTEM -static
-#define YMF_PASS_LDFLAGS(flags) flags
 #define LIBS_DEBUG
 #define LIBS_SYSTEM -lutil
 
@@ -30,6 +26,13 @@
 
 /* For mem-limits.h.  */
 #define BSD4_2
+
+/* Shared library stuff. */
+#define TEXT_START 0
+#define DATA_START 0
+#define UNEXEC unexfreebsd.o
+#define RUN_TIME_REMAP
+#define LINKER cc
 
 /* Reread the time zone on startup.  */
 #define LOCALTIME_CACHE

@@ -28,9 +28,9 @@ OLDXMENU= libXMenu11.a
 LIBXMENU= $(OLDXMENU)
 LIBX= $(LIBXMENU) -L/usr/X386/lib  -lX11     
 GNULIB_VAR = `$(CC) -print-libgcc-file-name` 
-LD=$(CC) -nostdlib 
-LDFLAGS = -static     
-obj=    dispnew.o frame.o scroll.o xdisp.o window.o 	term.o cm.o $(XOBJ) 	emacs.o keyboard.o macros.o keymap.o sysdep.o 	buffer.o filelock.o insdel.o marker.o intervals.o textprop.o  	minibuf.o fileio.o dired.o filemode.o 	cmds.o casetab.o casefiddle.o indent.o search.o regex.o undo.o 	alloc.o data.o doc.o editfns.o callint.o 	eval.o floatfns.o fns.o print.o lread.o 	abbrev.o syntax.o unexec.o  mocklisp.o bytecode.o 	process.o callproc.o 	doprnt.o  
+LD=cc 
+LDFLAGS =      
+obj=    dispnew.o frame.o scroll.o xdisp.o window.o 	term.o cm.o $(XOBJ) 	emacs.o keyboard.o macros.o keymap.o sysdep.o 	buffer.o filelock.o insdel.o marker.o intervals.o textprop.o  	minibuf.o fileio.o dired.o filemode.o 	cmds.o casetab.o casefiddle.o indent.o search.o regex.o undo.o 	alloc.o data.o doc.o editfns.o callint.o 	eval.o floatfns.o fns.o print.o lread.o 	abbrev.o syntax.o unexfreebsd.o  mocklisp.o bytecode.o 	process.o callproc.o 	doprnt.o  
 termcapobj = termcap.o tparam.o
 mallocobj = gmalloc.o ralloc.o vm-limit.o
 allocaobj =
@@ -47,7 +47,7 @@ ${etc}DOC: ${libsrc}make-docfile ${obj} ${lisp}
 ${libsrc}make-docfile:
 	cd ${libsrc}; ${MAKE} ${MFLAGS} make-docfile ../arch-lib
 temacs:   $(LOCALCPP) $(SHORT) $(STARTFILES) $(OLDXMENU) ${obj} ${otherobj}     prefix-args
-	$(LD)  ${STARTFLAGS} ${LDFLAGS}       -o temacs ${STARTFILES} ${obj} ${otherobj}          ${LIBES}
+	$(LD) `./prefix-args -Xlinker  ${STARTFLAGS} ${LDFLAGS} `      -o temacs ${STARTFILES} ${obj} ${otherobj}          ${LIBES}
 prefix-args: prefix-args.c $(config_h)
 	$(CC) $(ALL_CFLAGS) ${srcdir}/prefix-args.c -o prefix-args
 CPP = $(CC) -E
@@ -117,7 +117,7 @@ termcap.o : termcap.c $(config_h)
 terminfo.o : terminfo.c $(config_h)
 tparam.o : tparam.c $(config_h)
 undo.o : undo.c buffer.h commands.h $(config_h) 
-unexec.o  : unexec.c  $(config_h)
+unexfreebsd.o  : unexec.c  $(config_h)
 window.o : window.c indent.h commands.h frame.h window.h buffer.h termchar.h    termhooks.h disptab.h keyboard.h $(config_h)
 xdisp.o : xdisp.c macros.h commands.h indent.h buffer.h dispextern.h    termchar.h frame.h window.h disptab.h termhooks.h $(config_h) 
 xfaces.o : xfaces.c dispextern.h frame.h xterm.h buffer.h blockinput.h    window.h $(config_h) 
@@ -126,6 +126,7 @@ xmenu.o : xmenu.c xterm.h window.h frame.h keyboard.h blockinput.h $(config_h)
 xterm.o : xterm.c xterm.h termhooks.h termopts.h termchar.h window.h   dispextern.h frame.h disptab.h blockinput.h systime.h   gnu.h sink.h sinkmask.h $(config_h)
 xselect.o : xselect.c dispextern.h frame.h xterm.h blockinput.h $(config_h) 
 xrdb.o : xrdb.c $(config_h)
+hftctl.o : hftctl.c $(config_h)
 alloc.o : alloc.c frame.h window.h buffer.h  puresize.h syssignal.h
 alloc.o : blockinput.h $(config_h) intervals.h 
 bytecode.o : bytecode.c buffer.h $(config_h)

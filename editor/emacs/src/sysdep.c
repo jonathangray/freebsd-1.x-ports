@@ -775,7 +775,7 @@ unrequest_sigio ()
 
 /* Saving and restoring the process group of Emacs's terminal.  */
 
-#ifdef BSD
+#if defined(BSD) && !defined(__NetBSD__) && !defined(__FreeBSD__)
 
 /* The process group of which Emacs was a member when it initially
    started.
@@ -1049,7 +1049,7 @@ init_sys_modes ()
 #endif
 #endif /* not VMS */
 
-#ifdef BSD
+#if defined(BSD) && !defined(__FreeBSD__)
   if (! read_socket_hook && EQ (Vwindow_system, Qnil))
     narrow_foreground_group ();
 #endif
@@ -1407,7 +1407,7 @@ reset_sys_modes ()
   hft_reset ();
 #endif
 
-#ifdef BSD
+#if defined(BSD) && !defined(__NetBSD__) && !defined(__FreeBSD__)
   widen_foreground_group ();
 #endif
 }
