@@ -52,8 +52,8 @@ libdir=${exec_prefix}/lib
 # script's `--srcdir' option.  However, the value of ${srcdir} in
 # this makefile is not identical to what was specified with --srcdir,
 # since the variable here has `/lib-src' added at the end.
-srcdir=/a/rich/w/emacs/lib-src
-VPATH=/a/rich/w/emacs/lib-src
+srcdir=.
+VPATH=.
 
 # ==================== Emacs-specific directories ====================
 

@@ -105,10 +105,10 @@ infodir=${prefix}/info
 # expected to be in ${srcdir}/src, and the source code for Emacs's
 # utility programs is expected to be in ${srcdir}/lib-src.  This is
 # set by the configure script's `--srcdir' option.
-srcdir=/a/rich/w/emacs
+srcdir=.
 
 # Tell make where to find source files; this is needed for the makefiles.
-VPATH=/a/rich/w/emacs
+VPATH=.
 
 # ==================== Emacs-specific directories ====================
 
@@ -141,7 +141,7 @@ lisppath=${locallisppath}:${lispdir}
 # entry for the directory containing the installed lisp
 # files has been replaced with ../lisp.  This should be a
 # colon-separated list of directories.
-buildlisppath=${srcdir}/lisp
+buildlisppath=../lisp
 
 # Where to install the other architecture-independent
 # data files distributed with Emacs (like the tutorial,

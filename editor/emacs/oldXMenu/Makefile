@@ -1,6 +1,6 @@
 # Generated automatically from Makefile.in by configure.
-srcdir=/a/rich/w/emacs/oldXMenu
-VPATH=/a/rich/w/emacs/oldXMenu
+srcdir=.
+VPATH=.
 C_SWITCH_X_SITE=-I/usr/X386/include
 
 EXTRA=insque.o

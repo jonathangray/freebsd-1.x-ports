@@ -1,5 +1,5 @@
-srcdir=/a/rich/w/emacs/src
-VPATH=/a/rich/w/emacs/src
+srcdir=.
+VPATH=.
 CC=gcc
 CPP=gcc -E
 CFLAGS=-g -O 
