@@ -24,7 +24,7 @@
 # Comment out "-DVI_MODE" if you don't think that anyone will ever desire
 # the vi line editing mode and features.  Define -DUSG if you are using a
 # System V operating system.
-LOCAL_DEFINES = $(LOCAL_INCLUDES) -DVISIBLE_STATS -DVI_MODE #-DUSG
+LOCAL_DEFINES = $(LOCAL_INCLUDES) -DPAREN_MATCHING -DVISIBLE_STATS -DVI_MODE #-DUSG
 
 # Some systems need to define this (like older NeXT systems) in order
 # to prevent namespace conflicts.
