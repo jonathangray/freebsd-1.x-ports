@@ -28,6 +28,9 @@
 # include <stdio.h>
 
 # include "cdrom_globs.h"
+#ifdef __FreeBSD__
+# include "cdrom_freebsd.h"
+#endif
 #ifdef sun
 # include "cdrom_sun.h"
 #endif
@@ -55,19 +58,19 @@ Widget		title_dialog_widget;
 Widget		title_done_widget;
 
 static int	vol;
+extern void     leds_label_setup();
+static void     cb_track_button();
+static void     cb_timer_button();
+static void     volume_jump_proc();
+static void     volume_scroll_proc();
+static void     popup_title_dialog();
+static void     popdown_title_dialog();
+
 
 void
 logo_setup(parent_widget)
 	Widget		parent_widget;
 {
-	extern void	leds_label_setup();
-	extern void	cb_track_button();
-	extern void	cb_timer_button();
-	extern void	volume_jump_proc();
-	extern void	volume_scroll_proc();
-	extern void	popup_title_dialog();
-	extern void	popdown_title_dialog();
-
 	Widget		version_label_widget;
 	char		version_string[80];
 

@@ -18,6 +18,9 @@
 
 # include "debug.h"
 # include "cdrom_globs.h"
+#ifdef __FreeBSD__
+# include "cdrom_freebsd.h"
+#endif
 #ifdef sun
 # include "cdrom_sun.h"
 #endif
