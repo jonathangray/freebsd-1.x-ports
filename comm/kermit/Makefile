@@ -1,13 +1,15 @@
 PROG=	kermit
-CFLAGS+= -DBSD44 -DCK_CURSES -DDYNAMIC -DTCPSOCKET -DSETREUID -I${.CURDIR}
+CFLAGS+= -DBSD44 -DCK_CURSES -DDYNAMIC -DTCPSOCKET -I${.CURDIR}
 SRCS=	ckcmai.c ckucmd.c ckuusr.c ckuus2.c ckuus3.c ckuus4.c ckuus5.c \
 	ckuus6.c ckuus7.c ckuusx.c ckuusy.c ckcpro.c ckcfns.c ckcfn2.c \
 	ckcfn3.c ckuxla.c ckucon.c ckutio.c ckufio.c ckudia.c ckuscr.c \
 	ckcnet.c
 
-BINOWN= uucp
-BINGRP= dialer
-BINMODE= 4510
+# uncomment these for uucp setuid dialout 
+#CFLAGS+= -DSETREUID
+#BINMODE=4510
+#BINOWN= uucp
+#BINGRP= dialer
 
 .if !defined(${BINDIR})
 BINDIR=/usr/local/bin
