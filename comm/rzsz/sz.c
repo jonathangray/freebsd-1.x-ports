@@ -1,4 +1,4 @@
-#define VERSION "3.32.1 02-18-94"
+#define VERSION "3.32.2 03-15-94"
 #ifdef __386BSD__
 #define PUBDIR "/var/spool/uucppublic"
 #else
@@ -1406,6 +1406,8 @@ getinsync(flag)
 					if (blklen > 32)
 						blklen /= 2;
 			}
+			else
+				Beenhereb4 = 0;
 			Lastsync = Rxpos;
 			return c;
 		case ZACK:
