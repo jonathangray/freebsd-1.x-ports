@@ -1,0 +1,134 @@
+I've severely hacked over the startup configuration process for
+XPilot, to some extent as discussed on the XPilot mailing list.   My
+changes affect command-line options, map file format, and local config
+file format.
+
+What this means is that you can now control any configuration option
+from the command line, the map file, or the local defaults file - the
+system is completely orthogonal.   In general, options specified on
+the command line take precedence over options specified in the map
+file, which take precedence over options specified in the local
+defaults file, all of which take precedence over the built-in
+defaults.   This precedence can be overridden in some ways.
+
+Map files and config files have exactly the same format - in fact, you
+can specify map data in the config file if you want, although of
+course a map file will generally override this.   The format is fairly
+simple - each configuration option is specified as a name, followed by
+a colon, followed by the associated data.
+
+Names must start with an alphabetic character, and may contain any
+character other than a ':' internally, although internal whitespace is
+ignored.   Name comparisons are case-independant, so the names ``shot
+speed'', ``ShotSpeed'' and ``S hoT spEEd'' are all equivalent.
+
+Values may contain any character other than '#', newline and NUL, but
+leading and trailing whitespace is discarded.   Values may include a
+\override: prefix, which overrides the command-line value in the case
+of the map file, and overrides both the command-line value and the map
+value in the case of the configuration file.
+
+Multi-line values (e.g, the map data) may be specified using the
+\multiline: <delimiter> prefix - all subsequent lines up to but not
+including a line which matches the remainder of the value field will
+be stored as the value, and the delimiters will be discarded (see
+below for an example).   If no delimiter is found, the end of the file
+is silently taken as a delimiter.
+
+Blank lines and lines with only whitespace and comments are ignored,
+and any characters following a # character on a line are also ignored.
+
+Options specified on the command line may use the same names as are
+specified in config files, although special command-line-specific
+names have been provided as well for backwards compatibility (see
+below).
+
+A typical map file might look something like this (a bit truncated, of
+course):
+
+mapWidth: 10
+mapHeight: 10
+mapAuthor: Ted Lemon
+mapName: InnerSpace
+mapData: \multiline: foo
+xxxxxxxxxx
+x        x
+x        x
+x        x
+x        x
+x        x
+x        x
+x* *  * *x
+x        x
+xxxxxxxxxx
+foo
+
+There is no imposition of order in this file - for example, the map
+data can appear at the beginning or in the middle, as long as the
+delimiter is used.
+
+A typical local defaults file might look something like this:
+
+gravity: \override: 0	# Nobody in their right mind wants gravity!
+maxRobots: 4		# More robots start to clutter things up...
+
+The set of all possible config file, map file and command line options
+is enumerated in cmdline.c, and can be easily extended.   Currently,
+the following options are available:
+
+config     command line    default    description
+file name  alternative     setting
+---------- --------------- ---------- ----------------------------------------
+gravity	   		    -0.14     The ambient gravity
+shipMass   	             20.0     Mass of player's ships
+shotMass   		      0.1     Mass of an individual shot
+shotSpeed  	             21.0     Shot speed increment from player's speed
+shotLife   	             90	      Length of shot life, in ticks
+maxRobots  robots            -1	      Number of robots to create (-1
+				      means as many as possible)
+maxPlayerShots shots        256	      The most shots from any player
+				      that can be in flight at once
+shotsGravity                true      Are shots affected by gravity?
+loseMass   		    false     Does the player lose mass when shots 
+				      are fired?
+idleRun    rawmode          false     Do robots keep playing without humans?
+noQuit     		    false     Does the server stay up without humans?
+mapWidth   	            100       The width of the map
+mapHeight  	            100	      The height of the map
+mapFileName map          DEFAULT_MAP  The name of the map file (this doesn't
+				      get used except on the command line)
+mapName    	            unknown   The name of the map
+mapAuthor  	           anonymous  The author of the map
+mapData    		    (random)  The map data (yes, this can be specified
+				      on the command line!)
+mapRule    	          -1	      This corresponds to the rule value in
+				      old-style maps, and shouldn't be used
+				      in new maps, since the individual rule
+				      features can now be accessed seperately.
+crashWithPlayer 	    yes	      Can players crash into each other?
+playerKillings  	    yes	      Can players kill each other?
+playerShielding		    yes	      Can shields be used?
+limitedVisibility	    no	      Is visibility limited?
+limitedLives		    no	      Are lives limited?
+worldLives lives            0	      If yes, maximum number of lives
+teamPlay		    yes	      Is team play allowed?
+onePlayerOnly		    no	      Only one player allowed?
+timing			    no	      Are we racing?
+edgeWrap		    no	      Is wraparound enabled?
+edgeBounce		    no	      Is bouncing enabled?
+gravityPoint                0,0	      For line sources, a point through which
+				      the line passes.   For point sources, the
+				      point of origin of the gravity.
+gravityAngle                0	      The angle of the gravity line, if the
+				      source is a uniform line.
+gravityPointSource	    no	      Does the global gravity come from a
+				      point source?
+gravityClockwise	    no	      If yes, is it clockwise?
+gravityAnticlockwise        no	      Anticlockwise?
+defaultsFileName defaults MAPDIR/server-defaults
+				      This is usually specified on the command
+				      line to get an alternate defaults file.
+
+Note that some of the features controlled above aren't implemented yet
+- for example, edge bouncing doesn't work yet, and currently the
+global gravity can only come from the line ``y = 0x + 0''.
