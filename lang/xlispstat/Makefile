@@ -135,9 +135,11 @@ install: installexecs installlisp
 
 installexecs: xlispstat xlisp
 	cp xlispstat ${BINDIR}
+	-mkdir ${XLISPLIB}
 	cp xlisp ${XLISPLIB}
 	
 installlisp:
+	-mkdir ${XLISPLIB}
 	cp ${LISPFILES} ${XLISPLIB}
 	-mkdir ${XLISPLIB}/Data
 	-mkdir ${XLISPLIB}/Examples
