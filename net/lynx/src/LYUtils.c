@@ -16,7 +16,11 @@
 #endif
 
 #ifndef UTMP_FILE
+#if defined(__FreeBSD__) || defined(__bsdi__)
+#define UTMP_FILE "/var/run/utmp"
+#else
 #define UTMP_FILE "/etc/utmp"
+#endif
 #endif
 
 /*
