@@ -49,7 +49,8 @@ struct bootsector {
 	unsigned char nheads[2];	/* Heads */
 	unsigned char nhs[4];		/* number of hidden sectors */
 	unsigned char bigsect[4];	/* big total sectors */
-	unsigned char junk[476];	/* who cares? */
+	unsigned char junk[474];        /* who cares? */
+	unsigned short signat;          /* 0xaa55 */
 };
 
 typedef void SIG_TYPE;

@@ -209,6 +209,7 @@ char *argv[];
 	boot.nsect[1] = sectors / 0x100;
 	boot.nheads[0] = heads % 0x100;
 	boot.nheads[1] = heads / 0x100;
+	boot.signat = 0xaa55;
 
 					/* write the boot */
 	lseek(fd, 0L, 0);
