@@ -1,4 +1,4 @@
-#	$Header: /a/cvs/386BSD/ports/print/afm/Makefile,v 1.2 1993/10/17 00:00:54 ljo Exp $
+#	$Header: /a/cvs/386BSD/ports/print/afm/Makefile,v 1.3 1994/02/01 02:41:21 ljo Exp $
 #
 # FlexFAX Facsimile Software
 #
@@ -90,3 +90,7 @@ install: ${AFMFILES}
 	for i in ${AFMFILES}; do \
 	    ${INSTALL} -c -o bin -g bin -m 444 $$i ${AFMDIR}/`basename $$i .afm`; \
 	done
+
+pkg:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST afm_bin
+
