@@ -21,7 +21,7 @@ install:
 	install -c -m 444 doc/scc.l /usr/local/man/man1/scc.1
 	install -c -m 444 doc/sci.l /usr/local/man/man1/sci.1
 
-pkg: install
+package: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST schemetoc_bin
 
 forANY:

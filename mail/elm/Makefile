@@ -7,8 +7,11 @@
 #         (C) Copyright 1988-1992, USENET Community Trust
 #
 #  $Log: Makefile,v $
-#  Revision 1.12  1994/01/06 06:28:56  jkh
-#  Removed unnecessary src target
+#  Revision 1.13  1994/04/11 15:00:46  jkh
+#  rename pkg target to package to make Julian S. happy.
+#
+# Revision 1.12  1994/01/06  06:28:56  jkh
+# Removed unnecessary src target
 #
 # Revision 1.11  1993/12/28  17:36:18  smace
 # Added clean dependency for the pkg_src target
@@ -122,5 +125,5 @@ _utils:
 	cd utils; $(MAKE) $(MJ) -$(MAKEFLAGS) all
 
 
-pkg:
+package:
 	@echo -n

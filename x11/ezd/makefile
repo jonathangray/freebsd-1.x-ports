@@ -47,7 +47,7 @@ ezd-for-DECstation:
 clean:
 	rm -f ${OBJS} ezdmain.o DECstation-ezd.o
 
-pkg: install
+package: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ezd_bin
 
 noprogs:

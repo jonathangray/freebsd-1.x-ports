@@ -264,7 +264,7 @@ depend: $(CFILES) term.h
 	for i in $(CFILES); do echo $$i; $(CPP_DEPEND) $$i >> tmp_make; done 
 	mv tmp_make Makefile
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST screen_bin

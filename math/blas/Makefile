@@ -25,7 +25,7 @@ SRCS =	caxpy.f cblas1.f cblas2.f ccopy.f cdotc.f cdotu.f cgbmv.f cgemv.f \
 	stpmv.f stpsv.f strmv.f strsv.f xerbla.f
 CLEANFILES+= *.c
 
-pkg:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+package:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST blas_bin
 
 .include <bsd.lib.mk>

@@ -41,7 +41,7 @@ install: tcx untcx
 	mkdir /var/exec
 
 
-pkg:	pkg_bin
+package:	pkg_bin
 
 pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST 
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST tcx_bin

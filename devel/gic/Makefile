@@ -28,7 +28,7 @@ clean:
 	rm -f gic dot.gicrc *.tgz
 
 # Not quite perfect.
-pkg:	pkg_bin
+package:	pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ pkg/+INST all
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ \

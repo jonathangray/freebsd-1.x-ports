@@ -1,7 +1,10 @@
 # : Makefile.SH,v 16408Revision: 1.3 16408Date: 1993/12/30 01:32:17 $
 #
 # $Log: Makefile,v $
-# Revision 1.6  1994/03/05 01:28:13  ache
+# Revision 1.7  1994/04/11 14:59:40  jkh
+# rename pkg target to package to make Julian S. happy.
+#
+# Revision 1.6  1994/03/05  01:28:13  ache
 # 1) Perl uses scrambler crypt() version from libc instead of proper one
 # from -lcrypt (if exist)
 # 2) We have now all sem/shm/msg stuff, add it to perl too
@@ -345,7 +348,7 @@ shlist:
 	echo $(sh) | tr ' ' '\012' >.shlist
 
 
-pkg:	pkg_src pkg_bin
+package:	pkg_src pkg_bin
 
 pkg_src: clean pkg/+DESC_S pkg/+ONELINE_S pkg/+PLIST_S
 	pkg_create -c pkg/+ONELINE_S -d pkg/+DESC_S -f pkg/+PLIST_S perl_src

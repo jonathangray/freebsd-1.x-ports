@@ -317,7 +317,7 @@ depend::
 	$(MAKE) $(MFLAGS)  depend); \
 	done
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all install install.man
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xpm_bin

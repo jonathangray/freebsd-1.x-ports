@@ -943,7 +943,7 @@ gdb.tar.gz: setup-dirs-gdb
 	(cd gdb; $(MAKE) -f Makefile.in make-proto-testsuite.dir)
 	$(MAKE) $(MFLAGS) -f Makefile.in make-gdb.tar.gz
 
-pkg:	pkg_bin
+package:	pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST gdb_bin

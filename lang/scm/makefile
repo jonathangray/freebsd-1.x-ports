@@ -334,7 +334,7 @@ realclean:
 realempty:	temp/scm
 	-rm -f $(afiles)
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST scm

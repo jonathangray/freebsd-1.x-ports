@@ -360,7 +360,7 @@ install::
 	touch $(HSCORE_FILE)
 	chmod a+w $(HSCORE_FILE)
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install install.man
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xjewel_bin

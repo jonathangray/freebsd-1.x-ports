@@ -508,7 +508,7 @@ lint:
 lint1:
 	$(LINT) $(LINTFLAGS) $(FILE) $(LINTLIBS)
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ all install install.man
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ workman_bin

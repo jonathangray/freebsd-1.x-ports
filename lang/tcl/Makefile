@@ -162,7 +162,7 @@ test: tcltest
 	cd $(SRC_DIR); TCL_LIBRARY=`pwd`/library; export TCL_LIBRARY; \
 	cd $$cwd; ( echo cd $(SRC_DIR)/tests\; source all ) | ./tcltest
 
-pkg:	pkg_bin
+package:	pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST tcl_bin

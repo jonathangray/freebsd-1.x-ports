@@ -300,7 +300,7 @@ PICFLAGS = -fpic
 # -------------------------------------------------------------------------
 # start of Imakefile
 
-# $Header: /a/cvs/386BSD/ports/editor/point/Makefile,v 1.1 1994/02/15 22:12:42 jkh Exp $
+# $Header: /a/cvs/386BSD/ports/editor/point/Makefile,v 1.2 1994/04/11 14:58:54 jkh Exp $
 #
 # Point - a text editor for X Windows
 #
@@ -396,7 +396,7 @@ depend::
 
 clean::
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST 		-r pkg/+REQ point_bin

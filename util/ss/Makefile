@@ -1,5 +1,5 @@
 #############################################################################
-# Makefile $Revision: 1.3 $
+# Makefile $Revision: 1.4 $
 #
 # How to build the 'ss' package:
 # 1) Read this Makefile, keeping an eye out for anything that appears to
@@ -571,7 +571,7 @@ clean:
 spotless: clean
 	rm -f $(name) p$(name) 
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
         pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ss_bin

@@ -359,7 +359,7 @@ install::
 clean::
 	rm -f version.h y.tab.* SeParse.c
 
-pkg:
+package:
 	pkg_create -c pkg/+COMMENT -d pkg/+DESC -i pkg/+INSTALL -f pkg/+CONTENTS seyon_bin
 
 Seyon.c: Seyon.ad.h version.h

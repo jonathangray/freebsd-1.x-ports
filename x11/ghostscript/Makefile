@@ -20,6 +20,6 @@ clean:
 	cd gs; \
 	make clean
 
-pkg:	ghostscript install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+package:	ghostscript install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	strip /usr/gnu/bin/gs
 	pkg_create -v -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST ghostscript_bin

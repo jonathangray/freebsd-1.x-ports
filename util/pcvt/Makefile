@@ -6,5 +6,5 @@ all install:
 clean:
 	@echo -n
 
-pkg:
+package:
 	pkg_create -c pkg/+DOC -d pkg/+DESC -f pkg/+PLIST pcvt_kern

@@ -101,7 +101,7 @@ install:
 	install -c -m 444 mprof.1 /usr/local/man/man1
 	install -c libc_mp.a /usr/local/lib
 
-pkg: install
+package: install
 	pkg_create -c pkg/+COMMENT -d pkg/+DESC -f pkg/+CONTENTS mprof
 
 #

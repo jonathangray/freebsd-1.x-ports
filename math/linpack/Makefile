@@ -32,7 +32,7 @@ SRCS =	cchdc.f cchdd.f cchex.f cchud.f cgbco.f cgbdi.f cgbfa.f cgbsl.f \
 	zsvdc.f ztrco.f ztrdi.f ztrsl.f
 CLEANFILES+= *.c
 
-pkg:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+package:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST linpack_bin
 
 .include <bsd.lib.mk>

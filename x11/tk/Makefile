@@ -303,7 +303,7 @@ clean:
 distclean: clean
 	rm -f Makefile config.status
 
-pkg:	pkg_bin
+package:	pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ all install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ tk_bin

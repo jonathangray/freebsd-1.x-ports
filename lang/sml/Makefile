@@ -28,7 +28,7 @@ install: $(PROGS)
 	-mkdir -p /usr/gnu/lib/emacs/site-lisp
 	install -c -m 444 tools/debug/*.el /usr/gnu/lib/emacs/site-lisp
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
 	pkg_create -c pkg/+ONELINE -d doc/release-notes/release-notes.txt -f pkg/+PLIST sml93_bin

@@ -383,7 +383,7 @@ install:
 	@echo Installing vile.hlp to $(DESTDIR) ; cp vile.hlp $(DESTDIR)
 	@chmod 0644 $(DESTDIR)/vile.hlp
 
-pkg:	install
+package:	install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST vile_bin
 
 compr-shar: link.msc /tmp/vilevers
@@ -547,7 +547,10 @@ random.$O:	glob.h
 vmalloc$O:	nevars.h
 
 # $Log: Makefile,v $
-# Revision 1.2  1994/02/25 03:15:50  jkh
+# Revision 1.3  1994/04/11 14:59:00  jkh
+# rename pkg target to package to make Julian S. happy.
+#
+# Revision 1.2  1994/02/25  03:15:50  jkh
 # Added a package for vile.
 #
 # Revision 1.1  1994/02/22  06:34:41  jkh

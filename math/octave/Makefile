@@ -17,6 +17,6 @@ clean:
 	cd octave; \
 	gmake clean
 
-pkg:	all install pkg/+ONELINE pkg/+PLIST
+package:	all install pkg/+ONELINE pkg/+PLIST
 	strip /usr/gnu/bin/octave
 	pkg_create -v -c pkg/+ONELINE -d README.FreeBSD -f pkg/+PLIST octave_bin

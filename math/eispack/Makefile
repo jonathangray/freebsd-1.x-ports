@@ -18,7 +18,7 @@ SRCS =	csroot.f epslon.f pythag.f bakvec.f balanc.f balbak.f bandr.f \
 	tsturm.f cdiv.f
 CLEANFILES+= *.c
 
-pkg:	all install pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ
+package:	all install pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ eispack_bin
 
 .include <bsd.lib.mk>

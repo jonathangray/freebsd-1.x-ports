@@ -158,7 +158,7 @@ test: dpwish
 	cd $$cwd; cd $(SRC_DIR)/tests; \
 	( echo source all\; exit ) | $$cwd/dpwish -notk
 
-pkg:	pkg_bin
+package:	pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST tcl-dp_bin

@@ -1,5 +1,5 @@
 #!smake
-#	$Header: /a/cvs/386BSD/ports/comm/flexfax/Makefile,v 1.3 1994/03/07 03:44:17 ljo Exp $
+#	$Header: /a/cvs/386BSD/ports/comm/flexfax/Makefile,v 1.4 1994/04/11 14:57:23 jkh Exp $
 #
 # FlexFAX Facsimile Software
 #
@@ -99,7 +99,7 @@ install: makeDirs makeDevices
 	    (${ECHO} "= "$$i; cd $$i; ${MAKE} install); \
 	done
 
-pkg:    pkg_bin
+package:    pkg_bin
 
 pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST flexfax_bin

@@ -316,7 +316,7 @@ install::
 	else (set -x; $(MKDIRHIER) /usr/X386/man/man6); fi
 	$(INSTALL) -c $(INSTMANFLAGS) seahaven.6 /usr/X386/man/man6/seahaven.6
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST seahaven_bin

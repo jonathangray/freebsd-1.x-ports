@@ -63,7 +63,7 @@ $(OFILES):      $(HFILES)
 install: all
 	$(INSTALL_PROGRAM) bwbasic $(bindir)/bwbasic
 
-pkg:	install
+package:	install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST bwbasic_bin
 
 uninstall:

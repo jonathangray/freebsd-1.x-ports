@@ -1,4 +1,4 @@
-##  $Revision: 1.3 $
+##  $Revision: 1.4 $
 SHELL	= /bin/sh
 MAKE	= make
 
@@ -107,7 +107,7 @@ tar:
 	mv inn.tar.Z inn`date +%m%d`.tar.Z
 
 
-pkg:
+package:
 	@echo -n
 
 ##  Local convention; for xargs.

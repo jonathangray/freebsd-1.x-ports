@@ -255,4 +255,4 @@ lynx_bin:
 	pkg_create -f pkg/+CONTENTS -d pkg/+DESC -p /usr/local \
 		-c -"LYNX, Version 2.2" lynx_bin.tgz
 
-pkg:    lynx_bin
+package:    lynx_bin

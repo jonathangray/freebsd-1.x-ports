@@ -72,7 +72,7 @@ install: mush
 	cp Mushrc $(MRCDIR)/Mushrc
 	chmod 0644 $(MRCDIR)/Mushrc
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
         pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST mush_bin

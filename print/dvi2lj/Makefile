@@ -5,7 +5,7 @@ PROG=	dvi2lj
 CFLAGS+=-DLJ2P
 SRCS=	dvi2lj.c findfile.c
 
-pkg:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+package:	install pkg/+DESC pkg/+ONELINE pkg/+PLIST
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST dvi2lj_bin
 
 afterinstall:

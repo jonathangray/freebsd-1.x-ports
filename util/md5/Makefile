@@ -8,7 +8,7 @@ MANDIR= /usr/local/man/man
 beforeinstall:
 	./md5 -x | diff - ${.CURDIR}/test.result
 
-pkg: pkg_bin
+package: pkg_bin
 
 pkg_bin: install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST md5

@@ -3,7 +3,7 @@ NOOBJ= noobj
 all clean cleandir depend install lint tags:
 
 
-pkg:
+package:
 	@echo -n
 
 	

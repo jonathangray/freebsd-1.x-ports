@@ -73,7 +73,7 @@ install: ${TARGET}
 	install -c -m 700 -o root -g staff ${TARGET} ${INSTALLDIR}
 	install -c -m 644 -o root -g staff ${MANPAGE} ${MANDIR}
 
-pkg:    pkg_bin
+package:    pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST popper_bin

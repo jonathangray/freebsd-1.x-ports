@@ -317,7 +317,7 @@ PBMPLUSINCDIR = $(INCDIR)
     DEPLIBPNM = $(PNMDIR)/libpnm.a
    DEPLIBTIFF = -ltiff
 
-pkg:	all install pkg/+ONELINE pkg/+DESC pkg/+PLIST
+package:	all install pkg/+ONELINE pkg/+DESC pkg/+PLIST
 	pkg_create -v -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST pbmplus_bin
 
    CURRENTLIBS = $(LIBPBM)

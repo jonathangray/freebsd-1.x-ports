@@ -19,7 +19,7 @@ World:	config
 	@echo Make and Installation of xview is complete!
 	@echo Don't forget to set OPENWINHOME in your ~/.tcshrc or equiv.
 
-pkg:	World pkg/+ONELINE pkg/+DESC pkg/+PLIST
+package:	World pkg/+ONELINE pkg/+DESC pkg/+PLIST
 	pkg_create -c pkg/+ONELINE  -d pkg/+DESC -f pkg/+PLIST xview32_bin
 
 clean:

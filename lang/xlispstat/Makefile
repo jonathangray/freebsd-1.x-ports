@@ -131,7 +131,7 @@ xlispstat: Makefile xlisp setup.shell
 	./setup.shell xlispstat ${XLISPLIB}
 	chmod a+x xlispstat
 
-pkg:	install
+package:	install
 	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xlispstat_bin
 
 install: installexecs installlisp
