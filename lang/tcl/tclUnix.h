@@ -55,6 +55,10 @@
  *				uid_t.  0 means that it doesn't.
  */
 
+#ifndef TCL_PID_T
+#define TCL_PID_T 1
+#endif
+
 #ifndef TCL_GETTOD
 #define TCL_GETTOD 1
 #endif /* TCL_GETTOD */
