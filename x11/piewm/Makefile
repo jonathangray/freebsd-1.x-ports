@@ -418,6 +418,13 @@ deftwmrc.c:  system.twmrc
 
 	@echo '    (char *) 0 };' >>$@
 
+# FreeBSD package entries
+
+package: pkg_bin
+
+pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST all install install.man
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+PREREQ 	  piewm_bin
+
 # -------------------------------------------------------------------------
 # common rules for all Makefiles - do not edit
 
