@@ -1,0 +1,174 @@
+# Generated automatically from Makefile.in by configure.
+#
+# src/Makefile.in  --
+#
+# Makefile for Extended Tcl C sources. 
+# 
+#------------------------------------------------------------------------------
+# Copyright 1992-1993 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: Makefile,v 1.1 1994/02/09 01:53:45 jkh Exp $
+#------------------------------------------------------------------------------
+#
+SHELL = /bin/sh
+
+#------------------------------------------------------------------------------
+# Autoconfig defines that can be overridden in Config.mk
+
+CC          = cc
+RANLIB      = ranlib
+MCS         = touch
+srcdir      = .
+srcbasedir  = /usr1/FreeBSD.ports/lang/tclX
+bldbasedir  = /usr1/FreeBSD.ports/lang/tclX
+VPATH       = .
+prefix      = /usr/local
+exec_prefix = /usr/local
+ARCH        = 
+LIBS        =  -lm
+
+#------------------------------------------------------------------------------
+# Include user-editable defines.
+
+.include "${bldbasedir}/Config.mk"
+
+#------------------------------------------------------------------------------
+
+LIBTCL.A      = ${bldbasedir}/tclmaster/lib${ARCH}/libtcl.a
+LIBTCLX.A     = ${bldbasedir}/tclmaster/lib${ARCH}/libtclx.a
+TCL           = ${bldbasedir}/tclmaster/bin${ARCH}/tcl
+TCLEXTEND.H   = ${bldbasedir}/tclmaster/include/tclExtend.h
+TCLPP_H       = ${bldbasedir}/tclmaster/include/tcl++.h
+APPINIT       = ${bldbasedir}/tclmaster/src/tclXAppInit.c
+SYSLIBS       = ${bldbasedir}/tclmaster/src/SYSLIBS${ARCH}
+TCLXMAINPP.O  = ${bldbasedir}/tclmaster/lib${ARCH}/tclXmain++.o
+
+LDLIBS = ${LIBTCLX.A} ${LIBTCL.A} ${LIBS}
+
+CC_FLAGS = ${CPPFLAGS} ${XCFLAGS} ${CFLAGS} -I${srcbasedir}/src \
+           -I${bldbasedir}/src -I${TCL_UCB_SRC}
+ 
+.c.o:
+	${CC} ${CC_FLAGS} -c $<
+
+#------------------------------------------------------------------------------
+
+OBJS= \
+    tclXbsearch.o    tclXchmod.o      tclXclock.o      tclXcmdInit.o \
+    tclXcmdloop.o    tclXcnvclock.o   tclXdebug.o      tclXdup.o     \
+    tclXfcntl.o      tclXfilecmds.o   tclXfilescan.o   tclXflock.o   \
+    tclXfstat.o      tclXgeneral.o    tclXgetdate.o    tclXhandles.o \
+    tclXid.o         tclXinit.o       tclXkeylist.o    tclXlib.o     \
+    tclXlist.o       tclXmain.o       tclXmath.o       tclXmsgcat.o  \
+    tclXprocess.o    tclXprofile.o    tclXregexp.o     tclXselect.o  \
+    tclXserver.o     tclXsignal.o     tclXshell.o      tclXstring.o  \
+    tclXunixcmds.o   tclXutil.o
+
+UCBOBJS=tclCmdIL.o
+ 
+#------------------------------------------------------------------------------
+# Compile the TclX library and link the shell.  If the link fails, purge
+# the executable, as some systems leave invalid executables around.
+
+all: made.tmp ${TCL} ${TCLEXTEND.H} ${TCLPP_H} ${APPINIT} ${SYSLIBS} \
+     ${TCL_PLUS_BUILD}
+
+${TCL}: tclXAppInit.o ${LIBTCLX.A} ${LIBTCL.A} made.tmp 
+	${CC} ${CC_FLAGS} ${XLDFLAGS} tclXAppInit.o ${LDLIBS} ${XLDLIBS} \
+	      -o ${TCL} || (rm -f ${TCL}; exit 1)
+	if ${DO_STRIPPING} ; then \
+	    strip ${TCL}; \
+	    ${MCS} ${TCL}; \
+	else \
+	    exit 0 ;\
+	fi
+
+made.tmp ${LIBTCLX.A}: ${OBJS} ${UCBOBJS} ${CPLUSOBJS}
+	${AR} cr ${LIBTCLX.A} ${OBJS} ${UCBOBJS} ${CPLUSOBJS}
+	${RANLIB} ${LIBTCLX.A}
+	touch made.tmp
+
+tclCmdIL.o: tclCmdIL.c ${TCL_UCB_SRC}/patchlevel.h
+	MASTER=${TCL_MASTERDIR}/`../tools/tclxversion` ;\
+	${CC} -c ${CC_FLAGS} -DTCL_LIBRARY=\"$$MASTER\" tclCmdIL.c
+
+tclCmdIL.c: ${TCL_UCB_SRC}/tclCmdIL.c
+	rm -f tclCmdIL.c
+	cp ${TCL_UCB_SRC}/tclCmdIL.c tclCmdIL.c
+
+tclXinit.o: tclXinit.c
+	MASTER=${TCL_MASTERDIR}/`../tools/tclxversion` ;\
+	${CC} -c ${CC_FLAGS} -DTCL_MASTERDIR=\"$$MASTER\" \
+	    ${srcdir}/tclXinit.c
+
+tclXcmdInit.o: tclXcmdInit.c tclXpatchl.h
+
+tclXgetdate.c: tclXgetdate.y
+	${YACC} $(srcdir)/tclXgetdate.y
+	sed 's/yy/TclXyy/g' <y.tab.c >tclXgetdate.c
+	rm y.tab.c
+
+tcl++.o: tcl++.C tcl++.h
+	${CCPLUS} -c ${CC_FLAGS} ${srcdir}/tcl++.C
+	${AR} cr ${LIBTCLX.A} tcl++.o
+	${RANLIB} ${LIBTCLX.A}
+	touch made.tmp
+
+#------------------------------------------------------------------------------
+# Copy include files, etc to the master directory.
+#
+
+${TCLEXTEND.H}: tclExtend.h
+	rm -f ${TCLEXTEND.H}
+	cp ${srcdir}/tclExtend.h ${TCLEXTEND.H}
+
+${TCLPP_H}: tcl++.h
+	rm -f ${TCLPP_H}
+	cp ${srcdir}/tcl++.h ${TCLPP_H}
+
+${APPINIT}: tclXAppInit.c
+	rm -f ${APPINIT}
+	cp ${srcdir}/tclXAppInit.c ${APPINIT}
+
+${SYSLIBS}: SYSLIBS
+	rm -f ${SYSLIBS}
+	cp SYSLIBS ${SYSLIBS}
+
+#------------------------------------------------------------------------------
+# Make sure tcl++.h compiles, plus force tcl++.o into the library.
+
+TCL_PLUS: tcl++ tcl++.o ${TCLXMAINPP.O}
+
+tcl++: tclXmain++.o tcl++.o made.tmp
+	${CCPLUS} ${CC_FLAGS} ${XLDFLAGS} tclXmain++.o tclXAppInit.o \
+           ${LDLIBS} ${XLDLIBS} -o tcl++
+
+tclXmain++.o: tcl++.h tclXmain++.C
+	${CCPLUS} -c -I${CPLUSINCL} ${CC_FLAGS} tclXmain++.C
+
+tclXmain++.C: tclXmain.c
+	rm -f tclXmain++.C
+	cp ${srcdir}/tclXmain.c tclXmain++.C
+
+${TCLXMAINPP.O}: tclXmain++.o
+	rm -f ${TCLXMAINPP.O}
+	cp tclXmain++.o ${TCLXMAINPP.O}
+
+#------------------------------------------------------------------------------
+
+clean:
+	-rm -f made.tmp tclXgetdate.c tclXmain++.C tclXAppInit.o tclCmdIL.c
+	-rm -f ${OBJS} ${UCBOBJS} tclXmain++.o tcl++.o ${TCL} tcl++
+
+#------------------------------------------------------------------------------
+# Restore to the distributed state.
+
+distclean: clean
+	rm -f Makefile tclXconfig.h SYSLIBS

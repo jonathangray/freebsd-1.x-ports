@@ -1,0 +1,107 @@
+NAME
+       focus - Direct keyboard events to a particular window
+
+SYNOPSIS
+       focus
+       focus window
+       focus option ?arg arg ...?
+
+
+DESCRIPTION
+       The  focus  command  is used to manage the Tk input focus.
+       At any given time, one window in an application is  desig-
+       nated  as  the focus window for that application;  any key
+       press or key release events directed to any window in  the
+       application  will  be redirected instead to the focus win-
+       dow.  If there is no focus window for an application  then
+       keyboard  events  are  discarded.  Typically, windows that
+       are prepared to deal with  the  focus  (e.g.  entries  and
+       other  widgets  that display editable text) will claim the
+       focus when mouse button 1 is pressed  in  them.   When  an
+       application  is created its main window is initially given
+       the focus.
+
+       The focus command can take any of the following forms:
+
+       focus  If invoked with no  arguments,  focus  returns  the
+              path  name  of the current focus window, or none if
+              there is no focus window.
+
+       focus window
+              If invoked with a single argument consisting  of  a
+              window's  path  name, focus sets the input focus to
+              that window.  The return value is an empty  string.
+
+       focus default ?window?
+              If  window  is  specified,  it  becomes the default
+              focus window (the window that  receives  the  focus
+              whenever  the focus window is deleted) and the com-
+              mand returns an  empty  string.   If  window  isn't
+              specified, the command returns the path name of the
+              current default focus window, or none if  there  is
+              no  default.   Window  may  be specified as none to
+              clear its existing value.  The  default  window  is
+              initially none.
+
+       focus none
+              Clears  the focus window, so that keyboard input to
+              this application will be discarded.
+
+
+FOCUS EVENTS
+       Tk's model of the input focus is different than X's model,
+       and  the  focus  window  set with the focus command is not
+       usually  the  same  as  the  X  focus  window.   Tk  never
+       explicitly  changes the official X focus window.  It waits
+       for the window manager to direct the X input focus to  and
+       from  the  application's  top-level windows, and it inter-
+       cepts FocusIn and FocusOut events coming from the X server
+       to detect these changes.  All of the focus events received
+       from X are discarded by Tk;  they never reach the applica-
+       tion.  Instead, Tk generates a different stream of FocusIn
+       and FocusOut for the application.  This means that FocusIn
+       and  and  FocusOut events seen by the application will not
+       obey the conventions described in  the  documentation  for
+       Xlib.
+
+       Tk  applications receive two kinds of FocusIn and FocusOut
+       events, which can be distinguished by their detail fields.
+       Events with a detail of NotifyAncestor are directed to the
+       current focus window when it becomes active  or  inactive.
+       A  window  is the active focus whenever two conditions are
+       simultaneously true: (a) the window is  the  focus  window
+       for  its application, and (b) some top-level window in the
+       application has received the X focus.  When  this  happens
+       Tk  generates  a  FocusIn  event for the focus window with
+       detail NotifyAncestor.  When a  window  loses  the  active
+       focus (either because the window manager removed the focus
+       from the application or because the focus  window  changed
+       within  the application) then it receives a FocusOut event
+       with detail NotifyAncestor.
+
+       The events described above are directed  to  the  applica-
+       tion's  focus  window regardless of which top-level window
+       within the application has received the focus.  The second
+       kind of focus event is provided for applications that need
+       to know which particular top-level window has the X focus.
+       Tk generates FocusIn and FocusOut events with detail Noti-
+       fyVirtual for top-level windows whenever they  receive  or
+       lose  the  X focus.  These events are generated regardless
+       of which window in the application has the Tk input focus.
+       They  do not imply that keystrokes will be directed to the
+       window that receives  the  event;   they  simply  indicate
+       which top-level window is active as far as the window man-
+       ager is concerned.  If a  top-level  window  is  also  the
+       application's  focus  window,  then  it  will receive both
+       NotifyVirtual and NotifyAncestor events when  it  receives
+       or loses the X focus.
+
+       Tk  does  not  generate the hierarchical chains of FocusIn
+       and FocusOut events described in  the  Xlib  documentation
+       (e.g.   a window can get a FocusIn or FocusOut event with-
+       out all of its ancestors getting  events  too).   Further-
+       more,  the mode field in focus events is always NotifyNor-
+       mal and the only values ever present in the  detail  field
+       are NotifyAncestor and NotifyVirtual.
+KEYWORDS
+       events, focus, keyboard, top-level, window manager

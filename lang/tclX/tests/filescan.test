@@ -1,0 +1,315 @@
+#
+# filescan.test
+#
+# Tests for the scancontext and scanfile commands.
+#---------------------------------------------------------------------------
+# Copyright 1992-1993 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: filescan.test,v 1.1 1994/02/09 01:54:11 jkh Exp $
+#------------------------------------------------------------------------------
+#
+
+if {[info procs test] != "test"} then {source testlib.tcl}
+
+# Increment a name.  This takes a name and "adds one" to it, that is advancing
+# each digit lexically through "0"..."9" -> "A"-"Z" -> "a"..."z".  When one
+# digit wraps, the next one is advanced.  Optional arg forces upper case only
+# if true and start with all upper case or digits.
+
+proc IncrName {Name args} {
+    set Upper [expr {([llength $args] == 1) && [lindex $args 0]}]
+    set Last  [expr [clength $Name]-1]
+    set Begin [csubstr $Name 0 $Last]
+    set Digit [cindex $Name $Last]
+    set Recurse 0
+    case $Digit in {
+        {9}     {set Digit A}
+        {Z}     {if {$Upper} {set Recurse 1} else {set Digit a}}
+        {z}     {set Recurse 1}
+        default {set Digit [ctype char [expr [ctype ord $Digit]+1]]}
+    }
+    if {$Recurse} {
+        if {$Last == 0} then {
+            return 0 ;# Wrap around
+        } else {
+            return "[IncrName $Begin]0"
+        }
+    }
+    return "$Begin$Digit"
+}
+
+# Proc to generate record that can be validated.  The record has 
+# grows quite large to test the dynamic buffering in the file I/O.
+
+proc GenScanRec {Key LineNum} {
+  set extra [replicate :@@@@@@@@: $LineNum]
+  return  "$Key This is a test record ($extra) index is $Key"
+}
+
+# Proc to validate a matched record.
+
+proc ValMatch {scanInfo id} {
+    global testFH matchInfo
+
+    Test filescan-${id}.1 {filescan tests} {
+         set matchInfo(line)
+    } 0 [GenScanRec [lindex $scanInfo 0] [lindex $scanInfo 2]]
+
+    Test filescan-${id}.2 {filescan tests} {
+         set matchInfo(offset)
+    } 0 [lindex $scanInfo 1]
+
+    Test filescan-${id}.3 {filescan tests} {
+         set matchInfo(linenum)
+    } 0 [lindex $scanInfo 2]
+
+    Test filescan-${id}.4 {filescan tests} {
+         set matchInfo(handle)
+    } 0 $testFH
+
+    set matchType [lindex $scanInfo 3] 
+    global matchCnt
+    incr matchCnt($matchType)
+}
+
+global matchInfo matchCnt chkMatchCnt testFH
+
+foreach i {0 1 2 3 df} {
+    set chkMatchCnt($i)  0
+}
+set scanList       {}
+set maxRec        200
+
+# Build a test file and a list of records to scan for.  Each element in the 
+# list will have the following info:
+#   {key fileOffset fileLineNumber matchType}
+# Also build a file to diff against for the -copyfile option.
+
+unlink -nocomplain {TEST.TMP TEST2.TMP TESTCHK.TMP}
+set testFH [open TEST.TMP w]
+set testChkFH [open TESTCHK.TMP w]
+
+set key FatHeadAAAA
+for {set cnt 0} {$cnt < $maxRec} {incr cnt} {
+    set rec [GenScanRec $key [expr $cnt+1]]
+    if {($cnt % 10) == 0} {
+        set matchType [random 4]
+        incr chkMatchCnt($matchType)
+        set scanInfo [list "$key [tell $testFH] [expr $cnt+1] $matchType"]
+        if {[random 2]} {
+            set scanList [concat $scanList $scanInfo]
+        } else {
+            set scanList [concat $scanInfo $scanList]
+        }
+    } else {
+        incr chkMatchCnt(df)
+        puts $testChkFH $rec
+    }
+    if {$cnt == [expr $maxRec/2]} {
+        set midKey $key
+    }
+    puts $testFH $rec
+    set key [IncrName $key 1]  ;# Upper case only
+}
+
+close $testFH
+close $testChkFH
+
+# Build up the scan context.
+
+set testCH [scancontext create]
+
+foreach scanInfo $scanList {
+    set key [lindex $scanInfo 0]
+    set matchType [lindex $scanInfo 3]
+    set cmd "global matchInfo; ValMatch \{$scanInfo\} 1.1" 
+    case $matchType in {
+      {0} {scanmatch -nocase $testCH [string toupper $key] $cmd}
+      {1} {scanmatch $testCH ^$key  $cmd}
+      {2} {scanmatch $testCH $key\$ $cmd}
+      {3} {scanmatch $testCH $key   $cmd}
+    }
+}
+
+scanmatch $testCH {
+    global matchCnt testFH matchInfo
+
+    incr matchCnt(df)
+
+    Test filescan-1.2 {filescan tests} {
+        set matchInfo(handle)
+    } 0 $testFH
+}
+
+proc ValScan id {
+    global matchInfo matchCnt chkMatchCnt testFH
+
+    Test filescan-${id}.1 {filescan tests} {
+        set matchCnt(0)
+    } 0 [set chkMatchCnt(0)]
+
+    Test filescan-${id}.2 {filescan tests} {
+        set matchCnt(1)
+    } 0 [set chkMatchCnt(1)]
+
+    Test filescan-${id}.3 {filescan tests} {
+        set matchCnt(2)
+    } 0 [set chkMatchCnt(2)]
+
+    Test filescan-${id}.4 {filescan tests} {
+        set matchCnt(3)
+    } 0 [set chkMatchCnt(3)]
+
+    Test filescan-${id}.5 {filescan tests} {
+        set matchCnt(df)
+    } 0 [set chkMatchCnt(df)]
+}
+
+foreach i {0 1 2 3 df} {
+    set matchCnt($i)  0
+}
+set testFH [open TEST.TMP r]
+scanfile $testCH $testFH
+close $testFH
+ValScan 1.3
+
+foreach i {0 1 2 3 df} {
+    set matchCnt($i)  0
+}
+set testFH [open TEST.TMP r]
+set test2FH [open TEST2.TMP w]
+scanfile -copyfile $test2FH $testCH $testFH
+close $testFH
+close $test2FH
+ValScan 1.4
+
+Test filescan-1.5 {filescan tests} {
+    system "diff TESTCHK.TMP TEST2.TMP"
+} 0 0
+
+scancontext delete $testCH
+
+# Test return and continue from within match commands
+
+set testFH [open TEST.TMP r]
+
+set testCH [scancontext create]
+seek $testFH 0
+global matchCnt
+set matchCnt(0) 0
+
+scanmatch $testCH $midKey {
+    global matchCnt
+    incr matchCnt(0)
+    continue;
+}
+
+scanmatch $testCH ^$midKey {
+    error "This should not ever get executed  2.1"
+}
+
+scanmatch $testCH [IncrName $midKey] {
+    return "FudPucker"
+}
+
+Test filescan-2.2 {filescan tests} {
+    scanfile $testCH $testFH
+} 0 "FudPucker"
+
+scancontext delete $testCH
+
+# Test argument checking and error handling.
+
+Test filescan-3.1 {filescan tests} {
+    scancontext foomuch
+} 1 {invalid argument, expected one of: create or delete}
+
+Test filescan-3.2 {filescan tests} {
+    scanmatch $testCH
+} 1 {wrong # args: scanmatch ?-nocase? contexthandle ?regexp? command}
+
+Test filescan-3.3 {filescan tests} {
+    scanmatch
+} 1 {wrong # args: scanmatch ?-nocase? contexthandle ?regexp? command}
+
+Test filescan-3.4 {filescan tests} {
+    scanfile
+} 1 {wrong # args: scanfile ?-copyfile filehandle? contexthandle filehandle}
+
+Test filescan-3.5 {filescan tests} {
+    set testCH [scancontext create]
+    scanfile $testCH $testFH
+} 1 {no patterns in current scan context}
+catch {scancontext delete $testCH}
+
+close $testFH
+
+# 
+# Test subMatch handling.
+#
+
+set testFH [open TEST.TMP w]
+loop idx 0 10 {
+    puts $testFH "AAx[replicate xx $idx]xBBc[replicate cc $idx]cDD"
+}
+close $testFH
+
+# Procedure to verify submatches.  Works for upper or lower case.
+
+proc ChkSubMatch {id matchInfoVar} {
+    upvar $matchInfoVar matchInfo
+
+    set idx [expr $matchInfo(linenum) - 1]
+
+    set end0 [expr 3+($idx * 2)]
+    Test filescan-$id.0.$idx {filescan tests} {
+        set matchInfo(submatch0)
+    } 0 "x[replicate xx $idx]x"
+    Test filescan-$id.1.$idx {filescan tests} {
+        set matchInfo(subindex0)
+    } 0 "2 $end0"
+
+    set start1 [expr $end0+3]
+    set end1 [expr $start1+($idx*2)+1]
+    Test filescan-$id.2.$idx {filescan tests} {
+        set matchInfo(submatch1)
+    } 0 "c[replicate cc $idx]c"
+    Test filescan-$id.3.$idx {filescan tests} {
+        set matchInfo(subindex1)
+    } 0 "$start1 $end1"
+
+    Test filescan-$id.4.$idx {filescan tests} {
+        list [info exists matchInfo(submatch2)] \
+             [info exists matchInfo(subindex2)]
+    } 0 {0 0}
+}
+
+set testFH [open TEST.TMP r]
+
+set testCH [scancontext create]
+scanmatch $testCH {\A*(x*)B*(c*)DD} {
+    ChkSubMatch 4 matchInfo
+}
+
+scanmatch -nocase $testCH {\Aa(x*)B(C*)Dd} {
+    ChkSubMatch 5 matchInfo
+}
+
+scanfile $testCH $testFH
+
+close $testFH
+unlink {TEST.TMP TEST2.TMP TESTCHK.TMP}
+
+rename GenScanRec {}
+rename ValMatch {}
+rename ValScan {}
+rename ChkSubMatch {}
+
+unset matchCnt chkMatchCnt matchInfo testFH test2FH testChkFH

@@ -1,0 +1,317 @@
+#
+# tcllib.test
+#
+# Tests for commands and functionallity involved in demand loadable Tcl
+# libraries.
+#---------------------------------------------------------------------------
+# Copyright 1992-1993 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: tcllib.test,v 1.1 1994/02/09 01:54:13 jkh Exp $
+#------------------------------------------------------------------------------
+#
+
+if {[info procs test] == ""} then {source testlib.tcl}
+eval $SAVED_UNKNOWN
+
+# Load the slow-path part of the unknown command.  Otherwise the unknown
+# command will not work when the loadpath is changed.
+
+if ![auto_load tclx_unknown2] {
+    error "can't auto_load tclx_unknown2"
+}
+
+global save_auto_path auto_path
+set save_auto_path $auto_path
+set auto_path {}
+catch {unset auto_path}
+
+if {[id user] == "root"} {
+    puts stderr "*************************************************************"
+    puts stderr "You are running as `root', certain tcllib tests will be"
+    puts stderr "skipped"
+    puts stderr "*************************************************************"
+}
+
+#
+# Since we have libraries coming and going in this test, we need to
+# reset the environment.  
+#
+proc TclLibReset {} {
+    global auto_execs auto_index auto_pkg_index auto_path
+    catch {unset auto_execs}
+    catch {unset auto_index}
+    catch {unset auto_pkg_index}
+    
+    # This alters the internal knowledge of the last path that was loaded.
+    if [info exists auto_path] {
+        set save_auto_path $auto_path
+    } else {
+        set save_auto_path {}
+    }
+    set auto_path {}
+    auto_load
+    set auto_path $save_auto_path
+}
+
+proc TclLibCleanUp {} {
+    catch {chmod +rwx tcllib1.dir}
+    catch {chmod +rwx tcllib2.dir}
+    unlink -nocomplain [glob -nocomplain tcllib1.dir/* tcllib1.dir/.*]
+    unlink -nocomplain [glob -nocomplain tcllib2.dir/* tcllib2.dir/.*]
+    catch {rmdir tcllib1.dir}
+    catch {rmdir tcllib2.dir}
+    TclLibReset
+}
+
+TclLibCleanUp
+
+proc PutFile {fileName args} {
+    set fp [open $fileName w]
+    foreach line $args {
+        puts $fp $line
+    }
+    close $fp
+}
+
+catch {rename buildpackageindex {}} ;# Make sure we can autoload this
+
+#
+# Test parameter checking for the basic commands that are implemented
+# in C.
+#
+
+Test tcllib-1.1 {command parameter checking} {
+    auto_load a b c d
+} 1 {wrong # args: auto_load ?command?}
+
+Test tcllib-1.2 {command parameter checking} {
+    loadlibindex
+} 1 {wrong # args: loadlibindex libFile}
+
+Test tcllib-1.3 {command parameter checking} {
+    loadlibindex a b c d
+} 1 {wrong # args: loadlibindex libFile}
+
+#
+# Test error recovery from bogus paths (should ignore path and not find proc)
+#
+
+Test tcllib-2.1 {bogus path test} {
+    set auto_path [list /bogus/dir/path/no/work [pwd]/../tclmaster]
+    TclLibAAA
+} 1 {invalid command name "TclLibAAA"}
+
+catch {rename buildpackageindex {}} ;# Make sure we can autoload this
+
+Test tcllib-2.2 {bogus path test} {
+    set auto_path [list ~bogususerman/tcllib [pwd]/../tclmaster]
+    TclLibAAA
+} 1 {invalid command name "TclLibAAA"}
+
+Test tcllib-2.3 {bogus path test} {
+    set auto_path [pwd]/../tclmaster
+    set auto_path [list /bogus/dir/path/no/work]
+    TclLibAAA
+} 1 {invalid command name "TclLibAAA"}
+
+
+#
+# Test error recovery from bogus package library indices.
+#
+
+proc BuildTestLib {name {pbase TclLibAA}} {
+   PutFile $name \
+        "#@package: $name-package ${pbase}B ${pbase}C ${pbase}D" \
+        "proc ${pbase}B {} {return \"***${pbase}B***\"}" \
+        "proc ${pbase}C {} {return \"***${pbase}C***\"}" \
+        "proc ${pbase}D {} {return \"***${pbase}D***\"}" \
+        "#@packend"
+}
+
+mkdir tcllib1.dir
+BuildTestLib tcllib1.dir/test1.tlib
+PutFile tcllib1.dir/test1.tndx {bogus
+data}
+
+TclLibReset
+set auto_path [list [pwd]/tcllib1.dir [pwd]/../tclmaster]
+
+TestReg tcllib-3.1 {bogus package library index} {
+    TclLibAAB
+} 1 {^format error in library index "/.*test1.tndx" \(bogus\)$}
+
+catch {rename buildpackageindex {}} ;# Make sure we can autoload this
+
+PutFile tcllib1.dir/test1.tndx \
+    {test1-package 56 240 TclLibAAB TclLibAAC TclLibAAD}
+
+TestReg tcllib-3.2 {bogus package library index} {
+    TclLibAAB
+} 1 {^range to eval outside of file bounds "/.*test1.tlib"$}
+
+
+PutFile tcllib1.dir/test1.tndx \
+    {test1-package -1 140 TclLibAAB TclLibAAC TclLibAAD}
+
+TestReg tcllib-3.3 {bogus package library index} {
+    TclLibAAB
+} 1 {^range to eval outside of file bounds "/.*test1.tlib"$}
+
+catch {rename buildpackageindex {}} ;# Make sure we can autoload this
+
+PutFile tcllib1.dir/test1.tndx \
+    {test1-package 156 40 TclLibAAB TclLibAAC TclLibAAD}
+
+TestReg tcllib-3.4 {bogus package library index} {
+    TclLibAAB
+} 1 {^range to eval outside of file bounds "/}
+
+TclLibReset
+set auto_path [list [pwd]/tcllib2.dir [pwd]/../tclmaster]
+
+if {[id user] != "root"} {
+    Test tcllib-4.1 {bad rebuild package library index} {
+        global errorCode errorInfo
+        mkdir tcllib2.dir
+        BuildTestLib tcllib2.dir/test1.tlib TclLibAB
+        chmod -w tcllib2.dir
+        list [catch {TclLibABB} msg] [crange $msg 0 25] \
+             [lrange $errorCode 0 1] \
+             [string match "*while loading Tcl library index*" $errorInfo] \
+             [string match "*while auto loading \"TclLibABB\"*" $errorInfo]
+    } 0 {1 {building package index for} {POSIX EACCES} 1 1}
+}
+
+TclLibCleanUp
+mkdir tcllib1.dir
+set auto_path [list [pwd]/tcllib1.dir [pwd]/../tclmaster]
+
+PutFile tcllib1.dir/tclIndex "#" "badline" "nukearray nukearray.tmp" \
+    "baz baz.tmp"
+
+Test tcllib-5.1 {bogus Ousterhout library index} {
+    set stat [catch nukearray msg]
+    if [string match "*/tclIndex isn't a proper Tcl index file" $msg] {
+        list $stat {IS OK}
+    } else {
+        list $stat $msg
+    }
+} 0 {1 {IS OK}}
+
+PutFile tcllib1.dir/tclIndex "# Tcl autoload index file, version 2.0" \
+        {set auto_index(parray)   " source $dir/parray.tcl"} \
+        {set auto_index(nukearray) "source $dir/spazzzzzzzz"} \
+
+TestReg tcllib-5.2 {missing file found with Ousterhout library index} {
+    nukearray
+} 1 {^couldn't read file}
+
+PutFile tcllib1.dir/nukearray.tmp {proc nukearray {} {}}
+chmod 000 tcllib1.dir/nukearray.tmp
+
+if {[id user] != "root"} {
+    TestReg tcllib-5.3 {missing file found with Ousterhout library index} {
+        nukearray
+    } 1 {^couldn't read file}
+}
+
+TclLibCleanUp
+mkdir tcllib1.dir
+
+BuildTestLib  tcllib1.dir/test2.tlib TclLibAC
+set auto_path [list [pwd]/tcllib1.dir [pwd]/../tclmaster]
+
+PutFile tcllib1.dir/tclIndex "# Tcl autoload index file, version 2.0" \
+        {set auto_index(parray)   " source $dir/parray.tcl"} \
+        {set auto_index(nukearray) "source $dir/nukearray.tmp"}
+PutFile tcllib1.dir/nukearray.tmp {proc nukearray {} {return "@nukearray@"}}
+
+Test tcllib-6.1 {successful library access} {
+    TclLibACB
+} 0 {***TclLibACB***}
+
+Test tcllib-6.2 {successful library access} {
+    TclLibACB
+} 0 {***TclLibACB***}
+
+Test tcllib-6.3 {successful library access} {
+    nukearray
+} 0 {@nukearray@}
+
+#
+# Test skipping of duplicate packages.  Also make sure loadlibindex overrides
+# existing package definitions.
+#
+TclLibCleanUp
+mkdir {tcllib1.dir tcllib2.dir}
+set auto_path [list [pwd]/tcllib1.dir [pwd]/tcllib2.dir [pwd]/../tclmaster]
+
+PutFile tcllib1.dir/test1.tlib \
+    {#@package: test-pkg DupPkgTest} \
+    {proc DupPkgTest {} {return {Version-1}}
+}
+PutFile tcllib2.dir/test2.tlib \
+    {#@package: test-pkg DupPkgTest} \
+    {proc DupPkgTest {} {return {Version-2}}
+}
+
+Test tcllib-7.1 {Duplicate package handling} {
+    DupPkgTest
+} 0 {Version-1}
+
+TclLibReset
+rename DupPkgTest {}
+
+Test tcllib-7.2 {Duplicate package handling} {
+    lrmdups {a b c}  ;# Force load of indices.
+    loadlibindex tcllib2.dir/test2.tlib
+    DupPkgTest
+} 0 {Version-2}
+
+#
+# Test backslash parsing in #@package: line.
+#
+TclLibCleanUp
+mkdir {tcllib1.dir tcllib2.dir}
+set auto_path [list [pwd]/tcllib1.dir [pwd]/tcllib2.dir [pwd]/../tclmaster]
+
+PutFile tcllib1.dir/test1.tlib \
+    {#@package: test-pkg procAAA \\} \
+    {           procBBB \\         } \
+    {           procCCC            } \
+    {proc procAAA {} {return {AAA}}} \
+    {proc procBBB {} {return {BBB}}} \
+    {proc procCCC {} {return {CCC}}}
+
+Test tcllib-8.1 {backslash parsing in package headers} {
+    TclLibReset
+    procAAA
+} 0 {AAA}
+
+
+Test tcllib-8.2 {backslash parsing in package headers} {
+    TclLibReset
+    procBBB
+} 0 {BBB}
+
+
+Test tcllib-8.3 {backslash parsing in package headers} {
+    TclLibReset
+    procCCC
+} 0 {CCC}
+
+TclLibCleanUp
+
+rename TclLibCleanUp {}
+rename PutFile {}
+rename TclLibReset {}
+
+set auto_path $save_auto_path
+rename unknown {}

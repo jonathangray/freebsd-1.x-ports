@@ -1,0 +1,84 @@
+# Generated automatically from Makefile.in by configure.
+#
+# tools/Makefile.in  --
+#
+# Makefile for building tools used during install
+#------------------------------------------------------------------------------
+# Copyright 1992-1993 Karl Lehenbauer and Mark Diekhans.
+#
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted, provided
+# that the above copyright notice appear in all copies.  Karl Lehenbauer and
+# Mark Diekhans make no representations about the suitability of this
+# software for any purpose.  It is provided "as is" without express or
+# implied warranty.
+#------------------------------------------------------------------------------
+# $Id: Makefile,v 1.1 1994/02/09 01:54:20 jkh Exp $
+#------------------------------------------------------------------------------
+#
+SHELL = /bin/sh
+
+#------------------------------------------------------------------------------
+
+CC          = cc
+srcdir      = .
+srcbasedir  = /usr1/FreeBSD.ports/lang/tclX
+bldbasedir  = /usr1/FreeBSD.ports/lang/tclX
+VPATH       = .
+prefix      = /usr/local
+exec_prefix = /usr/local
+XINCLUDES   = # no special path needed
+
+.include "${bldbasedir}/Config.mk"
+
+#------------------------------------------------------------------------------
+
+CC_FLAGS = ${CPPFLAGS} ${XCFLAGS} ${CFLAGS} -I${srcbasedir}/src \
+	${XINCLUDES} -I${TCL_UCB_SRC}
+
+.c.o:
+	${CC} ${CC_FLAGS} -c $<
+ 
+#------------------------------------------------------------------------------
+
+all: tclxversion $(TK_BUILD) instcopy bldmanhelp cpmanpages cphelpdir
+
+tclxversion: getversion.c
+	$(CC) $(CC_FLAGS) ${srcdir}/getversion.c -o tclxversion
+
+WISHX: tkxversion
+
+tkxversion: getversion.c
+	$(CC) $(CC_FLAGS) -I$(TK_UCB_SRC) -DTK_GET_VERSION \
+	   ${srcdir}/getversion.c -o tkxversion
+
+instcopy: instcopy.tcl buildutil.tcl
+	rm -f instcopy
+	cat ${srcdir}/buildutil.tcl ${srcdir}/instcopy.tcl >instcopy
+
+bldmanhelp: bldmanhelp.tcl
+	rm -f bldmanhelp
+	cp ${srcdir}/bldmanhelp.tcl bldmanhelp
+
+cpmanpages: cpmanpages.tcl buildutil.tcl
+	rm -f cpmanpages
+	cat ${srcdir}/buildutil.tcl ${srcdir}/cpmanpages.tcl >cpmanpages
+
+cphelpdir: cphelpdir.sh
+	rm -f cphelpdir
+	echo ":"                           >cphelpdir
+	echo "TOOLS=${bldbasedir}/tools"   >cphelpdir
+	cat ${srcdir}/cphelpdir.sh        >>cphelpdir
+	chmod a+x cphelpdir
+
+#------------------------------------------------------------------------------
+
+clean:
+	-rm -f tclxversion tkxversion *.o
+	-rm -f instcopy bldmanhelp cpmanpages cphelpdir TclXman.lst
+
+#------------------------------------------------------------------------------
+# Restore to the distributed state.
+
+distclean: clean
+	rm -f Makefile

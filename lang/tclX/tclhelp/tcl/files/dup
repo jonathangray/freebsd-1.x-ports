@@ -1,0 +1,35 @@
+       dup fileId ?targetFileId?
+              Duplicate  an  open  file.  A new file id is opened
+              that addresses the same file as fileId.
+
+              If targetFileId is specified, the the file  is  dup
+              to this specified file id.  Normally this is stdin,
+              stdout, or stderr.  The  dup  command  will  handle
+              flushing  output and closing this file.  The target
+              file should be open if its one of stdin, stdout, or
+              stderr and the process is not going to do an execl.
+              Otherwise internal C code that uses  one  of  these
+              files  via  direct  access to stdio FILE struct may
+              behave strangely or fail.
+
+              The procedure shown below will create a child  pro-
+              cess and set its standard input and output files to
+              a pair of pipe files we pass as arguments.  Finally
+              the  program  does an execl of a specified command,
+              with the program's stdin and stdout coming from and
+              going to our pair of pipes.
+
+                  proc ChildProcess {cmd inPipe outPipe} {
+                      if {[set childPid [fork]] == 0} {
+                          dup $inPipe stdin
+                          close $inPipe
+                          dup $outPipe stdout
+                          close $outPipe
+
+                          execl $cmd
+                          # will never make it here...
+                      }
+                      return $childPid
+                  }
+
+              This command is provided by Extended Tcl.

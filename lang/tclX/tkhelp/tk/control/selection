@@ -1,0 +1,119 @@
+NAME
+       selection - Manipulate the X selection
+
+SYNOPSIS
+       selection option ?arg arg ...?
+
+
+DESCRIPTION
+       This  command  provides a Tcl interface to the X selection
+       mechanism and implements the full selection  functionality
+       described  in the X Inter-Client Communication Conventions
+       Manual (ICCCM), except that it supports only  the  primary
+       selection.
+
+       The  first  argument to selection determines the format of
+       the rest of the arguments and the behavior of the command.
+       The following forms are currently supported:
+
+       selection clear window
+              If  there  is a selection anywhere on window's dis-
+              play, clear it so that no window owns the selection
+              anymore.  Returns an empty string.
+
+       selection get ?type?
+              Retrieves  the  value  of the primary selection and
+              returns it as a result.  Type specifies the form in
+              which  the selection is to be returned (the desired
+              ``target'' for conversion, in  ICCCM  terminology),
+              and  should  be  an  atom  name  such  as STRING or
+              FILE_NAME;  see the Inter-Client Communication Con-
+              ventions   Manual   for   complete  details.   Type
+              defaults to STRING.  The selection owner may choose
+              to return the selection in any of several different
+              representation formats, such as STRING, ATOM, INTE-
+              GER, etc. (this format is different than the selec-
+              tion type;  see the ICCCM  for  all  the  confusing
+              details).   If  the selection is returned in a non-
+              string format, such as INTEGER or ATOM, the  selec-
+              tion command converts it to string format as a col-
+              lection of fields separated by spaces:   atoms  are
+              converted to their textual names, and anything else
+              is converted to hexadecimal integers.
+
+       selection handle window command ?type? ?format?
+              Creates a handler for selection requests, such that
+              command  will  be  executed  whenever  the  primary
+              selection is owned by window and  someone  attempts
+              to retrieve it in the form given by type (e.g. type
+              is specified in the selection get  command).   Type
+              defaults  to STRING.  If command is an empty string
+              then any existing handler for window  and  type  is
+              removed.
+
+              When  the  selection is requested and window is the
+              selection owner and type  is  the  requested  type,
+              command  will be executed as a Tcl command with two
+              additional numbers appended to it (with space sepa-
+              rators).  The two additional numbers are offset and
+              maxBytes:  offset specifies  a  starting  character
+              position  in  the  selection and maxBytes gives the
+              maximum number of bytes to retrieve.   The  command
+              should   return  a  value  consisting  of  at  most
+              maxBytes of the  selection,  starting  at  position
+              offset.   For  very  large  selections (larger than
+              maxBytes) the selection  will  be  retrieved  using
+              several invocations of command with increasing off-
+              set values.  If  command  returns  a  string  whose
+              length  is  less than maxBytes, the return value is
+              assumed to include all  of  the  remainder  of  the
+              selection;   if  the  length of command's result is
+              equal to maxBytes  then  command  will  be  invoked
+              again, until it eventually returns a result shorter
+              than maxBytes.  The value of maxBytes  will  always
+              be relatively large (thousands of bytes).
+
+              If  command  returns  an  error  then the selection
+              retrieval is rejected  just  as  if  the  selection
+              didn't exist at all.
+
+              The  format  argument  specifies the representation
+              that should be used to transmit  the  selection  to
+              the  requester (the second column of Table 2 of the
+              ICCCM), and  defaults  to  STRING.   If  format  is
+              STRING, the selection is transmitted as 8-bit ASCII
+              characters (i.e.  just in the form returned by com-
+              mand).   If  format  is ATOM, then the return value
+              from command is divided into  fields  separated  by
+              white  space;   each field is converted to its atom
+              value, and the 32-bit  atom  value  is  transmitted
+              instead  of  the  atom name.  For any other format,
+              the return  value  from  command  is  divided  into
+              fields  separated  by white space and each field is
+              converted to a 32-bit integer;  an array  of  inte-
+              gers is transmitted to the selection requester.
+
+              The  format argument is needed only for compatibil-
+              ity with selection requesters that  don't  use  Tk.
+              If  the  Tk  toolkit  is being used to retrieve the
+              selection then the value is  converted  back  to  a
+              string  at the requesting end, so format is irrele-
+              vant.
+
+       selection own ?window? ?command?
+              If window is specified, then  it  becomes  the  new
+              selection  owner  and  the command returns an empty
+              string as result.  The existing owner, if  any,  is
+              notified  that  it has lost the selection.  If com-
+              mand is specified, it is a Tcl  script  to  execute
+              when  some  other  window  claims  ownership of the
+              selection away from window.  If neither window  nor
+              command  is  specified then the command returns the
+              path name of the window in  this  application  that
+              owns the selection, or an empty string if no window
+              in this application owns the selection.
+
+
+KEYWORDS
+       clear, format, handler,  ICCCM,  own,  selection,  target,
+       type

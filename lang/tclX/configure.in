@@ -1,0 +1,460 @@
+dnl----------------------------------------------------------------------------
+dnl configure.in -
+dnl----------------------------------------------------------------------------
+dnl  This file is an input file used by the GNU "autoconf" program to
+dnl  generate the file "configure", which is run during Tcl installation
+dnl  to configure the system for the local environment.  Many of these
+dnl  checks are duplicates of those required by Tcl & Tk, since TclX
+dnl  includes there internal header files.  The sections from Tcl and Tk
+dnl  are grouped together and marked for easy sycning with Outerhout's
+dnl  releases.
+dnl
+dnl  Although the generated configure script is under the GNU Public,
+dnl  License Extended Tcl remains freely redistributable for any purpose,
+dnl  including commercial use.
+dnl----------------------------------------------------------------------------
+dnl $Id: configure.in,v 1.1 1994/02/09 01:53:35 jkh Exp $
+dnl----------------------------------------------------------------------------
+AC_INIT(src/tclExtend.h)
+ifdef([AC_REVISION],AC_REVISION($Revision: 1.1 $),)dnl
+
+AC_CONFIG_HEADER(src/tclXconfig.h)
+
+#------------------------------------------------------------------------------
+#     Rescan command line looking for the --arch= option.
+#------------------------------------------------------------------------------
+
+changequote(,)dnl
+for arg in $configure_args
+do
+  # Handle --arch with a space before the argument.
+  if test x$next_arch = xyes; then TCL_ARCH=.$arg; next_arch=
+  else
+    case $arg in
+     --arch=*)
+	TCL_ARCH=.`echo $arg | sed 's/[-a-z_]*=//'` ;;
+     --arch)
+	next_arch=yes ;;
+    esac
+  fi
+done
+
+if test x$TCL_ARCH = x
+then
+  echo "No architecture suffix will be used"
+else
+  echo "An architecture suffix of \"$TCL_ARCH\" will be appended to bin and lib directories."
+fi
+changequote([,])dnl
+AC_SUBST(TCL_ARCH)
+
+#------------------------------------------------------------------------------
+#     Check for various programs used during the build.
+#------------------------------------------------------------------------------
+
+AC_PROG_YACC
+AC_PROG_RANLIB
+CC=${CC-cc}
+AC_SUBST(CC)
+AC_PROGRAM_CHECK(MCS_CMD, "mcs", [mcs -d], touch)
+
+#------------------------------------------------------------------------------
+#       Some make programs require includes to be 
+#         .include "file"
+#     others...
+#         include file
+#------------------------------------------------------------------------------
+
+echo checking how make handles includes
+rm -fr conftestdir
+if mkdir conftestdir; then
+  cd conftestdir
+  cat > Makeinclude <<EOF
+
+EOF
+  cat > Makefile <<EOF
+include Makeinclude
+
+all:
+EOF
+  if make >/dev/null 2>/dev/null; then
+    MAKEINCLUDE="include"
+    MAKEQUOTE=''
+  else
+    MAKEINCLUDE=".include"
+    MAKEQUOTE='"'
+  fi
+  cd ..
+  rm -fr conftestdir
+fi
+AC_SUBST(MAKEINCLUDE)
+AC_SUBST(MAKEQUOTE)
+
+#------------------------------------------------------------------------------
+#       Check for various Unix or library functions that can be used by TclX.
+#------------------------------------------------------------------------------
+
+AC_HAVE_FUNCS(catgets getcwd select setitimer setlinebuf sigaction setpgid)
+AC_HAVE_FUNCS(bzero bcopy gethostbyname fsync getpriority)
+
+#------------------------------------------------------------------------------
+#       Check for system header files.
+#------------------------------------------------------------------------------
+
+AC_HEADER_CHECK(values.h, , AC_DEFINE(NO_VALUES_H))
+
+#------------------------------------------------------------------------------
+#       Check for missing functions that we need.  They will be
+#       compiled in the osSupport directory. Must check for SCO
+#       -lintl, which is were strftime is hidden.
+#------------------------------------------------------------------------------
+
+AC_SCO_INTL
+AC_FUNC_CHECK(strftime, ,[LIBOBJS="$LIBOBJS strftime.o"])
+AC_FUNC_CHECK(random, ,[LIBOBJS="$LIBOBJS random.o"])
+AC_FUNC_CHECK(rename, ,[LIBOBJS="$LIBOBJS rename.o"])
+AC_SUBST(LIBOBJS)
+
+#------------------------------------------------------------------------------
+#       Check for missing typedefs.
+#------------------------------------------------------------------------------
+
+AC_COMPILE_CHECK(time_t, [#include <sys/types.h>], , , AC_DEFINE(time_t, long))
+
+#------------------------------------------------------------------------------
+#       What type do signals return?
+#------------------------------------------------------------------------------
+
+AC_RETSIGTYPE
+
+#------------------------------------------------------------------------------
+#       Find out all about time handling differences.
+#------------------------------------------------------------------------------
+
+AC_TIME_WITH_SYS_TIME
+AC_TIMEZONE
+
+AC_COMPILE_CHECK([tm_tzadj in struct tm], $decl,
+[struct tm tm; tm.tm_tzadj;], AC_DEFINE(HAVE_TM_TZADJ), )
+
+AC_COMPILE_CHECK([tm_gmtoff in struct tm], $decl,
+[struct tm tm; tm.tm_gmtoff;], AC_DEFINE(HAVE_TM_GMTOFF), )
+
+AC_HAVE_FUNCS(gettimeofday)
+
+AC_COMPILE_CHECK([timezone variable], , [
+extern long timezone;
+timezone += 1;
+exit (0);
+], AC_DEFINE(HAVE_TIMEZONE_VAR))
+
+#------------------------------------------------------------------------------
+#     Test to see if "times" returns a status or the amount of
+#     elapsed real time.
+#------------------------------------------------------------------------------
+
+echo "checking to see if 'times' returns the elapsed real time"
+AC_TEST_PROGRAM([
+#include <sys/types.h>
+#include <sys/times.h>
+main() {
+struct tms cpu;
+times (&cpu);
+sleep (2);
+if (times (&cpu) > 0)
+     exit (0);
+else 
+     exit (1);
+}
+], AC_DEFINE(TIMES_RETS_REAL_TIME), )
+
+#------------------------------------------------------------------------------
+#     Determine if "." is used as separator for the manual directory
+#     names.  i.e. man/man.1 vs man/man1
+#------------------------------------------------------------------------------
+
+echo "checking man directory/section separator (man/man.1 vs man/man1)"
+mandirs="/usr/man/man.1 /usr/man/cat.1 /usr/share/man.1 /usr/share/man.1 
+        /usr/man/cat.C"
+gotdotdir="NO"
+for d in $mandirs
+do
+    if test -d $d
+    then
+        gotdotdir="YES"
+    fi
+done
+
+mandirs="/usr/man/man1   /usr/man/cat1   /usr/share/man1   /usr/share/man1
+         /usr/man/man1.Z /usr/man/cat1.Z /usr/share/man1.Z /usr/share/man1.Z"
+gotnodotdir="NO"
+for d in $mandirs
+do
+    if test -d $d
+    then
+        gotnodotdir="YES"
+    fi
+done
+
+if test $gotdotdir = YES -a $gotnodotdir = NO
+then
+    MAN_DIR_SEPARATOR="."
+elif test $gotdotdir = NO -a $gotnodotdir = YES
+then
+    MAN_DIR_SEPARATOR=""
+else
+    MAN_DIR_SEPARATOR="."
+    echo "WARNING: could not determine man directory/section separator"
+    echo "         assuming man/man.1 (can override in Config.mk)."
+fi
+AC_SUBST(MAN_DIR_SEPARATOR)
+
+#------------------------------------------------------------------------------
+# Define srcbasedir and bldbasedir as absolute paths.
+#------------------------------------------------------------------------------
+
+srcbasedir=`cd $srcdir;pwd`
+AC_SUBST(srcbasedir)
+bldbasedir=`pwd`
+AC_SUBST(bldbasedir)
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#                      Begin code from Tcl configure.in
+#------------------------------------------------------------------------------
+
+#--------------------------------------------------------------------
+#       Supply substitutes for missing POSIX library procedures, or
+#       set flags so Tcl uses alternate procedures.
+#--------------------------------------------------------------------
+
+AC_FUNC_CHECK(gettimeofday, , AC_DEFINE(NO_GETTOD))
+
+#--------------------------------------------------------------------
+#       Supply substitutes for missing POSIX header files.  Special
+#       notes:
+#           - Sprite's dirent.h exists but is bogus.
+#           - stdlib.h doesn't define strtol, strtoul, or
+#             strtod insome versions of SunOS
+#           - some versions of string.h don't declare procedures such
+#             as strstr
+#--------------------------------------------------------------------
+
+AC_UNISTD_H
+AC_COMPILE_CHECK(dirent.h, [#include <sys/types.h>
+#include <dirent.h>], [
+DIR *d;
+struct dirent *entryPtr;
+char *p;
+d = opendir("foobar");
+entryPtr = readdir(d);
+p = entryPtr->d_name;
+closedir(d);
+], tcl_ok=1, tcl_ok=0)
+AC_HEADER_EGREP([Sprite version.* NOT POSIX], tcl_ok=0)
+if test $tcl_ok = 0; then
+    AC_DEFINE(NO_DIRENT_H)
+fi
+AC_HEADER_CHECK(errno.h, , AC_DEFINE(NO_ERRNO_H))
+AC_HEADER_CHECK(float.h, , AC_DEFINE(NO_FLOAT_H))
+AC_HEADER_CHECK(limits.h, , AC_DEFINE(NO_LIMITS_H))
+AC_HEADER_CHECK(stdlib.h, tcl_ok=1, tcl_ok=0)
+AC_HEADER_EGREP(strtol, stdlib.h, , tcl_ok=0)
+AC_HEADER_EGREP(strtoul, stdlib.h, , tcl_ok=0)
+AC_HEADER_EGREP(strtod, stdlib.h, , tcl_ok=0)
+if test $tcl_ok = 0; then
+    AC_DEFINE(NO_STDLIB_H)
+fi
+AC_HEADER_CHECK(string.h, tcl_ok=1, tcl_ok=0)
+AC_HEADER_EGREP(strstr, string.h, , tcl_ok=0)
+AC_HEADER_EGREP(strerror, string.h, , tcl_ok=0)
+if test $tcl_ok = 0; then
+    AC_DEFINE(NO_STRING_H)
+fi
+AC_HEADER_CHECK(sys/time.h, , AC_DEFINE(NO_SYS_TIME_H))
+AC_HEADER_CHECK(sys/wait.h, , AC_DEFINE(NO_SYS_WAIT_H))
+
+#--------------------------------------------------------------------
+#       Check for various typedefs and provide substitutes if
+#       they don't exist.
+#--------------------------------------------------------------------
+
+AC_MODE_T
+AC_PID_T
+AC_SIZE_T
+AC_UID_T
+
+#--------------------------------------------------------------------
+#       If a system doesn't have an opendir function (man, that's old!)
+#       then we have to supply a different version of dirent.h which
+#       is compatible with the substitute version of opendir that's
+#       provided.  This version only works with V7-style directories.
+#--------------------------------------------------------------------
+
+AC_FUNC_CHECK(opendir, , AC_DEFINE(USE_DIRENT2_H))
+
+#--------------------------------------------------------------------
+#       The check below checks whether <sys/wait.h> defines the type
+#       "union wait" correctly.  It's needed because of weirdness in
+#       HP-UX where "union wait" is defined in both the BSD and SYS-V
+#       environments.  Checking the usability of WIFEXITED seems to do
+#       the trick.
+#--------------------------------------------------------------------
+
+AC_COMPILE_CHECK([union wait], [#include <sys/types.h> 
+#include <sys/wait.h>], [
+union wait x;
+WIFEXITED(x);           /* Generates compiler error if WIFEXITED
+                         * uses an int. */
+], , AC_DEFINE(NO_UNION_WAIT))
+
+#------------------------------------------------------------------------------
+#                       End code from Tcl configure.in
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#                      Begin code from Tk configure.in
+# Notes: Added check for X11_s.
+# 
+#------------------------------------------------------------------------------
+
+#--------------------------------------------------------------------
+#	Include sys/select.h if it exists and if it supplies things
+#	that appear to be useful and aren't already in sys/types.h.
+#	This appears to be true only on the RS/6000 under AIX.  Some
+#	systems like OSF/1 have a sys/select.h that's of no use, and
+#	other systems like SCO UNIX have a sys/select.h that's
+#	pernicious.  If "fd_set" isn't defined anywhere then set a
+#	special flag.
+#--------------------------------------------------------------------
+
+echo checking for sys/select.h
+AC_COMPILE_CHECK(fd_set, [#include <sys/types.h>],
+	[fd_set readMask, writeMask;], ,
+	AC_HEADER_EGREP(fd_mask, sys/select.h, AC_DEFINE(HAVE_SYS_SELECT_H),
+		AC_DEFINE(NO_FD_SET)))
+
+#--------------------------------------------------------------------
+#	Locate the X11 header files and the X11 library archive.  Try
+#	the ac_find_x macro first, but if it doesn't find the X stuff
+#	(e.g. because there's no xmkmf program) then check through
+#	a list of possible directories.
+#--------------------------------------------------------------------
+
+AC_PROGRAM_CHECK(tk_ok, xmkmf, 1, 0)
+if test $tk_ok = 1; then
+    AC_FIND_X
+fi
+if test "$XINCLUDE_DIR" != ""; then
+     x_includes="$XINCLUDE_DIR"
+fi
+if test "$x_includes" = /usr/include; then
+    XINCLUDES="# no special path needed"
+elif test "$x_includes" != ""; then
+    XINCLUDES=" -I$x_includes"
+else
+    echo checking for X11 header files
+    XINCLUDES="# no special path needed"
+    AC_TEST_CPP([#include <X11/Intrinsic.h>], , XINCLUDES="nope")
+    if test "$XINCLUDES" = nope; then
+        dirs="/usr/unsupported/include /usr/local/include /usr/X386/include /usr/include/X11R4 /usr/X11R5/include /usr/include/X11R5 /usr/openwin/include /usr/X11/include"
+        for i in $dirs ; do
+	    if test -r $i/X11/Intrinsic.h; then
+	        XINCLUDES=" -I$i"
+	    fi
+        done
+    fi
+fi
+if test "$XINCLUDES" = nope; then
+  echo "Warning:  couldn't find any X11 include files."
+  XINCLUDES="# no include files found"
+fi
+AC_SUBST(XINCLUDES)
+
+if test "$XLIBRARY_DIR" != ""; then
+    x_libraries="$XLIBRARY_DIR"
+fi
+if test "$x_libraries" = /usr/lib; then
+    XLIBSW=-lX11
+elif test "$x_libraries" != ""; then
+    XLIBSW="-L$x_libraries -lX11"
+else
+    echo "checking for X11 library archive"
+    AC_HAVE_LIBRARY(X11_s, XLIBSW="-lX11_s", XLIBSW=nope)
+    if test "$XLIBSW" = nope; then
+        AC_HAVE_LIBRARY(X11, XLIBSW="-lX11", XLIBSW=nope)
+    fi
+    if test "$XLIBSW" = nope; then
+	dirs=${XLIBRARY_DIR-"/usr/unsupported/lib /usr/local/lib /usr/X386/lib /usr/lib/X11R4 /usr/X11R5/lib /usr/lib/X11R5 /usr/openwin/lib /usr/X11/lib"}
+        for i in $dirs ; do
+	    if test -r $i/libX11.a; then
+		XLIBSW="-L$i -lX11"
+	    fi
+	done
+    fi
+fi
+if test "$XLIBSW" = nope ; then
+    AC_HAVE_LIBRARY(Xwindow, XLIBSW=-lXwindow)
+fi
+if test "$XLIBSW" = nope ; then
+    echo "Warning:  couldn't find the X11 library archive.  Using -lX11."
+    XLIBSW=-lX11
+fi
+AC_SUBST(XLIBSW)
+
+#------------------------------------------------------------------------------
+#       Check for the existence of various libraries.  The order here
+#       is important, so that then end up in the right order in the
+#       command line generated by Make.
+#------------------------------------------------------------------------------
+
+AC_HAVE_LIBRARY(Xbsd, [LIBS="$LIBS -lXbsd"])
+AC_HAVE_LIBRARY(socket, [LIBS="$LIBS -lsocket"])
+AC_HAVE_LIBRARY(nsl, [LIBS="$LIBS -lnsl"])
+
+#------------------------------------------------------------------------------
+#                       End code from Tk configure.in
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+#------------------------------------------------------------------------------
+#       Check for additional libraries the Tcl/Tk does not check for.
+#------------------------------------------------------------------------------
+
+AC_HAVE_LIBRARY(sun, [LIBS="$LIBS -lsun"])
+AC_HAVE_LIBRARY(c_s, [LIBS="$LIBS -lc_s"])
+AC_HAVE_LIBRARY(ieee, [LIBS="$LIBS -lieee"])
+
+#------------------------------------------------------------------------------
+#       If Config.mk is not in the build directory, copy it local.
+#------------------------------------------------------------------------------
+
+if test ! -r Config.mk
+then
+    echo "Copying $srcdir/Config.mk to build directory"
+    cp $srcdir/Config.mk  Config.mk || exit 1
+fi
+
+#------------------------------------------------------------------------------
+#       Copy the tests to the build directory if they are not there.
+#       We could do something fancier, but this is easy for now.
+#------------------------------------------------------------------------------
+
+if test ! -d tests
+then
+    echo "Copying $srcdir/tests contents to build directory"
+    mkdir tests
+    # Prevent line to long on some systems.
+    CURDIR=`pwd`
+    cd $srcdir/tests
+    cp *.test *.tcl all $CURDIR/tests || exit 1
+    cd $CURDIR
+fi
+
+#------------------------------------------------------------------------------
+# Generate the make files.
+#------------------------------------------------------------------------------
+
+AC_SUBST(prefix)
+AC_SUBST(execprefix)
+
+AC_OUTPUT(Makefile osSupport/Makefile src/Makefile tclsrc/Makefile tksrc/Makefile tktclsrc/Makefile tools/Makefile src/SYSLIBS tksrc/SYSLIBS)
