@@ -1,0 +1,201 @@
+File CKOEXP.DOC  --  C-KERMIT OS/2 EXTERNAL PROTOCOLS DOCUMENTATION
+
+Most recent update: Mon Jul  5 16:49:52 1993
+
+This file contains hints and tips about using C-Kermit with external
+protocols and using C-Kermit itself as an external protocol.
+
+
+INVOKING EXTERNAL PROTOCOLS FROM C-KERMIT
+
+Example 1: ZMODEM
+
+Assuming you have the m2zmodem program, add these commands to CKERMOD.INI:
+
+  define sz !m2zmodem -f 1 -s \%1  ; Send file
+  define rz !m2zmodem -f 1 -r \%1  ; Receive file
+
+or:
+
+  define sz !m2zmodem -u \v(ttyfd) -h -prty 0 -s \%1          ; Send file
+  define rz !m2zmodem -u \v(ttyfd) -h -prty 0 -t -res -r \%1  ; Receive file
+
+and then use them just as if these were C-Kermit commands, e.g.:
+
+  C-Kermit>sz oofa.txt  ; Send OOFA.TXT with ZMODEM protocol
+
+
+INVOKING C-KERMIT FROM ANOTHER PROGRAM
+
+If you are writing a communications program and wish to incorporate the Kermit
+protocol within it, one way is to use the OS/2 function call DosExecPgm to
+call up C-Kermit.  You would supply the instructions for Kermit using
+command-line options, and Kermit would do the transfer, returning back to your
+program when it had finished.
+
+The only problem is you might already have opened up the COM port within your
+program, so that when Kermit tries to do the same it gets an error code back
+from DosOpen.  The -l command line option gets round this problem by letting
+C-Kermit inherit the port's open file handle.  -l takes one numeric parameter
+which is the handle of the COM port, and it must occur in front of any other
+command-line parameter which accesses the COM port.  The following is a
+complete C program written using the Microsoft C compiler version 5.1 and the
+Microsoft OS/2 Software Development Toolkit, which illustrates how to use the
+-l command-line option.
+
+#define	INCL_BASE
+#include <os2.h>
+/*
+ *	Example of how to use the C-Kermit -l option to invoke
+ *	Kermit from another program under OS/2.
+ */
+main(int argc, char *argv[]) {
+HFILE	ttyfd;
+USHORT	action;
+int	err,i;
+char	failname[80];
+char	args[80];
+RESULTCODES	res;
+struct dcb {			/* Device control block */
+	USHORT write_timeout;
+	USHORT read_timeout;
+	BYTE flags1, flags2, flags3;
+	BYTE error_replacement;
+	BYTE break_replacement;
+	BYTE xon_char;
+	BYTE xoff_char;
+} ttydcb;
+
+	/*** Open a file ***/
+	if (err=DosOpen(argv[1],&ttyfd,&action,0L,0,1,0x0012,0L)) {
+		printf("Error %d opening %s\n",err,argv[1]);
+		exit(1);
+	}
+	if (err=DosDevIOCtl(&ttydcb,NULL,0x0073,1,ttyfd)) {
+		printf("Error %d from IOCTL on %s\n",err,argv[1]);
+    		exit(1);
+	}
+	ttydcb.flags3 &= 0xF9;
+	ttydcb.flags3 |= 0x04;	/* Read "some" data from line */
+	DosDevIOCtl(NULL,&ttydcb,0x0053,1,ttyfd);
+
+	/*** Call kermit ***/
+	strcpy(args,"ckermit");
+	i = strlen(args);
+	args[i++]=0;
+	sprintf(&args[i],"-l %d -q -s test.c",ttyfd);
+	i += strlen(&args[i]);
+	args[i++]=0;
+	args[i++]=0;
+	if (err=DosExecPgm(failname,80,EXEC_SYNC,args,NULL,&res,
+						    "CKERMIT.EXE")) {
+		printf("Error %d executing Kermit\n",err);
+		exit(1);
+	}
+	
+	/*** Print out return code ***/
+	printf("Termination code %d\n",res.codeTerminate);
+	printf("Result code %d\n",res.codeResult);
+
+	/*** Close the file ***/
+	if (err=DosClose(ttyfd)) {
+		printf("Error %d closing %s\n",err,argv[1]);
+	}
+}
+
+
+USING OS/2 C-KERMIT WITH TE/2
+-----------------------------
+
+by Brady Flowers, Oberon Software, BBS: 507-388-1154, Fido: 1:292/60
+
+
+(Note: This document contains only a brief discussion on using CKERMIT with
+TE/2.  You will also need to know how to use CKERMIT, a discussion of which is
+beyond the scope of this document; see the documentation accompanying
+CKERMIT.  This document may contain errors, use at your own risk.  This
+document in no way implies a commitment on the part of Oberon Software or the
+author.)
+
+1. You must use CKERMIT Version 5A(188) or later.  This file is available
+   on the Oberon BBS as CK5A188.ZIP.
+
+2. It is recommended that you use the SIO comm port driver instead of the
+   default COM.SYS.  SIO050.ZIP is also available on the Oberon BBS.  See
+   the SIO documentation for information on installing SIO.
+
+3. CKERMIT comes in both 16-bit and 32-bit OS/2 executable formats.  Only
+   the 32-bit version is tested.  See the CKERMIT documentation for
+   information on installing CKERMIT.
+
+4. Once CKERMIT is installed on your system, you need to set up TE/2 to
+   use it as an external program.  You do this by modifying the TE2.XEX
+   file.  See the TE/2 documentation for a more detailed discussion on how
+   to use the TE2.XEX file.  For our purposes here, we assume that you
+   have already installed CKERMIT to your liking in the directory "D:\PBIN",
+   and that you have renamed CKOKER32.EXE to CKERMIT.EXE.  In the examples
+   below, remember to change the path and file name to match your setup!
+
+   Use any text editor to edit the TE2.XEX file. Each entry in the file is
+   four lines long; pick any two, four-line entries that you do not use
+   and replace them with with the example settings below.  If TE/2 is
+   currently running, you will want to exit and restart TE/2 so that it will
+   re-read the modified file.
+
+A. KERMIT Receive
+
+   The four line TE2.XEX file entry should look like:
+
+       0x0011,3
+       KERMIT Download
+       d:\pbin\ckermit.exe
+       -l %h -r
+
+   - The first line specifies that the program will be run as a child
+     program to TE/2, TE/2 will save and restore the screen before and
+     after executing the program and wait for a keystroke before returning.
+   - The second line is the title that will appear in the "External
+     Programs" menu.
+   - The third line is the full path/name of the executable (modify this
+     to match your setup).
+   - The fourth line is the command line parameters for the program, the
+     "%h" causes the numeric value of the open Com port handle to be
+     passed CKERMIT.
+
+   To use KERMIT download, initiate the file transfer with the host
+   system and, when the host prompts you to begin receiving, press
+   Alt-J and select "KERMIT Download" from the menu.
+
+
+B. KERMIT Send
+
+   The four-line TE2.XEX file entry should look like:
+
+       0x0011,3
+       KERMIT Upload
+       d:\pbin\ckermit.exe
+       -l %h -s %?[Send files(s):]
+
+   - The first line specifies that the program will be run as a child
+     program to TE/2, TE/2 will save and restore the screen before and
+     after executing the program and wait for a keystroke before returning.
+
+   - The second line is the title that will appear in the "External
+     Programs" menu.
+
+   - The third line is the full path/name of the executable (modify this
+     to match your setup).
+
+   - The fourth line is the command line parameters for the program, the
+     "%h" causes the numeric value of the open Com port handle to be
+     passed CKERMIT. The "%?[Send files(s):]" will cause TE/2 to present
+     you with an input field before executing the program, the prompt for
+     the input will be "Send file(s):" and whatever you type here
+     (presumably a list of file names) will be placed into the command
+     line at this point.
+
+To use KERMIT upload, initiate the file transfer with the host system and,
+when the host prompts you to begin sending, press Alt-J and select "KERMIT
+Upload" from the menu.
+
+(End of CKOEXP.DOC - Further contributions welcome)

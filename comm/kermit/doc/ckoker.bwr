@@ -1,0 +1,309 @@
+CKOKER.BWR          "Beware File" for C-Kermit Version 5A        -*- text -*-
+
+				 OS/2 VERSION
+
+Applies to version 5A(189)
+
+Last update: Wed Sep  8 16:54:09 1993
+
+Authors: Frank da Cruz, Christine M. Gianone, Columbia University.
+         Kai Uwe Rommel, Technische Universitaet Muenchen, Germany.
+
+  Copyright (C) 1985, 1993, Trustees of Columbia University in the City of New
+  York.  The C-Kermit software may not be, in whole or in part, licensed or
+  sold for profit as a software product itself, nor may it be included in or
+  distributed with commercial products or otherwise distributed by commercial
+  concerns to their clients or customers without written permission of the
+  Office of Kermit Development and Distribution, Columbia University.  This
+  copyright notice must not be removed, altered, or obscured.
+
+Report problems, suggestions, fixes, etc, to Frank da Cruz:
+
+  Internet: fdc@columbia.edu
+  BITNET/EARN: FDCCU@CUVMA
+
+Columbia University Academic Information Systems
+612 West 115th Street, New York, NY  10025  USA
+
+
+DOCUMENTATION
+
+C-Kermit 5A is documented in the book "Using C-Kermit" by Frank da Cruz and
+Christine M. Gianone, 1993, Digital Press, Burlington, MA, USA.  Digital Press
+ISBN: 1-55558-108-0; Prentice-Hall ISBN: 0-13-037490-3.  Price: US $34.95.  In
+USA, call DECdirect at 1-800-344-4825, refer to order number EY-J896E-DP.  A
+German edition will be available in late 1993 from Verlag Heinz Heise in
+Hannover, Germany.
+
+UPDATE: EDIT 189
+
+As of version 5A(189), OS/2 C-Kermit supports TCP/IP connections if you have
+IBM TCP/IP installed on your OS/2 system.  This requires a change in the
+installation instructions.  A new automatic install procedure is now included,
+a Rexx program called INSTALL.CMD.  Just put the installation diskette into
+drive A:, click on the Drive A: icon, then click on INSTALL.CMD.
+
+  NOTE: Early tests indicate that OS/2 C-Kermit's TCP/IP support does
+  not work with FTP Software's PC/TCP for OS/2 version 1.3, despite the
+  reports that it includes an IBM compatible TCPIPDLL.DLL.
+
+To bypass the INSTALL procedure and install OS/2 C-Kermit manually, please
+read the installation instructions in the READ.ME (CKOAAA.DSK) file.
+
+For other new features of edit 189, please read the file CKCKER.UPD.
+
+
+THE 16-BIT AND 32-BIT VERSIONS
+
+OS/2 C-Kermit can be built in a 16-bit version, which works under both OS/2
+1.x and 2.0 (and later), and in a 32-bit version, which works only under OS/2
+2.0 and later.  The program herald and the SHOW FEATURES command tell you
+which version you have.
+
+The 16-bit version might run out of stack space and crash under certain
+conditions (the OS/2 message will be "Stack Overflow").  This is a limitation
+of the Microsoft C 6.00 development system it was built with, and of the
+underlying 16-bit architecture.
+
+The 32-bit version does not (should not) crash, but it can't be used under
+OS/2 1.x.  So it is best to use the 32-bit version under OS/2 2.00 and later.
+
+
+GENERAL LIMITATIONS AND PROBLEMS
+
+C-Kermit does not support multiple sessions.  If you SET PORT 1 and make a
+connection, and escape back and SET PORT 2, the connection on port 1 is
+closed, dropped, and hung up.  To achieve multiple C-Kermit sessions, run
+separate copies in different OS/2 windows.
+
+C-Kermit's performance on serial connections -- and the performance of any
+other OS/2 communication software program -- can be improved significantly by
+using a 16550A(FN) communications port controller (UART) rather than a 8250,
+16450, or other unbuffered UART.  Unbuffered UARTs interrupt the CPU once per
+character, whereas a buffered UART interrupts every 8-14 (or more) characters.
+Measurements during C-Kermit file transfer on an otherwise unloaded i486/33
+under OS/2 2.0 show approximately 60% CPU usage with a buffered UART and
+75%-100% using an unbuffered one.  And of course, as with all other OS/2
+applications (and OS/2 itself), a faster CPU and more memory also help.
+
+In any case, native OS/2 serial communications software is NOT as fast as DOS
+communications software (such as MS-DOS Kermit) under DOS on the same machine
+because OS/2 communications must be done through the serial device driver,
+which adds considerable overhead (context switching; registers, stack, call
+gate, etc), whereas DOS applications can access the bare hardware directly.
+
+If you refer to a disk drive that is not ready, or to a file on such a disk
+drive, the OS/2 critical error handler might pop up and require action from
+the keyboard.  This occurs during execution of commands by inferior processes,
+such as DIRECTORY, REMOTE DIRECTORY, DELETE, REMOTE DELETE, etc.  It should
+not occur in file transfer operations.  The "hard error box" will put a halt
+to unattended, scripted operations, and it stops the operation of the OS/2
+C-Kermit server if there is no human in attendance.  To work around: add the
+line "AUTOFAIL=YES" to CONFIG.SYS.  This eliminates the hard error box, but it
+applies system-wide, not just to C-Kermit.
+
+You can't give a command like "RECEIVE A:".  C-Kermit will fail to open
+the output file.  You must also include a filename, e.g. "RECEIVE A:X.X".
+
+Certain commands that rely on underlying CMD.EXE services, including DELETE
+and TYPE, do not accept full pathnames (or, at least they do not pass them
+correctly to CMD.EXE).
+
+If the PUSH command, and related commands, do not work for you, check the
+definition of your OS/2 COMSPEC environment variable.
+
+There is no way to change the OS/2 code page after you have started Kermit.
+RUN CHCP doesn't do it because it only affects the CMD.EXE process below,
+which, of course, exits immediately after running CHCP.
+
+Printer support.  The good news:
+
+ . The PRINT command works.
+ . Files can be transferred to PRN in the 32-bit version only.
+ . LOG SESSION PRN works in the 32-bit version.
+ . The Print-Screen key prints the current terminal emulation screen in the
+   32-bit version (not tested in the 16-bit version).
+ . Host-initiated transparent print operations work correctly in the 32-bit
+   version. 
+
+The bad news:
+
+ . There is no Print item in the C-Kermit window menu because C-Kermit
+   is a character-mode (VIO), rather than Presentation Manager (PM),
+   application. 
+ . Ctrl-Print-Screen has no effect.
+ . Host-initiated print operations are presently ignored by the 16-bit
+   version (because if they are not ignored, they cause a stack overflow).
+ . The following host-initiated print operations are not supported:
+   - ESC [ 0 i    (print current screen)   
+   - ESC [ 1 i    (print current line)
+   - ESC [ ? 5 i  (autoprint is treated like transparent print)
+ . Print operations, when attempted on an OS/2 system that has no printer
+   installed, can hang the Kermit program.
+
+Wish list:
+
+ . Add LAN Manager and other network support.
+ . 132-column mode for VT102 emulator, using horizontal scrolling if
+   the graphics adapter (EGA, VGA) does not support 132 columns.
+ . VT-220/320/420 emulation
+ . Tektronix emulation
+ . Hebrew VT420 features (cursor direction, etc)
+
+COMMUNICATIONS AND DIALING
+
+Unless you have a very fast machine (say, 25 MHz or higher), OS/2 and its
+serial port drivers are not fast enough to keep up with serial input at 19200
+bps or higher unless you have configured your connection for the optimum type
+of flow control, preferably RTS/CTS.  Symptoms of lost data include fractured
+terminal screens during CONNECT and packet retransmissions during file
+transfer.  High-speed communication works well if RTS/CTS is effective, but
+the overall throughput is limited by your PC's CPU speed (and how busy OS/2 is
+with other concurrent processes).
+
+SET LINE and SET PORT are synonyms, they do exactly the same thing: select the
+communication device.  The syntax is the same for both:
+
+  SET LINE [ <device-name> ]
+  SET PORT [ <device-name> ]
+
+If you omit the device name, C-Kermit reverts to its default communications
+device, normally COM1.  If you include a device name:
+
+ 1. If the device name is a single digit, 1 through 8, C-Kermit converts
+    this digit to the corresponding COM port name, COM1 through COM8.
+    For example, "set port 2" is converted to "set port com2".
+
+ 2. If the device name begins with an underscore character (_), and all of
+    the following characters are numeric (for example, _12), the number is
+    assumed to be a file descriptor for an already-open communication device
+    (more about this below).  If the device name begins with an underscore,
+    but any non-numeric characters follow, a syntax error results.
+
+ 3. Any other sequence of characters (including "COM1", etc) is accepted
+    literally as a device name. 
+
+In cases (1) and (3), C-Kermit attempts to open the device, and then, if
+successful, checks to see whether it is a real communications device.  If not,
+the SET LINE / SET PORT command fails.  In case (3) (see below), no checking
+is done.  NOTE: You can also pass an open file descriptor to C-Kermit on
+the command line, e.g. "ckermit -l 4".  See the sample program below.
+
+Unless you use the MODE command to change it, the OS/2 serial port device
+driver requires DSR and CTS.  If your modem or device does not provide these
+signals, you can enable communication by telling the driver not to require
+them, before starting C-Kermit (or in your CKERMIT.CMD file).  For example:
+
+  MODE COM2 IDSR=OFF,ODSR=OFF,OCTS=OFF
+
+If you have problems using COM3, COM4, or higher, specify the address and
+interrupt number (IRQ) in your OS/2 CONFIG.SYS file, in the line that starts
+the serial communication driver, COM.SYS (or SIO.SYS):
+
+  DEVICE=C:\OS2\COM.SYS (number,base-address,irq) ...
+
+This example gives the addresses and IRQs for COM3 and COM4 but leaves the
+values for COM1 and COM2 alone:
+
+  DEVICE=C:\OS2\COM.SYS (3,3E8,10) (4,2E8,15)
+
+and this example gives values for COM1 through COM4:
+
+  DEVICE=C:\OS2\COM.SYS (1,3F8,4) (2,2F8,3) (3,3E8,10) (4,2E8,15)
+
+WARNING: the addresses and IRQs for COM3 and COM4 are not standardized, and
+can vary depending on the design and configuration of your communication
+board.  Consult the documentation that came with your communication board.
+
+KEY ASSIGNMENTS
+
+The default key assignments are as listed in "Using C-Kermit", Table V-3,
+page 430.  DEC PF1-4 to PC F1-4.  DEC keypad 0-9 to Alt-0 thru Alt-9, top
+rank, and so on.  If you want to assign these functions to the PC's numeric
+keypad instead, simply TAKE CKOVTK.INI.
+
+SHOW KEY does not show what characters are sent by the special keys F1..F10,
+Alt-0..Alt-9, or the Arrow keys, nor the actions associated with Page Up,
+Alt-=, etc.  This information is given in Tables V-1..V-3 on pages 428-430
+of "Using C-Kermit".
+
+SET KEY works with the Num Lock key, but several cautions are necessary:
+
+ 1. Num Lock has two different scan codes: \510 and \766.
+ 2. Every time you push Num Lock, the scan code toggles.
+ 3. Every time you push Num Lock, the keypad state toggles.
+
+Assigning characters to Num Lock with SET KEY does not change this behavior.
+Thus, if you want the keypad keys to always send the same codes, no matter
+what the Num Lock state is, you must include two SET KEY commands for each key.
+This is done by CKOVTK.INI.
+
+If you need to send VT220 key sequences (F6-F20, Help, Do, Find, etc),
+use the VT220 section of CKOVTK.INI.  Read the comments in the second half
+of the file for directions to find out how to activate the VT220 key settings,
+and, if using a VAX/VMS host, give it these commands before starting your
+application:
+
+  $ set term /device=vt200
+  $ set term /noeight
+
+Key scan codes are not all the same as in MS-DOS Kermit.  Most ordinary keys
+have the same codes, but not as many keys are differentiated.  All
+combinations of Ctrl, Shift, and Alt with a particular key do not necessarily
+produce unique scan codes.  There are no \Kverbs as in MS-DOS Kermit.
+
+TERMINAL EMULATION
+
+SET DEBUG SESSION is currently not supported.
+
+Various VT102 terminal features are not supported, including:
+
+ . Blink
+ . Smooth scroll
+ . Switching between 80- and 132-column mode
+
+and others are simulated:
+
+ . Double-width and double-height lines (by doubling characters)
+ . Underlining (by a distinct color)
+
+Scrolling is slower in an OS/2 Window.  This is because OS/2 is operating in
+graphics mode and must draw each dot (pixel) individually.  Fullscreen
+scrolling is faster, which uses character mode.  But when running C-Kermit in
+fullscreen you lose the ability to cut and paste.
+
+The cursor disappears briefly while the screen is being updated and appears
+again within a few milliseconds after screen activity stops.  This can be
+somewhat disconcerting, but it increases the speed of screen updates.
+
+SET FLOW XON/XOFF prevents you from transmitting Ctrl-S and Ctrl-Q characters
+to the host.  These characters are commands (Search and Quote) in EMACS.
+
+If the host sends the escape sequence to put the terminal into 132-column
+mode, and subsequently sends data that would appear in the rightmost 52
+columns, this may interfere with existing data on the screen.  If C-Kermit is
+started in an OS/2 132-column fullscreen session under OS/2 2.0 (only possible
+on certain video adapters), it will display such data correctly but will
+always be in 132-column mode, even if only 80-column mode is used.
+
+Shift-in/Shift-Out works only if you SET TERMINAL LOCKING-SHIFT ON.
+
+FILE TRANSFER
+
+There is no way send the complete contents of a file in text mode if the file
+contains a Ctrl-Z character that is not the last character in the file.  In
+other words, Ctrl-Z is always treated as end-of-file when the FILE TYPE is set
+to TEXT.  There should be a SET EOF {CTRLZ, NOCTRLZ} command as in MS-DOS
+Kermit to control the treatment of Ctrl-Z characters in text files.
+
+Be sure to activate the appropriate type of flow control before transferring
+files, especially if you are using long packets:
+
+  SET FLOW RTS/CTS
+    Preferred, if the device your PC is immediately connected to supports it.
+
+  SET FLOW XON/XOFF
+    Used end-to-end, but subject to noise corruption, propogation delays, etc.
+
+By default OS/2 C-Kermit uses whatever flow control is already configured
+for the communications port driver at the time you started C-Kermit.

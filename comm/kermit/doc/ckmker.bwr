@@ -1,0 +1,1305 @@
+FILE CKMKER.BWR       MACINTOSH KERMIT "BEWARE" FILE             September 1993
+
+
+  Version: Mac Kermit 0.99(189) / C-Kermit 5A(189) Pre-ALPHA
+  Last update of this file: Wed Sep 22 14:34:13 1993
+
+  Frank da Cruz, Columbia University
+  e-mail: fdc@columbia.edu (Internet), FDCCU@CUVMA (BITNET/EARN)
+
+
+This document applies to the pre-pre-pre-pre-release of Mac Kermit 1.0.
+This is a work in progress, and progress is slow due to lack of funding for
+the required work.
+
+Many features remain to be filled in, refined, fixed, or even designed.
+Several volunteer programmers in scattered locations around the world are
+working on the new release as their schedules permit.
+
+This is the first Mac Kermit version to have been built with the C-Kermit 5A
+file transfer protocol modules, so it incorporates all the latest protocol
+features of C-Kermit, including sliding windows and character set translation.
+
+As yet, there is no documentation for Mac Kermit 1.0 except the Mac Kermit
+0.9(40) user guide, this file, and the C-Kermit documentation, which describes
+the commands you can give at the Mac-Kermit prompt in Mac Kermit's command
+window, which are useful in Mac Kermit for modem dialing, script
+programming, etc.  C-Kermit documentation is:
+
+  Frank da Cruz and Christine M. Gianone, "Using C-Kermit", Digital Press,
+  Burlington, MA, 1993, 514 pages.
+
+    Order Number: EY-J896E-DP
+    Digital Press ISBN: 1-55558-108-0
+    Prentice Hall ISBN: 0-13-037490-3
+
+  US single-copy price: $34.95; quantity discounts available.  Available in
+  computer bookstores or directly from Digital Press.  In the USA, call
+  DECdirect toll-free 1-800-344-4825 to order; major credit cards
+  accepted.
+
+  Overseas, order through your bookstore (refer to the Prentice Hall ISBN
+  shown above) or your local Digital Equipment Corporation branch (refer to
+  the DEC order number).
+
+  You can also order from Columbia University:
+
+    Kermit Development and Distribution
+    Columbia University Academic Information Systems
+    612 West 115th Street
+    New York, NY  10025  USA
+    Telephone: (USA) 212 854-3703
+
+  Domestic and overseas orders accepted.  Price: $34.95 (US, Canada, and
+  Mexico), $45 elsewhere.  Orders may be paid by MasterCard or Visa, or
+  prepaid by check in US dollars.  Add $35 bank fee for checks not drawn on
+  a US bank.  Price includes shipping.  Do not include sales tax.
+
+This file contains information for both users and for implementors.
+Eventually everything will be sorted out and we'll have professionally
+published Mac-Kermit-specific user documentation.
+
+Send comments, bug reports, etc, to me at the e-mail address above.
+
+
+THE HQX FILE
+
+The Mac Kermit program is distributed on the Internet and BITNET/EARN in
+printable ASCII BinHex 4.0 form.  Convert back into a runnable application
+using BinHex Version 4.  If you have BinHex 5.0 rather than 4.0, you will
+have to edit away the plain-text line:
+
+(This file must be converted with BinHex 4.0)
+
+and the line below it, and then it should be covertible by BinHex 5.0.
+
+You can also order Mac Kermit on diskette, ready to run, from Columbia
+University at the address above.
+
+
+SOURCE CODE
+
+Macintosh Kermit is written in C.  The modules whose names start with "ckm"
+are specific to the Macintosh.  These can be C source code (.c), header files
+for #include (.h), or resource files (.r).  The makefile is ckmker.mak, which
+you should rename to kermit.make for use in MPW.  The modules whose names
+start with "ckc" or "cku" are shared with other C-Kermit implementations:
+UNIX, VMS, OS/2, Amiga, OS-9, etc.
+
+This version of Mac Kermit can be built using only MPW C 3.2 Final (NOT 3.0
+or 3.1, and not any Beta version of 3.2) on the Macintosh.  MPW 3.2 is
+required because Mac Kermit needs more than 32K of uninitialized global data
+space, and the limit in MPW 3.1 and earlier is 32K.  It is probably not
+possible to reduce the size of the uninitialized global data area by more than
+about 3-4 more K (by converting array declarations to pointers and then
+mallocing the space at runtime), so we can't get below 32K, so therefore we
+must use the new MPW C 3.2 "32-bit everything" model ("-model far").
+
+  NOTE TO DEVELOPERS: References to the Pattern data type have to be changed
+  to fit MPW 3.2's new redefinition (which, they say, was done to eliminate
+  crashes on 68000-based CPUs).  See quickdraw.h and Appendix J of the 3.2
+  Release Notes.  When this is done, remove "-d dangerousPattern" from the C
+  command line in the makefile.
+
+Many of the source files contain 8-bit characters.  Make sure you have
+transferred them to your Mac correctly.  Use text mode, but make sure
+character translation is turned off.  Also, many of the ckm*.* files have
+lines longer than 80, which can prevent them from being transferred via
+certain kinds of e-mail (such as BITNET).
+
+  NOTE TO DEVELOPERS: These source files need to be edited to ensure that
+  all lines are less than 80 characters wide (after tab expansion), and
+  8-bit characters are all converted to "\ooo" ASCII octal notation (I tried
+  using the \266 (delta) line continuation character in the kermit.make file
+  to break up long lines, but it didn't seem to work.)  The final release
+  source code should contain only 7-bit ASCII characters, and no lines
+  longer than 80.
+
+NOTE: An effort is underway to make Mac Kermit also compilable by Think C.
+
+
+NEW FEATURES
+
+Multiple screen windows: for terminal emulation, command processing, text
+editing, server response, etc, managed in the normal Macintosh way, as well as
+with a new "Window" menu to select any Mac Kermit window explicitly.  Cutting
+and pasting works among most of the windows, including double click to select
+a word, triple click to select a line.  Material can be copied from the
+terminal window to other Mac Kermit windows, or to other applications.
+Pasting into the terminal window sends text to the remote computer.  The
+terminal session can also be logged directly to a file.
+
+The Command window runs the C-Kermit command parser, just like on UNIX, VMS,
+or OS/2, and similar to MS-DOS Kermit.  This gives you access to features that
+are not in the mouse/menu interface, most importantly the DIAL command and the
+script programming language, and allows the same script programs to be used by
+C-Kermit on UNIX, VMS, the Macintosh, the Amiga, OS/2, etc, and by MS-DOS
+Kermit (with proper precautions about portability).  Text command files can be
+used as Mac Kermit startup files ("init files", like for C-Kermit or MS-DOS
+Kermit).  Filenames can be referred to by their full path names in the SEND
+command, etc, for example "send diskname:foldername:filename", or by relative
+pathnames, e.g. "send ::foldername:filename".
+
+Window sizing (vertically only) using the size box, including the terminal
+emulation window.
+
+Scrollback in most windows, including the terminal window.
+
+Font selection in the terminal window.
+
+More efficient file transfer via sliding window packet protocol and longer
+packets.  The window size may be as big as 31 (the theoretical maximum) and
+packets can be up to about 5000 characters long.
+
+File transfer character set translation (available only via the Command
+window).  The commands are SET FILE CHARACTER-SET, SET TRANSFER CHARACTER-SET,
+and SET LANGUAGE.
+
+Locking shift packet protocol for efficient transfer of 8-bit data over
+7-bit communication channels.
+
+Dynamic packet size adjustment to adapt to communication line quality.
+
+File transfer thermometer.
+
+Redesigned menus (but nowhere near final).
+
+Faster terminal emulation.
+
+Many bugs fixed.
+
+
+MISSING OR DESIRABLE FEATURES
+
+No Tektronix or ReGis graphics emulation (volunteers needed!).
+
+Missing VT320 features, including 132-column mode, and VT220, VT102, VT100,
+and VT52 submodes.
+
+No 3270 terminal emulation (volunteers?).
+
+No color support, e.g. ANSI color directives during terminal emulation.
+
+No "Print selection" and "Print screen" options selectable by mouse clicks
+(work is in progress).  Presently, printing can only be done in the terminal
+window via escape sequences sent from the host.
+
+No SET KEY command -- key settings are accessible only through the menu
+interface.  Maybe in a future edit.
+
+No Comm Toolbox support, e.g. for making connections thru MacTCP, LAT.
+
+No multiple sessions -- e.g. modem port in one window, printer port in another.
+The hard part here is not putting up another window, but associating all the
+varied and many communication, protocol, and terminal emulation parameters
+separately for each window (this is not just a programming problem, but also
+a user interface design issue).
+
+Internationalization of the user interface (this will be done before the
+final release).
+
+Operation as a server is problematic.  Dialing in to a Mac running Mac Kermit
+in server mode is problematic because the needed modem signals are not
+available on the Mac.  The server's response to REMOTE CD, REMOTE DIRECTORY,
+REMOTE DELETE, and similar commands is either not working or leaves much to be
+desired.  Server end of REMOTE LOGIN is not implemented.
+
+
+USING MAC KERMIT WITH MODEMS
+
+The Macintosh serial port is not an RS-232 device and does not support the
+full repertoire of modem signals needed for normal operation with modems.
+Communication with modems is accomplished using various "fakeouts", each of
+which sacrifices some feature in order to accomplish some other feature,
+since the Mac has only one modem signal to send to the modem, and reads only
+one modem signal from the modem.  Thus, for example, the Mac can't hang up
+the phone by dropping DTR and use hardware flow control at the same time.
+
+To have the ability to hang up the phone by dropping DTR, you need a regular
+Macintosh modem cable that connects the Mac's "Handshake Out" signal
+(Mini-Din-8 Pin 1) to the modem's DTR signal (DB25 pin 20), and the modem
+should be configured to hang up when DTR goes down.  In Mac Kermit, you should
+NOT check "DTR input flow control" or "CTS output flow control".
+
+To use hardware flow control with high-speed modems, you need:
+
+ 1. A special Macintosh hardware-flow-control-modem cable that connects the
+    modem's CTS signal (DB25 pin 5) to the Macintosh's "Handshake In" signal
+    (Mini-Din-8 Pin 2) and the Mac's "Handshake Out" signal (Mini-Din-8 Pin 1)
+    to the modem's RTS signal (DB25 pin 4).  This cable *might be* available
+    from stores or suppliers as a "Macintosh Hardware Handshake Modem Cable"
+    (buy at your own risk).
+
+ 2. You MUST configure your modem to ignore DTR ("&D0" on most Hayes and
+    compatible modems) and to use RTS/CTS flow control.  NOTE: This means
+    you can't hang up the phone by "dropping DTR".  Normally, it will hang
+    up automatically when you log out from the remote computer or service.
+    If it doesn't, use the escape sequence (such as +++) to get back to the
+    modem's command processor, and then type the modem command for hanging
+    up (usually ATH0).
+
+ 3. In Mac Kermit's Communications Settings menu, uncheck Xon/Xoff flow
+    control, and check DTR input flow control and CTS output flow control.
+
+To use the internal modem on the Powerbook, use the Portable or PowerBook
+control panel (depending on if you're using System 7.0 or 7.1) to switch
+between the internal modem and the external modem serial port.
+
+
+GENERAL BUGS
+
+The new version is too big for 512K Macs or below.  Reportedly, even
+attempting to start Mac Kermit on a 512K mac results in a System error that
+requires the Mac to be restarted.
+
+Many of Mac Kermit's settings are not saved in the "Save Settings" file.
+These include the communication port, certain key settings, menu-command-keys
+active, etc etc.
+
+Reportedly on a PowerBook 100 and SE30 (and perhaps other models), "put Kermit
+away in the finder menu by quitting using close or clicking on the close box.
+See the dimmed Kermit icon in the folder (normal so far). Now try to re-enter
+Kermit, either by double-clicking on the icon in the folder, or by selecting
+it from the Finder menu. Crash, bomb screen says "bus error" and allows you to
+restart.  No funny type manager INITs.  Doesn't seem to be bothered if the
+Kermit window is left open, only when it's closed but not Quit."
+
+Reportedly, "On a Mac LC III, running sys 7.1 *invariably* and *ALWAYS*; every
+time I save a macro or macro set, Kermit Crashes, giving an error message '#1'.
+This is independent of any INITS or CDEVs, and always occurs."
+
+Reportedly, "On a Mac II with System 6.0.7 with math coprocessor and Color
+Cursor, Dimmer, Mousekey, Programmer's key, Randomizer, and SAM Interrupt
+loaded, any attempt to save the settings file freezes the system."
+
+Reportedly, "Using a Mac Plus with 45Meg Rodime but running Kermit from a
+floppy, doing a GET FILE from PC to Mac at 19200 bps with the PC as server:
+when the PC says 100% transmitted I get System Error ID=27 on the Mac.  The
+restart button on the error message box does not reboot."
+
+SET FILE COLLISION UPDATE and subsequent reception of files makes Mac Kermit
+bomb.
+
+When a SEND command is given from the Command window (at the Mac-Kermit>
+prompt), the file transfer display window says "Receiving" instead of
+"Sending".  Also, something screwy is going on with the window size -- with
+two window slots selected, the window size (on the display) blinks between
+"0" and "1"...
+
+Reportedly, Mac Kermit does not pick up the file type (text vs binary) from
+an incoming file attribute packet.  So, for example, when sending a file from
+UNIX with SET FILE TYPE BINARY, Mac Kermit still receives it text mode
+(apparently the Mac-specific code has its own private file-type variable that
+is not coordinated with the mainline C-Kermit code).  What's worse
+(reportedly), when setting Mac Kermit's local file type to binary, the
+Macintosh locks up at the end of the transfer.
+
+Severe problems when running on a Mac (only under System 7?) that has
+SuitCase, Adobe Type Manager, TrueType, or Mac Layers Keyboard loaded, ranging
+from messed-up screens (bad font spacing) to Kermit or Mac bombs.  Hopefully
+this will clear up when the new Macintosh Extended Latin font is finished and
+integrated with Mac Kermit.
+
+There also seems to be an incompibility between Now Utilities 4.01 and
+MacKermit.  It worked OK with NU 4.0, but with NU 4.01, if you try to launch
+MacKermit from a pull-down NowMenu, the Mac (e.g. IIci, System 7.0 with
+Tune-up 1.11) freezes.
+
+One user reports that Mac Kermit bombs unexpectedly "when trying to use key
+settings" unless "32-bit addressing is turned off".
+
+Kermit's ID (signature) is KR09, which hasn't changed in years, so if you have
+a lot of different Kermit versions on your disk, clicking on a Kermit startup
+file will start a random version of Kermit, not necessarily the one you want.
+The ID should be updated to KR10 (files ckmker.mak = kermit.make, ckmdef.h,
+ckmker.r, ckmkr2.r, ckmsav.c).
+
+Starting one copy of Mac Kermit while another one is active (e.g. under
+MultiFinder) results in lots of errors for both Kermits.  Kermit always
+initializes the modem port when it starts up, and this hangs up any other
+version of Kermit (and who knows what other programs) that might be using the
+modem port.  Kermit should (a) not touch the communication device until it
+needs to do i/o (this would give the selection of alternate communication
+devices the opportunity to take effect first), and (b) should (if this is
+possible on the Mac) detect whether the communication device is in use
+already, and if so, give an appropriate error message.
+
+Many bugs (malfunctions, hanging or bombing of the system, even the occasional
+destruction of files, etc) were reported for earlier releases (and
+non-releases) of Mac Kermit under System 7.  Let's wipe the slate clean and
+see how this version fares.
+
+
+MENUS, WINDOWS, AND DIALOG BOXES
+
+The menus are not complete, and will be rearranged.  They must fit on a small
+screen, even after translation into languages like Swedish, where the words
+are longer than English.  See APPENDIX at the end of this file.
+
+The File menu (English version) is too long for a small screen.
+
+Some of the dialog boxes violate the Human Interface Guidelines (HIG) from
+Apple, and need redesigning also.
+
+The edit menu Undo command doesn't work, and the Edit menu lacks a Select
+All command.
+
+In the file-send dialog box, an attempt to edit the "Send As" name results
+in deselecting the file and dimming the Send button.
+
+Typing a letter into a file dialog box tends not to scroll the file list.
+
+If you click on Load Settings in the File menu while the command screen is
+foremost, the terminal screen will come to the foreground.  However, any
+characters you type still go into the command window.  Load Settings should
+either leave you in whatever window you were in before, or else fully select
+the terminal window.
+
+Various items are not saved in the settings file: the communication port
+(modem or printer), character sets, etc.
+
+LOG SESSION (given from the command window) does not seem to work (produces
+an empty file).  CLOSE SESSION puts up an alert box.
+
+Various confusion with cutting and pasting between windows, especially after
+a window that has been cut from is closed.
+
+Pasting text into the bottom of a text window does not cause the scroll bar
+to update; any text below the visible region cannot be scrolled to or
+otherwise viewed.  (Workaround: save and reopen the file.)
+
+Click and drag to select text doesn't scroll.  Shift-clicking should be a
+workaround for the above problem, but it doesn't work exactly as it should
+either. If the selection is scrolled out of sight, you can only shift click if
+the selection is >0 characters long (that is, you can extend a selection, but
+not from a 0-length selection).
+
+When pasting text into the buffer, if the text is too long, the edit
+menu remains highlighted and Kermit appears to be out of commission.  Using
+MacsBug to 'es' and restart it, repainting the screen in the editor
+buffer on the host that I was pasting into, shows that the pasting
+went partway and then some characters were lost.
+
+All blank lines are removed from text files upon opening.
+
+There is no way to select file and transfer character sets in the menus, or
+language rules.  Furthermore, the present character-set menu applies only to
+the terminal emulation character set, and it lists many sets that are not
+implemented.  These should be removed.  The new menus should look
+approximately as shown at the end of this file, in the proposed menu
+design appendix.
+
+
+MAC KERMIT CHARACTER SET AND FONT BUGS
+
+There is presently no way for users to specify their own character-encoding
+translations.  The translations for file transfer and terminal emulation
+are built in to Kermit.
+
+A point size of 7 is listed in the Font menu, but it can't be selected.
+
+Mac Kermit's built-in VT100 terminal font does not scale well to any size
+other than 9.
+
+Mac Kermit's VT100 font has entirely different character codes than all the
+other Mac fonts for the "special" (8-bit) characters.  If you switch to, say,
+Courier for terminal emulation, all the special characters (accented letters,
+etc) come out wrong.  Furthermore, Apple character encodings (like Quickdraw)
+lack certain characters (e.g. Icelandic Thorn and Eth) needed for Latin-1.
+
+The VT100 font is built into Mac Kermit, which means it can't be hooked in to
+Key Caps, so you can never find out what keys to type in order to send special
+characters.  This also seems to cause some problems with SuitCase and friends.
+The font should be externalized, but then it becomes difficult to install Mac
+Kermit -- you can't just stick in the disk and run it, you have to install
+fonts first.  It would be best to keep the font defined in Mac Kermit, but
+also have an external copy for the benefit of Key Caps.
+
+The VT100 font doesn't print correctly (accented characters, VT100 special
+and technical characters, etc).  
+
+See the separate file, ckmker.fon, for a detailed description of these
+problems and a proposed solution.
+
+Proportional fonts can be selected during terminal emulation, but of course
+they don't look right because terminals use fixed-width fonts.  Maybe
+proportional characters could be displayed within fixed-size boxes.  Or maybe
+Kermit should only allow monospace fonts in its font menu.
+
+Selecting the Chicago font doesn't work at all (a mystery).
+
+
+TERMINAL EMULATION BUGS & LIMITATIONS
+
+Local echoing doesn't work very well.  Reportedly the characters are
+the wrong size and appear at positions that are unrelated to the
+cursor or mouse location.
+
+If you select Mouse -> Arrow Keys in the Terminal Settings dialog,
+there is no way to turn off this feature.
+
+Window height can be changed, but not width.  We need 132 column mode, and a
+terminal width menu selection (and correct response to VT "set width" escape
+sequences").
+
+Mac Kermit does not respond correctly to DECCOLM escape sequences from the
+host, i.e. ESC [ ? 3 h/l (h = 132 cols, l = 80 cols).  Aside from not changing
+the screen width, Mac Kermit also neglects to perform the other actions
+associated with these sequences: (1) clear the screen, (2) home the cursor,
+and (3) set scrolling region to 24 lines.
+
+Reportedly, Mac Kermit occasionally forgets its window height.  E.g. if you
+set the window height to (say) 38 by dragging the corner of the terminal
+window, and inform the host of your new terminal dimensions, eventually (maybe
+after several hours of correct operation), Mac Kermit will begin to scroll
+within a 24-line line window, even though the window is still 38 lines long.
+
+Keyboard handling is not independent of the keyboard driver -- it assumes the
+US keyboard driver.  For example, Mac Kermit doesn't handle dead-key
+combinations used in France, Sweden, etc.  Mac Kermit accesses the KCHR
+resource, which is a no-no for System 7.
+
+Beware of the Option key.  It changes the value of any characters you use with
+it.  If you type Option-F, the Mac will send a D, if you type Option-B, the
+Mac will send a ":", etc.  If you want to use the option key as a modifier, be
+sure to check the "Unmodify" box.
+
+There is no mechanism (such as SO/SI, SS2, or SS3) for sending 8-bit
+characters to a 7-bit host during terminal emulation.
+
+Mac Kermit does not respond to host-generated escape sequences to designate
+selected character sets to G0..G3, for example ESC - A to designate Latin-1 to
+G1.  Mac Kermit should support:
+
+  ESC ( <ident>  Designates 94-byte character set <ident> to G0
+  ESC ) <ident>  Designates 94-byte character set <ident> to G1
+  ESC * <ident>  Designates 94-byte character set <ident> to G2
+  ESC + <ident>  Designates 94-byte character set <ident> to G3
+  ESC - <ident>  Designates 96-byte character set <ident> to G1
+  ESC . <ident>  Designates 96-byte character set <ident> to G2
+  ESC / <ident>  Designates 96-byte character set <ident> to G3
+
+where the <idents> are:
+
+<ident>    Size    Character-Set
+
+   A        96     ISO Latin-1
+   B        94     ASCII (default in G0, G1)
+   0        94     DEC Special Graphics
+   1        94/96  VT100 Alternate ROM
+   2        94     DEC Special Graphics
+   %5       94     DEC Supplemental Graphics = DEC Multinational Char Set
+   >        94     DEC Technical
+
+There is no mechanism for the user to explicitly designate character sets to
+G0..G3.  See menu design in the Appendix for how to do this.
+
+Reportedly, trying to scroll the terminal window while data is being sent to
+it can crash the Mac (I can't reproduce this one, maybe it's fixed now... or
+maybe it only happens with SuitCase, etc, loaded).
+
+Various VT200/300 functions are not implemented, including the character-set
+related items mentioned above, UDKs, various DECDSR, DECRQM, and other report
+requests (UDK status, keyboard dialect, keyboard action, insert/replace mode,
+newline mode, cursor key mode, numeric keypad mode, 132 column mode, smooth
+scroll, reverse video, autowrap, palette request, UPSS state, tab stops).
+
+Various obscure bugs with VT320 character attributes (most frequently
+appearing when using the UNIX "more" command).
+
+Various failures with "vttest".
+
+Set Key dialog box should show what a key sends if it is "unbound".
+
+Set Key Macros should allow decimal and hex escapes as well as octal, like
+MS-DOS Kermit (or C-Kermit itself): \onnn = octal, \dnnn = decimal, \xnn =
+hex, \nnn defaults to decimal (of course changing the default will cause
+problems).  C-Kermit already has code to parse these forms, as well as to
+handle grouping, e.g \{27}2 to send ESC followed by 2.
+
+Bad default mappings for many keys: Ctrl-1, Ctrl-2, etc, thru Ctrl-0.  (Also
+Shift-Ctrl-1, etc).  Ctrl-2 and Ctrl-Shift-2 should send NUL (ASCII 0).
+Ctrl-6 and Ctrl-Shift-6 should send Ctrl-^ (ASCII 30).  The other top-rank
+number keys should send nothing when pressed with Ctrl.  Reportedly, under
+System 7 some of these key combinations aren't even noticed.
+
+Others too: Ctrl-+, Ctrl-; have codes when they shouldn't, etc etc.  
+
+Arrow keys occasionally send incorrect sequences.
+
+TO CHECK: Do arrow keys and numeric keypad keys respond correctly to:
+
+  ESC =		DECKPAM		Set numeric keypad to application mode
+  ESC >		DECKNPNM	Set numeric keypad to numeric mode
+  CSI ? 1 h     SM		Set arrow keys to cursor mode
+  CSI ? 1 l     RM		Set arrow keys to application mode
+
+Codes that should be sent by arrow keys:
+
+  Key    Cursor  Application
+
+  Up      CSI A   SS3 A
+  Down    CSI B   SS3 B
+  Right   CSI C   SS3 C
+  Left    CSI D   SS3 D
+
+Codes sent by keypad keys:
+
+  DEC           Mac
+  Key           Key     Numeric Application
+
+  PF1           clear    SS3 P   SS3 P
+  PF2           kp =     SS3 Q   SS3 Q
+  PF3           kp /     SS3 R   SS3 R
+  PF4           kp *     SS3 S   SS3 S
+  0             kp 0     0       SS3 p
+  1             kp 1     1       SS3 q
+  2             kp 2     2       SS3 r
+  3             kp 3     3       SS3 s
+  4             kp 4     4       SS3 t
+  5             kp 5     5       SS3 u
+  6             kp 6     6       SS3 v
+  7             kp 7     7       SS3 w
+  8             kp 8     8       SS3 x
+  9             kp 9     9       SS3 y
+  comma (,)     kp +     ,       SS3 l
+  minus (-)     kp -     -       SS3 m
+  period (.)    kp .     .       SS3 n
+  Enter         enter    CR or   SS3 M
+			 CRLF (newline ON)                
+
+Similar comments about the DEC function keys F1..F20.  They should be
+mapped in some fashion to the Apple function keys (F1..F15).  Keyboard
+verbs should be assigned for all keys that send escape sequences, so users
+can remap them without having to know what the escape sequences are --
+especially if the escape sequences can change based on host-controlled
+mode-setting commands.  See how MS-DOS Kermit handles this.
+
+An option to make the cursor change size depending on whether the VT emulator
+is in "insert" or "replace" mode might be desirable (handy for IBM mainframe
+Xedit users).
+
+A wealth of information about VT (and Heath) terminal emulation can be found
+in kermit/a/msvibm.vt (the online description of the MS-DOS Kermit terminal
+emulator) on watsun.cc.columbia.edu, or (in more complete form) in Appendices
+I and II of "Using MS-DOS Kermit", Second Edition, by Christine M. Gianone,
+Digital Press, 1992.
+
+Printing problems are covered below.  However, in the context of the terminal
+emulator, it has been pointed out that formfeeds (Ctrl-L) received during
+transparent print operations do not cause a page feed.  They should.
+
+
+COMMAND BUGS
+
+Various commands are missing or non-operational: DIRECTORY, CD, PWD, PRINT,
+etc.  These should be filled in.
+
+(NOTE: there is something in the MPW 3.2 release notes that says how
+signal(SIGINT,xxx) can be used to catch "Command-.").
+
+The command window scrollback feature doesn't work until after you leave
+the command window and then reenter it.
+
+No filename completion when ESC or TAB is typed within a filename, no file
+lists are produced when "?" is typed in a filename, and yet there is no beep
+to indicate these features don't work (instead, the cursor disappears).
+
+Sometimes the TAKE command doesn't work (an alert box comes up: "Writing to
+console in applications is not supported").  Sometimes it does work.  We
+haven't narrowed this one down yet.  Ditto for launching Kermit from a TAKE
+file (Kermit document containing text commands) (this works fine for me, but
+one user reported that whether it works depends on the file's name!).
+
+Some SET commands have no effect, in particular all the SET TERMINAL commands,
+SET FILE NAMES, ...  These should be filled in, i.e. hooked in with the
+Macintosh code so that both pieces of the program (Mac menu and C-Kermit
+command parser) use the same variables.
+
+The PAUSE command should wake up immediately (and fail) if the user hits
+a key or clicks the mouse.
+
+Some of the \v(...) built-in variables don't work right: directory,
+home, host.  \v(directory) should show the name of the current folder.
+\v(host) should show the Appletalk node name (if any) of the Macintosh.
+\v(home) should probably show the name of the current disk volume.
+
+SET LINE should be converted to use a keyword table (the choices are MODEM
+and PRINTER).  (Well, not really -- we still want them to be able to type
+real device names...?)
+
+Messages displayed by the DIAL command, by script execution, etc, do not
+appear on the command window screen until the next prompt appears.  In fact,
+this seems to be true of the messages displayed by any command, but most other
+commands finish quickly and a prompt is issued right away, so you don't notice
+this effect except for DIAL, etc.
+
+SET DIAL DISPLAY ON doesn't work at all (even though dialing itself works
+fine).
+
+In SEND, TRANSMIT, TRANSLATE, and other commands that accept Macintosh
+filenames, you can't include spaces in the filename.  To refer to filenames
+containing spaces at the Mac-Kermit> prompt or in command files, replace
+the space by \32, for example:
+
+  Mac-Kermit>send This\32is\32a\32File
+
+
+FILE TRANSFER PROBLEMS
+
+Some apparent problems with very long packets (like 9000).
+
+An official, invertible translation between ISO Latin-1 and Apple Quickdraw
+does not exist (or, at least, we don't know about it).  Our own Extended Mac
+Latin character set is used in this version.  This set is specified in the
+separate file, ckmker.fon, which also discusses the other character-set and
+font-related issues.
+
+When a file is received in attended mode, the file name first put in the text
+edit box in the receive dialogue has:
+ - the first character of the received name cut off;
+ - garbage following the last character.  The garbage has been of
+   varying nature -- sometimes control characters, sometimes font 
+   names, sometimes other things.
+When correcting the name, it is necessary not just to type the name's first
+character back in, but also to prepend a space ahead of it, or when the name
+is used, the first character will again be cut off.
+
+Further, in the File Send dialogue:
+ - When a file name is already supplied, as from Boomerang 3, it has a garbage
+   character prepended to it, and sometimes junk after it;
+ - The highlight in the file list is for a *different* file, such as the first
+   in the folder;
+ - Moving the highlight causes the file name in the edit box to be replaced
+   with "X".
+
+(Somebody suggested these problems were caused by confusion between C strings
+and Pascal strings.)
+
+When downloading a file to the Mac, the file mode (text or binary) as
+announced in the sender's Attribute packet is not picked up by Mac Kermit.
+you have to click the text or binary button in the File Defaults Settings
+menu first.  Even then, there can be problems (as with MacBinary).
+
+Incoming MacBinary files are not recognized automatically -- you have to
+click the MacBinary button beforehand.  (Not really a bug, just a desirable
+feature.  Apparently some other Mac communication programs can do this.)
+
+Incoming MacBinary files are often stored with garbage in their filenames.
+
+If a group of MacBinary files is transferred *to* Mac Kermit (remote Kermit
+has been told to "set file type binary" and "send *.macbinary", Mac Kermit has
+MacBinary selected in the File Settings dialog), only the first arriving file
+is treated as MacBinary.  After that, Mac Kermit forgets that it is in
+MacBinary mode.  Workaround: send only one file at a time to Mac Kermit in
+MacBinary mode.
+
+Sometimes (maybe always) MacBinary downloads, particularly of long MacBinary
+files, result in errors like:
+
+	Zclose(): MacBinary botched: this file should NOT still be open
+	Resource fork size mismatch...
+	Data fork size mismatch...
+	too many NAKs
+
+In general, the code that handles incoming MacBinary files needs a lot of work.
+
+There is no way to set the ID signature (associated application) of an
+incoming file.  They all become MacWrite documents (except if downloading in
+MacBinary mode.)  There should be a way to specify the ID for an incoming
+file, or at least make it a TeachText file instead of MacWrite.  (NOTE: MPW
+C 3.2 has a new function for doing this: fsetfileinfo() -- see release notes.)
+
+If an Appleshare or Novell file server disk goes away (e.g. because the
+connection dropped) in the middle of a file transfer, The Mac hangs and has to
+be rebooted with the programmer button.
+
+In the file-send dialog box, there is no way to mark selected files for
+sending (e.g. shift-click, shift-drag).  You can only send a single file, or
+else all the files in a folder.  (But you can use MSEND in the command window
+to send a selected list of files.)
+
+The file transfer display / dialog-box needs a button for "retransmit the
+last packet" to let the user wake up a transfer that seems to be stuck.
+Maybe also a "send XON" button to let the user try to break an XOFF deadlock.
+
+SET FILE DISPLAY NONE should be able to disable the file transfer display
+window altogether, for "silent running", for example, for people who want
+to incorporate Kermit into their BBS software.
+
+It would also be nice if the file transfer display showed the name of the
+current folder (and other info, as in C-Kermit's fullscreen file transfer
+display -- character sets, estimated time to completion, etc).
+
+The "find a new unique filename" algorithm is not great.  It starts with
+the filename, if it exists, appends ".0", then ".1", etc, up to ".99".
+However, this doesn't guarantee that the newly created version will be
+higher than all the others.  If .1 and .3 exist, Mac Kermit will create .2.
+
+The File Settings menu selection "Supersede existing files of the same name"
+doesn't seem work.  But SET FILE COLLISION (in the command window) works
+correctly (except for APPEND, which acts like OVERWRITE).
+
+When a REMOTE command is given from the command window, the Response window
+does not pop up to show the response.  However, if you select the Response
+window in the Window menu, you'll see the server's responses have been
+collected there.
+
+Reportedly, you can't cut or copy from the Response Window and paste into
+other windows.
+
+To be checked:
+
+ . Mac Kermit's reaction to incoming Attribute packets.  Will it reject a
+   file on the basis of size?  (It should)
+
+ . I'm pretty sure (but not positive) it reacts correctly to the
+   encoding/character-set attribute.  But it should show the active
+   character-set conversion in the file transfer display, or at least
+   include it in the after-the-fact statistics display.
+
+SERVER MODE
+
+1. Mac Kermit server mode in general (NOTE: these haven't been checked
+   recently, maybe they are fixed)...
+
+Sending a text file to the Mac Kermit server works fine.  Getting a text file
+from the Mac Kermit server also works fine, except the status screen still
+says "Receiving".
+
+REMOTE SET FILE TYPE BINARY, sent by a client to the Mac Kermit server, works.
+Binary file transfers in both directions work fine.
+
+There is, of course, no way for the client to put the Mac Kermit server into
+MacBinary mode, because as far as the Kermit protocol is concerned, the only
+transfer modes are text and binary.
+
+REMOTE DIRECTORY sent to the Mac Kermit server, doesn't work (It sends back
+an E-packet saying "Can't list directory").
+
+FINISH works, the file transfer status screen disappears, but the File
+Transfer top-level menu item remains highlighted.
+
+2. MacBinary transfers with the Mac Kermit server.
+
+OK, now we want to transfer files in MacBinary mode with a Mac Kermit server.
+We click on MacBinary in the File Settings menu, then put Mac Kermit in
+server mode.
+
+GETting a file from the Mac Kermit server: screen display says "Receiving"
+(instead of sending).
+
+Giving a REMOTE HELP command to the server apparently makes it forget it's
+in MacBinary mode.  A subsequent GET has Mac Kermit sending the data fork
+only (empty), in binary mode.
+
+Putting it back in MacBinary mode manually, and a subsequent GET, gives
+checksum errors.  Then Mac Kermit forgets it's in MacBinary mode again.
+
+In general, there seems to be a lot of problems with Mac Kermit remembering
+that it's in MacBinary mode.  This is no doubt because Mac Kermit keeps its
+own private variables (one for text / binary / macbinary, another for
+data / resource / both fork(s)) instead of using Kermit's built-in "binary"
+variable.  This needs to be reworked.
+
+
+APPENDIX I: Excerpts from Info-Kermit Digest V16 #4
+
+Date: Thu, 29 Oct 1992 15:47:00 EST
+From: Frank da Cruz <fdc@watsun.cc.columbia.edu>
+Subject: Macintosh Kermit Status and Q & A
+Keywords: Macintosh Kermit
+
+Hundreds of messages arrive here every day asking or complaining about Mac
+Kermit.  Here is a brief status report, followed by some typical questions
+and their answers.
+
+Mac Kermit is part of the C-Kermit family of programs.  C-Kermit 5A for
+UNIX, VMS, OS/2, AOS/VS, and several other operating systems is in its last
+stages of its 3-year-plus development.  The final beta test version will be
+announced soon.  Each new edit of C-Kermit is built on the Macintosh too,
+and so a new Mac Kermit test edit is issued with every test edit of
+C-Kermit.
+
+Each new Mac Kermit edit has improvements in system-independent areas, such
+as file transfer performance and features, modem dialing, script language
+programming, etc.  However, there has been very little work on the
+Macintosh-specific parts of Mac Kermit in the past year, except that
+recently Paul Placeway made some impressive improvements in the speed of the
+terminal emulator.
+
+We have big plans for "Macintosh Kermit 1.0", and have had them for a long
+time.  You can read about them, and also about the many bugs and problems we
+know about, in the file kermit/sw/ckmker.bwr on watsun.cc.columbia.edu.  You
+can also read, in great detail, about the problems with Mac Kermit's VT100
+font, and the proposed solution, in kermit/sw/ckmker.fon.  You can pick up
+the latest test version of Mac Kermit from kermit/sw/ckmker.hqx.  FTP all of
+these files in text mode.
+
+So when will Mac Kermit 1.0 be available?  It depends on the schedules of
+the volunteer programmers.  As you know, nobody is being paid to work on Mac
+Kermit, so volunteers must find time outside of their real jobs or
+schoolwork to take on these tasks that we all want accomplished, and decide
+to do this instead of, say, making buckets of money writing commercial
+Macintosh applications.  It is much harder to find a public-spirited
+Macintosh programmer with spare time than practically any other kind of
+programmer.
+
+So please be patient.  When we have a Macintosh Kermit version that we feel
+is comparable in quality to the other popular Kermit programs, we will
+announce it far and wide.  In the meanwhile, if you are a skilled Macintosh
+programmer capable of working in the MPW C 3.2 programming environment, and
+you want to pitch in, let me know.  If you are not, feel free to use the
+test versions, with their current limitations.
+
+Here is where to find the latest files, all on watsun.cc.columbia.edu,
+via anonymous ftp, text mode:
+
+  kermit/sw/ckmker.hqx  --  Latest Mac Kermit
+  kermit/sw/ckmker.bwr  --  "Beware file" for latest Mac Kermit 
+  kermit/sw/ckmker.fon  --  Writeup of font situation
+  kermit/b/ckmker.doc   --  User manual for last real release, 0.9(40), ASCII
+  kermit/b/ckmker.ps    --  User manual for last real release, PostScript
+  kermit/charsets/mac*  --  The new Macintosh Kermit font, tables, docs, etc
+
+------------------------------
+
+Date: Sun, 18 Oct 1992 23:19:55 -0700 (PDT)
+From: Les Ferch <ferch@ucs.ubc.ca>
+Subject: MacKermit on Mac Plus
+
+I noticed a couple of minor problems with MacKermit on a Mac Plus.
+
+1. Using "Set modifiers..." I set Option to act as Ctrl. However, it does
+not work. To get a Ctrl key, I have to set Command to act as Ctrl and turn
+off Menu Keys. It would be nice to be able to keep Menu Keys and use
+Option as Ctrl.
+
+[Ed. - To use the Option key as a Ctrl key, you have to check the Opt box
+on the left side of the Set Modifiers dialog, and you also have to check
+both Unmodify and Ctrl on the right side, in the same row.  See ckmker.bwr.]
+
+2. The File menu is longer than the 9" screen. This confuses beginners
+looking for Quit. If Load Settings and Save Settings were moved to the
+Settings menu, the problem would be solved.
+
+[Ed. - A well-known problem.  The menus need a lot of work.]
+
+------------------------------
+
+Date: Tue, 20 Oct 92 10:29:40 EST
+From: Howie Richburg <RICHBUHJ%SNYCENVM@CUVMB.CC.COLUMBIA.EDU>
+Organization: State University of New York - Central Administration
+Subject: Re: MacKermit?
+
+Maybe I am doing something wrong.  Under settings I choose key settings.
+The scan codes I define such as {27}3, when executed are passed through to
+the terminal screen as #27'3 for example and not transmitted.  Any ideas?
+
+[Ed. - Presently, the backslash notation in Mac Kermit's key definitions
+only accepts octal (base 8) numbers, and no provision is made for grouping.
+Suppose you want to define a key to send ESC followed by the letter A.  In
+MS-DOS Kermit or C-Kermit, you would express this as \27A, \o33A, or \x1BA.
+In Mac Kermit, it must be \33A.  Now suppose you want to send ESC followed
+by the digit 3.  You can't write \273, because there would be no way to tell
+where the backslash code ended and the literal text began.  In MS-DOS or
+C-Kermit, you can write \{27}3, to separate the 27 from the 3.  Mac Kermit
+doesn't support this type of notation, so you have to write \33\63 (where 63
+is the octal value of the ASCII code for the character "3"), and so on until
+you reach the first non-numeric character or the end of the definition.
+Hopefully, a future release of Mac Kermit will support the same types of
+notation as MS-DOS Kermit and C-Kermit.]
+
+Do you think MacKermit is stable enough to use for a Mac Powerbook running
+System 7?
+
+[Ed. - We have received mixed reviews.  The main difficulty with Mac Kermit
+under System 7 actually has nothing to do with System 7 per se, but rather
+with the fact that Macs that have System 7 also tend to be loaded with lots
+of INITs.  Macs with all their INITs are becoming even more dangerous for
+communication software than PCs loaded with TSRs!  We have discovered that
+most INITs that have anything to do with font management -- Adobe Type
+Manager, SuitCase, TrueType, etc -- can interfere with Mac Kermit to various
+degrees, ranging from fractured screens to Mac Kermit or even system bombs.
+This probably happens because Mac Kermit uses its own internal font for
+terminal emulation.  We know the solution to this problem -- remove the
+internal font and make an external font suitable for VT320 emulation -- but
+it is taking a long time to accomplish it.]
+
+[Ed again - About the Powerbook.  Mac Kermit works as well on the Powerbook
+as it works on any other Mac, except for one obvious limitation (bug).  The
+Powerbook does not normally come with a modem port, only a printer port.
+Thus you have to choose the printer port in the Communications Settings
+menu, which works.  So far so good.  But the port selection is not saved
+when you Save Settings.  So you always have to open the communications menu
+and select the printer port every time you run Kermit on the Powerbook.
+This should be fixed soon.]
+
+In addition the Powerbook will be used to dial into a 3270 protocol
+converter to access our IBM host.  It will therefore require that certain
+key combinations submit specific codes to emulate PF keys.  The reason I ask
+is because I have no luck transmitting codes to emulate the PF keys.
+
+[Ed. - This is an extremely common question, but it does not have a general
+answer.  Here's the story: an IBM mainframe 3270 terminal has row upon row
+of "PF" keys that ordinary terminals don't have.  The operation of these
+keys is internal to the IBM 3270 protocol -- they don't send characters,
+they send signals or messages, or perform certain local functions, etc.  A
+3270 protocol converter -- such as an IBM 7171 -- lets ordinary ASCII
+terminals (or programs, like Kermit, that emulate them) interact with
+mainframe 3270 applications.  Data sent from the mainframe to the terminal
+is converted into (for example) ASCII text intermixed with VT100 escape
+sequences, so your screen looks right.  So far so good.  In the other
+direction, certain control characters or escape sequences coming from your
+keyboard are interpreted as PF keys.  The problem is, no two protocol
+converters, no two protocol-converter terminal-type configurations, no two
+sites, have the same idea of exactly which control characters or escape
+sequences should correspond to which PF keys.  WE CAN'T ANSWER THAT
+QUESTION.  You have to go to your IBM mainframe or IBM networking
+administrator and find out: for a particular terminal type (say VT100), what
+characters or sequences must the terminal or emulator send to simulate EACH
+of: the PF1 through PF24 keys; the PA1 through PA3 keys; the newline key,
+the cursor keys, backtab, the editing keys, the Attention key, etc etc.
+Once you have the table of 30 keys and their values, you can decide which
+keys on your Mac should correspond to which 3270 terminal keys, and then
+assign the corresponding character or escape sequence to each one in a
+Set Key Macros dialog -- a long and tedious exercise, which is best done
+once at each site centrally.  A Mac Kermit 3270 settings file is created,
+put on a file server, or copied onto diskette or and passed around.  In a
+future release, we hope to support plain-text key settings files like MS-DOS
+Kermit or C-Kermit.]
+
+------------------------------
+
+Date: Tue, 20 Oct 92 16:57:53 +0100
+From: johnen@GEI-Aachen.de (Uwe Johnen)
+Subject: Kermit on Mac
+
+I was very amused that I can use my Apple Powerbook as a terminal (vt100)
+over the V24 modem port. 
+
+But using Word Perfect on our VAX I was searching for the function keys,
+which I have to use while working with WP.
+
+If you have any idea where they are please let me know. I thing I tried
+everything. Which one tried I not ?
+
+[Ed. - Here is another case where you must go through the long and laborious
+process of making many, many key assignments.  VAX WordPerfect assignments
+have already been done for MS-DOS Kermit in the file kermit/a/msiwp3.ini,
+which contains 126 SET KEY commands!  Unfortunately: (a) the keyboard scan
+codes of the Macintosh are different from those of the PC, and (b) there is
+not yet a way to import textual SET KEY commands into Mac Kermit.  As noted
+above, hopefully there will be a textual SET KEY command in a forthcoming
+release.]
+
+------------------------------
+
+Date: Wed, 21 Oct 1992 12:58:24 -0700 (PDT)
+From: VFOAO07H@VAX.CSUN.EDU (George Mansoor)
+Subject: Printing from Kermit for Mac
+
+I have a question concerning Kermit for the Mac.  Is there a way to send 
+output to a printer much the way that the PC version can send the emulation 
+output to a printer?   Not screen dumps, but print sessions.  Does this make 
+any sense?  If it can, what version of Kermit for the MAC.
+
+[Ed. - Short answer: Yes.  Long answer: Here is how printing currently works
+in Mac Kermit.  Everybody knows there is a Print item in the File menu, but
+it is dimmed so you can't use it.  These items become active when Mac
+Kermit's terminal emulator receives certain escape sequences:
+
+  ESC [ 5 i  (or)   ESC [ ? 5 i   --  Start capturing text for printer
+  ESC [ 4 i  (or)   ESC [ ? 4 i   --  Stop capturing text for printer
+
+After receiving the "printer off" sequence, the print items can be used.
+Future releases of Mac Kermit will have additional printing capabilities:
+print screen, print selection, log session to printer, etc.]
+
+------------------------------
+
+Date: Thu, 29 Oct 92 08:47:23 PST
+From: John Holland <ZZHOLAND@UVVM.UVic.CA>
+Subject: Re: 0.99(97) Bug Report
+
+I reported some problems with Mac Kermit 0.99(97).  Since then I have
+obtained 183, and later 184, from watsun.cc.columbia.edu.
+
+I now use Mac Kermit as my terminal emulator of choice in my daily work,
+connected to a mainframe at 9600 baud, using a Mac Plus.  Commercial
+products, like Microphone and White Knight, seem to be assuming a slower
+connection and do not refresh the screen as quickly as I would like.  Kermit
+refreshes the screen quickly, and allows me to copy and paste and to move
+the cursor around with the mouse (and type without having to wait for the
+cursor to arrive at its destination).
+
+One of the problems I noted before is no longer a problem.
+
+I couldn't save settings without a system bomb.  No problem now.
+However, if I set Mouse -> Arrow Keys in Terminal... under Settings,
+I still can't turn it off.
+
+[Ed. - Sure enough, it's a bug.  The X disappears from the check box, but
+the feature is not turned off.  If you bring back the Terminal Settings
+screen, the box is checked again.]
+
+A new problem is related to fonts. I use Courier 10 point.  When the
+text I am working on is bolded and I delete characters from the middle
+of the line, pulling the rest of the line in, a trail of dots is sometimes
+left.  I demonstrated this to myself by typing a row of bold WWWWWWs, then
+deleting the leftmost one a few times. The rightmost pixel in the righmost
+character remains on the screen. This is a cosmetic bug which I am
+happily living with, given the other benefits of Kermit.
+
+[Ed. - Coexistence with fonts and font managers, and other font related
+problems (of which the one you list is a very minor example), are perhaps
+Mac Kermit's biggest problem at present.  It is described -- and a solution
+proposed -- in the files kermit/sw/ckmker.bwr and kermit/sw/ckmker.fon.]
+
+------------------------------
+
+
+APPENDIX II: MENU DESIGN (DRAFT!)
+
+Top-level menu:
+------------------------------------------------------------
+File  Edit  Settings  Special  Transfer  Window
+------------------------------------------------------------
+
+File
+------------------------------
+New                           
+Open...                       
+Close                         
+Save                          
+Save As...                    
+------------------------------
+Take Command File...          
+Take Commands from Window      
+------------------------------
+Page Setup...
+Print Screen...
+Print Selection...
+Log Session to Printer...
+Cancel Printing
+(Printer buffer status?)
+------------------------------
+Chain to Application...
+Quit                          
+------------------------------
+
+The Page Setup dialog should include a section that tells what to do
+with host-initiated printing (transparent print or autoprint):
+------------------------------
+(x) Send to printer
+( ) Save in Printer window
+( ) Save in file...
+( ) Discard
+------------------------------
+
+
+Edit
+------------------------------
+Undo
+------------------------------
+Cut
+Copy
+Paste
+Clear
+Select All
+------------------------------
+
+
+Settings                      
+------------------------------
+Load Settings...              
+Save Settings...              
+------------------------------
+Communications...             
+Kermit Protocol...                   
+File Transfer Defaults...              
+File Transfer Character Sets...
+Terminal Characteristics...                   
+Terminal Character Set...              
+------------------------------
+*-Shift-1..*-Shift-9 Active  
+Menu *-Keys Active            
+Key Macros...             
+Key Modifiers...              
+------------------------------
+
+
+Here is the terminal character sets dialog.  It's sort of an ISO 2022
+tutorial.  The first section "designates" character sets to graphics areas
+G0..G3.  Only one radio button can be pushed in each column, but multiple
+buttons can be pushed in a row.  A 96-byte character set (Latin-1 and DEC 
+MCS are the only ones) may not be designated to G0 (ISO rule).  If Latin-1
+or DEC MCS are chosen, G0 is automatically forced to ASCII.
+
+The second section "invokes" the selected graphics areas to GL and GR.
+Only one button can pushed in a row.
+-------------------------------------------------------------------
+                    Terminal Character Sets
+
+                       G0   G1   G2   G3
+US ASCII               (x)  ( )  ( )  ( )
+ISO 8859-1 Latin-1          (x)  ( )  ( )  <-- Note: No G0 here (dim)
+DEC Special Graphics   ( )  ( )  (x)  ( )
+DEC Technical          ( )  ( )  ( )  (x)
+DEC Multinational           ( )  ( )  ( )  <-- Note: No G0 here (dim)
+British/UK             ( )  ( )  ( )  ( )
+Canadian French        ( )  ( )  ( )  ( )
+Dutch                  ( )  ( )  ( )  ( )
+Finnish                ( )  ( )  ( )  ( )         
+French                 ( )  ( )  ( )  ( )
+German                 ( )  ( )  ( )  ( )
+Italian                ( )  ( )  ( )  ( )
+Norwegian/Danish       ( )  ( )  ( )  ( )
+Portuguese             ( )  ( )  ( )  ( )
+Spanish                ( )  ( )  ( )  ( )
+Swedish                ( )  ( )  ( )  ( )
+Swiss                  ( )  ( )  ( )  ( )
+-------------------------------------------------------------------
+Graphics Left  (GL):   (x)  ( )  ( )  ( )
+Graphics Right (GR):   ( )  (x)  ( )  ( )
+-------------------------------------------------------------------
+
+
+For file transfer character sets, the "Language rules" apply only
+if ASCII is checked in one (not zero or two) of the first two
+columns), otherwise the language rules buttons should be dim.
+-------------------------------------------------------------------
+                  File Transfer Character Sets
+
+File Character Set   Transfer Character Set    Language rules
+
+(x) Apple Quickdraw  (x) Transparent           (x) None
+( ) ASCII            ( ) ASCII                 ( ) Dutch
+( ) ISO Latin-1      ( ) ISO Latin-1           ( ) French
+                                               ( ) German
+                                               ( ) Icelandic
+                                               ( ) Scandinavian
+-------------------------------------------------------------------
+
+
+THE COMMUNICATIONS SETTINGS DIALOG
+
+Here we need a couple changes in terminology:
+
+1. "Baud Rate" is "incorrect".  It should say "Transmission speed" or
+   "Transmission Rate", or (if that's too long), simply "Speed".
+
+2. "Drop DTR on Quit" is obscure.  It should say "Hangup on Quit".
+
+
+FILE SETTINGS DIALOG:
+-------------------------------------------------------------------
+( ) Attended: dialog on each file received
+(x) Unattended: with the following defaults:
+
+File Names:           (x) Converted  ( ) Literal
+
+Filename Collisions:  (x) Backup     ( ) Append
+                      ( ) Discard    ( ) Overwrite
+                      ( ) Rename     ( ) Update
+
+[  ] Keep partially received files
+
+Transfer Mode: (x) Text        Fork: (x) Data
+               ( ) Binary            ( ) Resource
+               ( ) MacBinary
+-------------------------------------------------------------------
+
+
+THE TERMINAL SETTINGS DIALOG
+
+Change "[  ] Accept 8 Bit Characters" to:
+
+  Character size: (x) 7 bits  ( ) 8 bits
+
+
+THE PROTOCOL SETTINGS DIALOG (OK)
+
+
+THE SPECIAL MENU:
+
+Special                       
+------------------------------
+Hangup
+Send Break                    
+Send Long Break               
+Send XON                      
+Reset Terminal                
+------------------------------
+Log Session...                
+Dump Screen...
+Log Transactions...           
+Log Packets...                
+Log Debugging...              
+Call Debugger...                 (dim if no debugger loaded)
+------------------------------
+
+
+THE TRANSFER (File Transfer) MENU:
+
+Transfer
+------------------------------
+Send file...
+Receive file...
+Get file from server...
+------------------------------
+Show statistics
+------------------------------
+Change directory
+------------------------------
+Change remote directory
+Delete remote file...
+List remote files...
+Remote help
+Remote host command...
+Remote Kermit command...
+Remote space...
+Remote type...
+Remote who...
+Send file to server for printing...
+------------------------------
+Finish server
+Logout server
+------------------------------
+Enter server mode
+------------------------------
+
+THE WINDOW MENU
+
+Lists the names of the windows.  It should be modified to check or
+highlight the currently active window.  Assuming that font changes can
+be made to work in all windows, we should move the Font item to here,
+and have it invoke a submenu, applying to the current (checked) window
+(the whole window?  A selection within a window?)  (We have to move
+the Font menu because there isn't enough room for 7 menu items in the
+top-level menu.)
+
+For example: 
+
+  Window
+  ------------------------------
+X Terminal Window                (X = checked)
+  Command Window
+  Response Window
+  Untitled-1
+  ------------------------------
+  Font                        -> ------------------------------
+  ------------------------------ 9-point
+				 10-point
+				 12-point
+				 14-point
+				 18-point
+				 ------------------------------
+				 Avant Garde
+				 Bartholemew
+				 Bookman
+				 Chicago
+				 (etc)
+				 ------------------------------
+
+(End of CKMKER.BWR)

@@ -1,0 +1,732 @@
+C-KERMIT 5A INSTALLATION INSTRUCTIONS FOR VMS and OpenVMS           -*-text-*-
+
+  5A(189)
+  Most Recent Update: Tue Aug 24 16:14:15 1993
+
+  F. da Cruz, C. Gianone, Columbia University, New York, NY
+  Terry Kennedy, Saint Peters College, Jersey City, NJ
+  And: Peter Mossel, James Sturdevant
+
+  Copyright (C) 1985, 1993, Trustees of Columbia University in the City of New
+  York.  The C-Kermit software may be reproduced and shared without
+  restriction as long as this copyright notice is retained, except that it may
+  not be licensed or sold for profit as a software product itself, and it may
+  not be included in or distributed with commercial products or otherwise
+  distributed by commercial concerns to their clients or customers without
+  written permission of the Office of Kermit Development and Distribution,
+  Columbia University.
+
+
+DISCLAIMER:
+
+  The C-Kermit software is provided in source code form by Kermit Development
+  and Distribution, Columbia University.  The software is provided "as is;" no
+  other warranty is provided, express or implied, including without
+  limitations, any implied warranty of merchantability or implied warranty of
+  fitness for a particular purpose.
+
+  "VMS" as used in this document refers to both VMS and OpenVMS on VAX
+  processors and OpenVMS on Alpha AXP processors.  Most of the words in the
+  previous sentence are trademarks (TM) of Digital Equipment Corporation.
+
+  Neither Columbia University nor any of the contributors to the C-Kermit
+  development effort, including, but not limited to, AT&T, Digital Equipment
+  Corporation, Data General Corporation, International Business Machines
+  Corporation, or Saint Peters College warrant C-Kermit software or
+  documentation in any way.  In addition, neither the authors of any Kermit
+  programs, publications or documentation, nor Columbia University nor any
+  contributing institutions or individuals acknowledge any liability resulting
+  from program or documentation errors.
+
+
+DOCUMENTATION
+
+C-Kermit 5A is documented in the book "Using C-Kermit" by Frank da Cruz
+and Christine M. Gianone, Digital Press, Burlington, MA, USA.  Digital
+Press ISBN: 1-55558-108-0; Prentice-Hall ISBN: 0-13-037490-3.  Price: US
+$34.95.  In USA, call DECdirect at 1-800-344-4825, refer to order number
+EY-J896E-DP.
+
+
+CONFIGURING VMS FOR BEST RESULTS WITH KERMIT
+
+  1. TERMINAL BUFFER SIZE
+
+VMS is shipped with default installation parameters designed to function on
+all possible configurations.  Some of these parameters have not been changed
+since the "average" VMS system was a VAX-11/780 with 1Mb of memory.
+
+The main parameter that affects Kermit is the terminal type-ahead buffer size,
+which applies to serial terminal devices (with the TT or TX prefix).  There
+are two possible values in VMS - the "normal" size and the "alternate" size.
+The defaults for these are 78 and 200 bytes, respectively.  If more data
+arrives at the terminal driver than these buffers can hold (which is a likely
+occurrence during file transfer), it will be discarded and file transfers will
+be slowed down or terminated by errors.
+
+This is most frequently seen when receiving files on a slow VAX, particularly
+when using long packets and/or sliding windows.  File reception requires
+larger system buffers (to hold arriving packets), and the speed of the VAX
+controls how quickly Kermit can empty them.
+
+The recommended minimum size for each of these buffers is the number shown as
+"Buffer size" by the C-Kermit SHOW PROTOCOL command, which is the total amount
+of memory allocated by C-Kermit for packet buffers (window slots times packet
+length).  VMS C-Kermit is shipped with a buffer size of 9065, which can be
+altered by the user with a SET BUFFERS command.
+
+To change the values of the VMS typeahead buffer sizes, you should edit the
+file SYS$SYSTEM:MODPARAMS.DAT.  Determine the new values you want to use and
+add lines like the following to the end of the MODPARAMS.DAT file:
+
+  MIN_TTY_TYPAHDSZ = new_value_for_regular	! For VMS C-Kermit
+  MIN_TTY_ALTYPAHD = new_value_for_alternate	! For VMS C-Kermit
+
+for example:
+
+  MIN_TTY_TYPAHDSZ = 2064
+  MIN_TTY_ALTYPAHD = 2064
+
+The TTY_ALTYPAHD size should be at least as great as the TTY_TYPAHDSZ.
+Digital recommends a value of 2064 or greater for TTY_ALTYPAHD if you are
+running VMS V5.5 or higher, or if you are running the optional LATmaster code
+under VMS V5.4-1, -2, or -3.
+
+You should also examine this file to be sure there aren't any other
+definitions for TTY_TYPAHDSZ or TTY_ALTYPAHD.  If there are, you'll get
+warning messages in the next step.
+
+    You may wish to simply set TTY_TYPAHDSZ=TTY_ALTYPAHD=2064, since
+    most common VMS "TTY ports" these days are actually LAT or TCP/IP
+    devices, which cannot easily be configured to use the alternate
+    buffer.  Also, it takes a privileged user or program to set a port
+    to use the alternate buffer, and since we do not recommend
+    installing Kermit with privileges, this would restrict Kermit access
+    to privileged users.
+
+    Let's consider a medium-sized VAX with perhaps 64 "ports" (either
+    serial ports or LAT or TCP/IP network ports).  This system probably
+    has at least 16 megabytes of memory.  Configuring TTY_TYPAHDSZ to
+    2064 will take up 64 * 2064 bytes of memory, or 132096 bytes.  This
+    is less than 1 per cent of available memory.  Most systems would
+    have more than 16Mb of memory for 64 simultaneous users, lowering
+    the percentage even further.
+
+In some cases, it might also be necessary to increase your system's MAXBUF
+parameter.  It should be somewhat longer than the longest packet you want
+Kermit to be able to send or receive, to allow for SYS$QIO overhead (the
+bigger the value, the more overhead).  DEC currently recommends 2300, which
+should be sufficient for 2K (2048-byte) packets.  If you want to use
+C-Kermit's maximum packet length, 9024, then your MAXBUF should be set to
+about 12000.
+
+To have these changes take effect, run the "AUTOGEN" procedure:
+
+  @SYS$UPDATE:AUTOGEN GETDATA SETPARAMS
+
+This incorporates the new buffer sizes into the system configuration, and they
+will take effect the next time the system is reloaded.
+
+To examine your system parameters:
+
+  run sys$system:sysgen
+  SYSGEN> use current
+  SYSGEN> show maxbuf                (should be at least 2064)
+  SYSGEN> show virtualpagecnt        (should be at least 50000)
+  SYSGEN> show /tty                  (TTY_ALTYPAHD should be at least 2064)
+
+In an emergency, or for testing purposes, you can also change your MIN_MAXBUF
+value "on the fly":
+
+  $ run sys$system:sysgen
+  SYSGEN> set maxbuf 2300
+  SYSGEN> write current
+  SYSGEN> exit
+
+This operation should be used with caution, and should probably NOT be used
+with values greater than about 3000.  The AUTOGEN procedure is safer because
+it understands the relationships among the major parameters.
+
+  2. USER QUOTAS AND PRIVILEGES
+
+C-Kermit communications are also affected by the user's BYTLM quota and
+possibly also the process page quota (PGFLQUO).  In modern versions of VMS,
+the default BYTLM quota is 8192, which should normally be adequate.  If
+C-Kermit users experience error messages informing them that a quota was
+exceeded during terminal emulation or file transfer, the system manager should
+increase the user's BYTLM and/or process page quota.  To find out the user's
+quotas, the system manager should:
+
+  set default sys$system
+  run authorize
+  UAF> show <username>
+
+Then look for the relevant quotas and adjust them as required.  The BYTLM
+quota should be somewhat greater than the product of Kermit's window size
+and packet size, for example, 8192 for 4 window slots and 2000-byte-packets.
+PGFLQUO should be 20,000 or higher.
+
+If users will be using C-Kermit's PUSH command or issuing REMOTE commands (such
+as REMOTE DIR) to the VMS C-Kermit server, the user will need to have the
+ability to create subprocesses (AUTHORIZE parameter PRCLM).  If Kermit will
+itself be invoked as a subprocess (for example, from within a menu system) this
+should be considered as well.  Kermit uses local mailboxes for remote command
+execution, so users will also need the TMPMBX privilege if these commands are
+to be used.
+
+  3. CONFIGURING SERIAL COMMUNICATION PORTS
+
+If your system has a port that is frequently used for file transfers (for
+example, with a modem), you should have your system manager enable the
+alternate type-ahead buffer by placing the command:
+
+  $ SET TERMINAL ddcu:/PERMANENT/ALTYPEAHD
+
+in the system-wide startup command file, where ddcu: is the name of the
+device, for each such device.
+
+If the device is connected to a modem, and is to be used for dialing out,
+also include the /MODEM qualifier:
+
+  $ SET TERMINAL ddcu:/PERMANENT/ALTYPEAHD/MODEM
+
+If it is not connected to a modem or other data communications device that
+follows the RS-232 signalling conventions, you might have to set the /NOMODEM
+qualifier instead:
+
+  $ SET TERMINAL ddcu:/PERMANENT/ALTYPEAHD/NOMODEM
+
+Additionally, for non-privileged users to access a terminal device, they need
+to be granted access to it.  The default for terminals is access only by users
+with SYSTEM privileges (UIC group less than or equal to MAXSYSGROUP, or with
+SYSPRV privilege).  See the VMS documentation for the SET PROTECTION command
+for more information.  Note that if you grant everyone access to the port,
+anyone can make phone calls via the modem, so you might want to limit this to
+particular users, possibly by using a device ACL (VMS V5.0 and later only).
+
+ 4. LAT DEVICES
+
+LAT ports present additional complications.  Most LAT problems are not in
+Kermit, but can be reproduced using the SET HOST/DTE command or the SET HOST
+/LAT command. The VMS LAT documentation contains information on configuring
+LAT ports and troubleshooting problems.  Your terminal server might have come
+with additional documentation.
+
+Experience shows that it is difficult to properly configure a LAT port to
+handle both incoming and outgoing connections.  Therefore seperate LAT ports
+are recommended for incoming and outbound connections.
+
+ 5. CAPTIVE ACCOUNTS
+
+Some VMS sites restrict users from getting at the DCL prompt and services by
+setting their accounts to be "captive".  This should automatically prevent
+C-Kermit's DCL-access commands (such as PUSH) from working.  Any attempt to
+execute such a command should result in C-Kermit issuing an error message.
+Should a user circumvent this, VMS will automatically terminate the user's
+process.  In addition to CAPTIVE, accounts can also be set to RESTRICTED, to
+disable all types of spawning.  Note that DEC says that RESTRICTED is only
+used "to ensure users complete login processing without interruption". DEC
+further states that they intend to modify VMS utilities to no longer prohibit
+spawning in a future release.
+
+Further, you should be aware that preventing users from getting to DCL only
+provides an illusion of security. There are many ways of getting to DCL which
+are non-obvious. For cases where absolute security is required, you should in-
+vestigate the AUTHORIZE flags CAPTIVE and DISIMAGE. Consult the VMS Security
+Manual for more information.
+
+C-Kermit itself can be configured to prevent system access, by compiling it
+with the NOPUSH option, for example:
+
+   $ localopts = "/define=(""NOPUSH"")"
+   $ @ckvker.com
+
+This disables not only the PUSH command and its synonyms (RUN, @, SPAWN), but
+also OPEN !READ, OPEN !WRITE, as well as the server's execution of REMOTE HOST
+commands.  See CKCCFG.DOC for further information.
+
+
+DECODING VMS C-KERMIT HEX FILES
+
+If you have obtained the executable VMS C-Kermit program encoded in printable
+"hex" format on magnetic tape or over a network, you can decode it back into a
+runnable .EXE program image using the CKVDEH.MAR program.  This is an
+assembly-language program for the VAX or Alpha AXP, which you should assemble,
+link, and run as follows:
+
+  $ macro ckvdeh  (on the Alpha AXP, substitute "macro/migrate ckvdeh")
+  $ link ckvdeh
+  $ run ckvdeh
+
+CKVDEH prompts you for the input and output file names.  This procedure works
+on both the VAX and the Alpha AXP -- the same program, CKVDEH.MAR, compiles
+and runs on both platforms.
+
+The C-Kermit .EXE files were built under VAX/(Open)VMS 5.x and Alpha AXP
+OpenVMS 1.x.  The VAX versions will not run under pre-5.0 VAX/VMS releases.
+
+Since VMS C-Kermit can be built with no TCP/IP support or with support for
+several different TCP/IP packages, and it can be built on both the VAX and
+Alpha AXP platforms, you should pick the right .HEX file for your environment:
+
+  TCP/IP Product                  VAX            Alpha AXP
+
+   none                           CKVKER.HEX     CKVAXP.HEX
+   DEC TCP/IP (UCX)               CKVVUCX.HEX    CKVAUCX.HEX
+   TGV MultiNet                   CKVVTGV.HEX   *CKVATGV.HEX
+   Wollongong WIN/TCP (PathWay)   CKVVWIN.HEX   *CKVAWIN.HEX
+   Process Software TCPware      *CKVVPST.HEX   *CKVAPST.HEX
+
+   Labeled file converter:        CKVCVT.HEX     CKVACVT.HEX
+
+(*At this writing, these hex files are not yet available.)
+
+NOTE: The TGV MultiNet version can be compiled and linked successfully on
+the Alpha AXP, but it cannot make TCP/IP connections succesfully.  However,
+the Alpha AXP UCX version also works with MultiNet on the Alpha AXP.
+
+
+BUILDING VMS C-KERMIT FROM THE SOURCE CODE
+
+C-Kermit is written in the C programming language.  To build C-Kermit on the
+VAX, you must have VAX C 3.0 or later, DEC C, or GNU GCC.  VAX C has undergone
+a large number of changes during its lifetime.  Some header files may be
+missing in earlier versions.  VMS C-Kermit was developed using VAX C V3.2 and
+VMS V5.5, but it was designed to work on earlier systems, back to VMS 4.4 and
+VMS C 3.0, if built in those environments (testing is needed for
+verification).  Please report any problems building C-Kermit on older VMS/C
+configurations they can be fixed (or at least documented as problems).
+
+Beware: VAX C can generate incorrect code under certain circumstances.
+For example, if a function is used before it is declared, and it generates
+a return value (via a return statement) that is not used, other functions
+might have their entry masks (argument lists) corrupted.
+
+The User Authorization File (UAF) parameters of the account in which C-Kermit
+will be built must be set to accomodate the large size of some source modules.
+Recommended values are:
+
+  PAGE FILE QUOTA:  at least 60000
+  Working set extent:  at least 5012
+
+To modify: Suppose a user KERMIT is the VMS account from which Kermit is
+maintained.  To set these values, the system manager must do the following:
+
+  $ set default sys$system
+  $ mcr authorize
+  UAF> modify kermit/pgflquo=60000/wsextent=5012
+  UAF> exit
+
+If errors such as:
+
+  %cc-f-text Virtual Memory limits exceeded
+
+occur during the build procedure, these parameters may need adjustment
+(upwards).
+
+To build C-Kermit, create a new directory and make it your current directory:
+
+  $ CREATE/DIR [.KERMIT]
+  $ SET DEFAULT [.KERMIT]
+
+and put the C-Kermit source files and build procedures there, for example by
+copying them from the distribution tape or cartridge.
+
+Two build procedures are provided.  You can use either one:
+
+1. For those with VMS MAKE (available from DECUS, written by Todd Aven of the
+   Software Sweatshop in Long Beach, NY, and also distributed with VMS
+   C-Kermit on magnetic tape or cartridge by Columbia University; to install
+   it, follow the directions in CKVMAK.HLP), a makefile is supplied, called
+   CKVKER.MAK, originally written by Terry Kennedy of Saint Peters Collge,
+   Jersey City, New Jersey.  The makefile is CKVKER.MAK.  Rename it to
+   MAKEFILE. (note the period):
+
+   $ RENAME CKVKER.MAK MAKEFILE.
+
+   To build C-Kermit with DEC C, type (but don't do it yet -- first read about
+   network options below): 
+
+   $ MAKE
+
+   at the DCL prompt (shown as $).  To build C-Kermit with GNU C, type:
+
+   $ MAKE GKERMIT
+
+   Use MAKE if you plan to be editing the source files and rebuilding C-Kermit
+   periodically.  This eliminates the need to recompile source files that have
+   not been changed.
+
+2. The CKVKER.COM DCL command procedure.  This procedure unconditionally
+   compiles and links all the source modules into WERMIT.EXE.  This procedure
+   can be used on any VAX that has suitable versions of VMS and C, and it is
+   the procedure you would normally use if you do not intend to be modifying
+   the source code after building the program.  To build C-Kermit with the
+   DCL procedure, type:
+
+   $ @CKVKER
+
+   NOTE: CKVKER.COM should not be edited except for strictly local purposes.
+   It is generated automatically from CKVKER.MAK by:
+   
+   $ MAKE/KEEP/NOEXECUTE/FORCE/OUT=CKVKER.COM
+
+   All changes of a global nature should be made to the makefile and then a
+   new CKVKER.COM generated from it as shown.
+
+   NOTE: Original VMS Make did not work on the Alpha AXP.  A new version that
+   is said to work on the Alpha is available via anonymous ftp from
+   kermit.columbia.edu in the vms-make directory.  If you don't have a
+   version of MAKE that runs on the Alpha, then you can still use CKVKER.COM.
+
+If you have the DEC FORTRAN 6.0 library, UVMTHRTL.EXE, installed, the
+resulting KERMIT.EXE file will not run on VMS systems that have an older
+FORTRAN library, or lack one altogether:
+
+  %DCL-W-ACTIMAGE, error activating image MTHRTL
+  -CLI-E-IMGNAME, image file $1$DIA0:[SYS1.SYSCOMMON.][SYSLIB]UVMTHRTL.EXE
+  -SYSTEM-F-SHRIDMISMAT, ident mismatch with shareable image
+
+The new FORTRAN library has a different identifier.  To link with the old
+version of the FORTRAN, two possibilities exist:
+
+  1) Link with SYS$LIBRARY:STARLET/LIB which uses NO shareable images.
+
+  2) Perform two defines prior to linking (this causes warning messages)
+
+     DEFINE/USER MTHRTL FORTRAN$MTHRTL-VMS
+     DEFINE/USER VMTHRTL FORTRAN$VMTHRTL-VMS
+
+The second option has been tested successfully on a VAX/VMS system that
+has neither FORTRAN nor C installed.
+
+
+CUSTOMIZING THE BUILD PROCEDURE
+
+If you have a DCL symbol "localopts" (case doesn't matter) defined when you
+use either the makefile or the .COM file, the contents of that symbol will be
+added to the C compiler command line after the existing options.  You can use
+any legal CC compiler option there.  For example, if you want to override a
+siteopts definition, you can add:
+
+  $ LOCALOPTS = "/UNDEFINE=(""DYNAMIC"")"
+  $ MAKE
+    -- or --
+  $ @CKVKER
+
+Note the doubled quotes because they're inside a symbol definition.  If you
+don't have a LOCALOPTS symbol, the null string is used.  LOCALOPTS is
+evaluated in the generated .COM file, so it works for both the makefile and
+the .COM file.
+
+Read CKCCFG.DOC for further information about compile-time options for feature
+selection.
+
+
+VMS TCP/IP NETWORKING SUPPORT FOR C-KERMIT
+
+VMS C-Kermit is capable of establishing TCP/IP TELNET connections and acting
+as a TELNET program with built-in file transfer, script programming,
+character-set translation, etc, if it is built appropriately.  If you have one
+of the following products installed on your system, complete with libraries
+and header files:
+
+  1. DEC TCP/IP (UCX)
+  2. TGV MultiNet TCP/IP
+  3. Wollongong WIN/TCP
+  4. Wollongong PathWay
+  5. Process Software TCPware
+
+then you can include TCP/IP capability in your version of VMS C-Kermit.
+
+The TCP/IP product is selected automatically by the build procedure based on
+the presence or absence of certain files on your system.  To override the
+automatic selection, define the symbol NET_OPTION in one of the following ways
+before running the build procedure:
+
+  $ NET_OPTION = "NONET"      ! Build with no TCP/IP networking support
+  $ NET_OPTION = "DEC_TCPIP"  ! Build with DEC TCP/IP (UCX) support
+  $ NET_OPTION = "MULTINET"   ! Build with TGV MultiNet TCP/IP support
+  $ NET_OPTION = "WINTCP"     ! Build with WIN/TCP or PathWay support
+  $ NET_OPTION = "TCPWARE"    ! Build with Process Software TCPware support
+
+That is, type one of the commands listed above at the DCL prompt (shown above
+as "$") before running the build procedure.
+
+DEC TCP/IP (UCX)
+
+If the DEC TCP/IP version of KERMIT.EXE crashes immediately upon startup
+with a message like:
+
+  %LIB-E-ACTIMAGE, error activating image
+   R4GRIE$DIA0:[SYS0.SYSCOMMON.][SYSLIB]UCX$IPC_SHR.EXE;1
+  -SYSTEM-F-PRIVINSTALL
+
+it means the system manager has to install the UCX sharable library:
+
+  INSTALL ADD SYS$SHARE:UCX$IPC_SHR.EXE
+
+WOLLONGONG TCP/IP
+
+Wollongong support should work for both new (PathWay) and older (WIN/TCP)
+versions, and C-Kermit versions linked under older Wollongong versions should
+still run under the newer version.  But note that the pieces of the Wollongong
+package are now unbundled -- you have to buy the runtime, access, API, etc,
+pieces separately, and (of course) you need the API to compile C-Kermit with
+Wollongong TCP/IP support.
+
+If you are building with Wollongong TCP/IP, and you have the TCP/IP libraries
+and header files, but the #include files can't be found, then you need to
+unpack the WIN/TCP include-file library into separate files using the VMS
+LIBRARY command.
+
+You can't build VMS C-Kermit with Wollongong TCP/IP support using GCC due to
+the use of "noshare" in the Wollongong header files.
+
+TGV MULTINET
+
+If your VAX has the TGV MultiNet TCP/IP networking product, both procedures
+automatically build C-Kermit with MultiNet TCP/IP support included.  However:
+
+. In older (pre-V3.1) MultiNet installations, the header files might not be
+  installed.  Without these, C-Kermit will not build correctly.  The system
+  manager can add Multinet 3.1 programming support by installing MNETLIB031
+  from the Multinet distribution, if licensed to do so.
+
+. Anyone building the VMS version with certain versions of TGV MultiNet
+  support under VAX C 3.1 might get an error message about conficting
+  definitions of "time_t".  This is because of a conflict between DEC's
+  <types.h> and MultiNet's <types.h> caused because DEC changed the definition
+  between VAX C 3.0 and 3.1.  Kermit can't do anything about this because
+  CKVTIO.C #includes <time.h>, which itself includes <types.h>.  The warning
+  is not fatal.
+
+
+INSTALLING VMS C-KERMIT
+
+Until (and unless) the VMSINSTAL kits are ready (see below), VMS C-Kermit must
+be installed on your VMS system by hand.  (NOTE: It is not yet certain that
+there ever will be VMSINSTAL kits, since they would have to include many
+megabytes of differently-configured executables to choose from, plus the fact
+that many of system-configuration items discussed above are best done by the
+system manager manually, in privileged mode, after some thought and
+consideration).
+
+IMPORTANT:
+
+DO NOT INSTALL VMS C-KERMIT AS A PRIVILEGED PROGRAM!  Instead, install it as a
+foreign command.
+
+To install C-Kermit, follow this procedure:
+
+ 1. If you have the old Bliss Kermit-32 on your system, rename it to
+    KERMIT32.  If you have a symbol KERMIT defined to run Kermit-32, 
+    change the symbol name to KERMIT32.
+
+ 2. Identify the directory where you want to install the C-Kermit program.
+    Normally this would be a directory that is unaffected by installation
+    of DEC software, such as SYS$TOOLS = SYS$SYSDEVICE[SYSTOOLS].  From now
+    on, we will assume you are using SYS$TOOLS:.
+
+ 3. Copy WERMIT.EXE to that directory, rename it to KERMIT.EXE, and give users
+    permission to run it, for example:
+  
+    $ COPY WERMIT.EXE SYS$TOOLS:KERMIT.EXE
+    $ SET PROTECTION (S:RWED,O:RWED,G:RE,W:RE) SYS$TOOLS:KERMIT.EXE
+    
+ 3. Copy the standard CKERMIT.INI file to the same directory:
+
+    $ COPY CKERMIT.INI SYS$TOOLS:
+    $ SET PROTECTION (S:RWED,O:RWED,G:RE,W:RE) SYS$TOOLS:CKERMIT.INI
+
+ 4. Add the following line to SYS$COMMON:[SYSMGR]SYSTARTUP_V5.COM (or
+    whatever your system startup file is):
+
+    $ DEFINE/SYSTEM CKERMIT_INI SYS$TOOLS:CKERMIT.INI
+
+ 5. Find your system-wide login DCL command procedure:
+
+    $ SHOW LOGICAL SYS$SYLOGIN
+    "SYS$SYLOGIN" = "SYS$TOOLS:SYLOGIN.COM" (LNM$SYSTEM_TABLE)
+
+    and then add the following line to it:
+
+    $ KERMIT :== $SYS$TOOLS:KERMIT
+
+ 6. Install the C-Kermit HELP file in your VMS HELP library.  First delete any
+    earlier KERMIT help entry, then install the new one:
+
+    $ LIBRARY/HELP/DELETE=KERMIT SYS$HELP:HELPLIB.HLB 
+    $ LIBRARY/INSERT/HELP SYS$HELP:HELPLIB.HLB CKVKER.HLP
+
+ 7. Create a publicly accessible directory, such as [KERMIT], in which to make
+    other C-Kermit files available to your users:
+
+    CKERMIT.KDD
+      Sample dialing directory file.
+    CKERMIT.KSD
+      Sample services directory.
+    CKEDEMO.INI
+      Macro definitions from "Using C-Kermit".
+    CKEVT.INI
+      Command file to demonstrate special screen effects from "Using C-Kermit".
+    CKCKER.UPD
+      A supplement to the book, "Using C-Kermit", describing features added
+      since the book was published.
+    CKCKER.BWR
+      The general C-Kermit beware file.
+    CKVKER.BWR
+      The VMS-specific C-Kermit beware file.
+
+
+CASE STUDY: ALPHA AXP SETUP AND TEST RESULTS
+
+  (by Peter Mossel)
+
+Model number:  DEC3000/400, a workstation with 64MB of memory.
+Ports used:    OPA1: (a MMJ connector for the alternate operator console)
+               TTA1: (a 25-pin male D-connector on the back)
+Operating System:  OpenVMS AXP V1.0
+Firmware:  V1.1
+
+Upon power-up, the console displays something like:
+...
+CPU   OK  KN15-BA V1.1-S11A IO20 sV1.0 DECchip 21064 P2.1
+...
+
+Testing setup 1:  OPA1:
+
++-------+
+|     MMJ--- DECconnect cable ---MMJ H8571-A--- modem cable to PC
++-------+                            (passive adapter)
+
+In words, plug a DECconnect cable with MMJ plugs on both ends in the
+alternate console port on the back of the DEC3000/400.  Make sure S3 is
+in the "up" position.  The workstation screen is now the console (OPA0:)
+and the extra port, OPA1:, is available for connecting a terminal or
+printer.  This MMJ plug is the only MMJ plug on the back of this machine.
+
+My other host for the test is a DECpc 466, a 66MHz i486 with DOS 5.0 and
+MS-DOS Kermit 3.12.  The 466 has 2 serial ports, both 9-pin.  I attached a
+standard 9-pin to 25-pin modem cable (the ones that came into existence with
+the IBM PC/AT which originally had only a 9-pin serial port) to the serial
+port on the 466.
+
+Now we must join a 25-pin connector and a MMJ connector.  This is done with a
+passive adapter (H8571-A) which converts the RS423 signalling standard
+(balanced TX+ TX- RX+ RX-, DTR, DSR) to RS-232.  All this is fairly standard
+for DEC sites.  Note that when connecting a modem to an MMJ connector, we have
+only a subset of the required modem signals, so this is not supported via MMJ.
+The other port (TTA1) has full modem control.  Note that the DECconnect cable
+always reverses TX and RX, so it effectively functions as a NULL-modem cable.
+
+Testing setup 2:  TTA1
+
++-------+
+|     25-pin D connector --- NULL modem cable to PC
++-------+                            
+Use the (only) 25-pin D-connector on the back.  Now we need a null modem
+cable (see the Kermit book), and, because my PC has a 9-pin serial
+port, I also need a 9-pin to 25-pin modem cable.
+
+Testing setup 3:  LAT
+
+Connect the PC with a standard cable to the terminal server, which speaks
+LAT to my DEC3000/400.  The speed can be set up to 19200 baud with the
+terminal server in use.
+
+Test script for setup 1 and 2:
+
+On DEC3000:
+$ kermit
+C-Kermit>set line xxx
+   (where xxx is OPA1 or TTA1)
+C-Kermit>set speed 19200
+
+On the PC
+C:\kermit
+MS-Kermit>set port 1
+MS-Kermit>set speed 19200
+MS-Kermit>server
+
+On the DEC3000:
+C-Kermit>get test.fil
+C-Kermit>finish
+
+On the PC
+MS-Kermit>quit
+
+Test script for setup 3 (LAT):
+On the PC
+C:\kermit
+MS-Kermit>set port 1
+MS-Kermit>set speed 19200
+MS-Kermit>connect
+
+[ Now log into DEC3000 as host ]
+
+$ kermit -x
+
+[ back to the PC ]
+
+MS-Kermit>get test.fil
+MS-Kermit>bye
+
+Results:
+
+In all three cases, the data transfer speed is excellent.  Over 80% of the
+bandwidth of the communication channel is used for the file transfer,
+sometimes even more.  The DEC3000 is loaded with processes (MOTIF, Sybase
+DBMS, NFS clients and servers,...) and heavy network activity (DECnet, LAT,
+TCP/IP but no characters have ever been lost, even when the DBMS fires up.  No
+special SYSGEN parameters, just configured for a normal workstation with
+MOTIF.
+
+Notes:
+
+1.  Device protection
+
+In a system like this out of the box, the device protection on TTA1 and
+OPA1 does not allow an unprivileged user to use these lines for DIAL-OUT
+from Kermit.  Thus, the system manager must set every time the system is
+rebooted:
+
+  $ set protection=w:rwlp/device OPA1: 
+  $ set protection=w:rwlp/device TTA1:
+
+Without these special protections, a terminal connected to these ports 
+will still be able to login and get the "Username:" prompt.
+
+2.  Console device speed
+
+The VMS AXP V1.0 cover letter mentions that the command
+
+  $ set terminal/speed=nnnn/perm/opa1: 
+
+will have no effect on the speed of OPA1.  In practice, there is no problem
+with Kermit file transfers.  The data just get thru fine and file transfers
+are OK.  But Kermit gets confused when it calculates line thruput based on
+300 bps.  The release notes also mention that setting the speed of OPA1 can
+be accomplished by setting the console environment variable "tta1_baud" to the
+desired speed.  See the hardware guide on how to do this.  The problem will be
+fixed in a future release.
+
+
+MAKING AND USING VMSINSTAL KITS
+
+(NOTE: This section is only for future reference, in case it becomes
+practical to build VMSINSTAL kits for C-Kermit.  For now, please ignore.)
+
+After building C-Kermit using one of the procedures outlined above, execute
+the DCL procedure CKVMSI.COM to create a VMSINSTAL kit.  This kit can be
+created either with or without the source code.  In any case, it includes the
+C-Kermit executable program, the C-Kermit help file (for installation in your
+HELP library), plus a sample CKERMIT.INI (C-Kermit initialization) file, and
+release notes.  You may now install C-Kermit using the command:
+
+  @sys$update:vmsinstal kermit
+
+It will prompt you for which components you want installed, and where to put
+them.  CKVMSI and CKVKIT were written by Terry Kennedy of Saint Peters College.
+
+(End of file CKVINS.DOC)

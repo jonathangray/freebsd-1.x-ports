@@ -1,0 +1,244 @@
+C-KERMIT FOR OS-9/68K
+
+Version: 5A(188)
+Date:    November 23, 1992
+
+Adapted to OS-9 by Christian Hemsing, RWTH, Aachen, Germany
+E-Mail: CHRIS@LFM.RWTH-AACHEN.DE
+
+OS-9/68K C-Kermit Capabilities at a Glance:
+
+  Local operation:                   Yes
+  Remote operation:                  Yes
+  Transfer text files:               Yes
+  Transfer binary files:             Yes
+  International text:                Yes
+  Wildcard send:                     Yes
+  File transfer interruption:        Yes
+  Filename collision actions:        Yes
+  Can time out:                      Yes
+  8th-bit prefixing:                 Yes
+  Repeat count prefixing:            Yes
+  Alternate block checks:            Yes
+  Automatic parity detection:        Yes
+  Dynamic packet length:             Yes
+  CONNECT mode:                      Yes
+  Terminal emulation:                No (uses console driver)
+  Communication settings:            Yes
+  Transmit BREAK:                    Yes
+  Support for dialout modems:        Yes
+  TCP/IP support:                    No
+  X.25 support:                      No
+  IBM mainframe communication:       Yes
+  Transaction logging:               Yes
+  Session logging:                   Yes
+  Debug logging:                     Yes
+  Packet logging:                    Yes
+  Act as server:                     Yes
+  Talk to server:                    Yes
+  Advanced server functions:         Yes
+  Security for server:               Yes
+  Local file management:             Yes
+  Command/Init files:                Yes (Init file: .kermrc)
+  Long packets:                      Yes
+  Sliding Windows:                   Yes
+  File attributes packets:           Yes
+  Command macros:                    Yes
+  Script programming language:       Yes
+  Raw file transmit and capture:     Yes
+
+
+OS-9/68K BACKGROUND
+
+OS-9/68k is a multiuser, multitasking operating system designed to run on
+all Motorola 680x0 family processors from Microware Systems Corporation, 1900
+N.W. 114th Street, Des Moines, Iowa 50332 (Trademarks: Microware, OS-9,
+OS-9/68000, OS-9000).
+
+Due to its modular design, most of the code is completely hardware
+independent, so it can be easily be ported to a different hardware by writing
+new device drivers.
+
+The original (1980) OS-9/6809 was designed for the Motorola 6809 processor.
+Later (1983) they switched to the 680x0 family and released OS-9/68000.  For
+speed and compactness reasons most of the OS-9/68000 kernel is written in
+680x0 assembler language.  Now there is a so-called OS-9000 by Microware.  Its
+kernel is written in C and thus it is portable.  It is presently available for
+680x0 and Intel's 80386/486, and Microware plans to add further support for
+RISC and CISC processors.  (C-Kermit has not yet been tested under OS-9000.)
+
+The 100% ROM-able, fast, compact code in conjunction with real-time
+capabilities make OS-9/68k ideal for ROM-based systems used in measuring,
+controlling, etc.  It has found a wide acceptance within the scientific and
+industrial world.
+
+Yet, a full disk based OS-9/68k offers a program development environment
+similar to UNIX. This includes (of course, limited) UNIX sofware compatibility
+at C source code level, source code level debugging, UNIX I/O model, UNIX task 
+model, UNIX-like shell and networking.
+
+A number of UNIX utilities like lex, yacc, lint, etc, have been ported to
+OS-9/68k.
+
+The basic commands of OS-9 are:
+
+  DEL     delete a file
+  DELDIR  delete a directory
+  MAKDIR  create a directory
+  DIR     directory listing
+  PROCS   show currently running processes
+  LIST    type contents of a text file
+  CWD     change working directory
+  PD      print working directory
+
+All commands can be given a "-?" as a switch, which will display a brief
+(usually sufficient) help message.
+
+All command references (like all references to names on OS-9/68k) are NOT
+case sensitive (switches, though, may be case sensitive since they are
+interpreted by the running program).
+
+On OS-9 systems you can redirect stdin, stdout, stderr just like in UNIX,
+and you can run programs (including Kermit) in the background.
+Pipelines work just like in UNIX.
+
+OS-9 doesn't know anything about character sets; all messages are in English
+using ascii.
+
+OS-9 does not generally have windows etc. (windows has been ported by someone,
+though). You can't really say anything about the terminal emulation.
+Many systems don't even have a console, but only RS232 lines, with no
+action by th driver whatsoever. So it depends on the terminal conncted to
+that line.
+In case a display is already part of the machine, then it depends on the
+vendor (which usually also does the portation), which emulation the console
+will have. E.g. I have ported OS-9 to Atari, which includes a VT52 emulation
+on the console.
+OS-9 is really meant to be ported, so no restrictions are given.
+
+
+
+OS-9/68K DEVICES
+
+All devices (terminal lines, networks, disks) can have arbitrary names but
+the usual convention is:
+
+ Terminal lines:
+   term  the console terminal
+   t1    terminal line #1
+   :
+   tn    terminal line #n
+
+ Harddisks:
+   h0    hard disk #0
+   h1    hard disk #1
+   :
+   hn    harddisk #n
+
+ Floppy disks (diskettes):
+   d0    floppy disk drive #0
+   d1    floppy disk drive #1
+   :
+   d0    floppy disk drive #n
+
+A path name starting with a slash ("/") must always include a device name
+as the first field.  For example, the C-Kermit command SET LINE /T3 would
+select the terminal line /t3.
+
+The console terminal is either a real terminal, or the screen and keyboard of
+a workstation such as a Macintosh, Amiga, or Atari ST that is running OS-9.
+Terminal emulation is not done by OS-9 C-Kermit, but rather by the real
+terminal or the workstation console driver.  This includes the capability to
+display national and international characters.
+
+
+THE OS-9/68K FILE SYSTEM
+
+The file system is tree-structured just like the UNIX file system.
+
+  /h0/chris
+
+means the directory  or file "chris" on hard disk #0.
+
+  chris/rubbish
+
+means the subdirectory or file "rubbish" in the subdirectory "chris" of the
+current directory.
+
+The command "chd" without any parameters will always take you to your home
+directory.
+
+Wildcard expansion is performed by the shell with two metacharacters:
+
+  * stands for an arbitrary string of arbitrary length
+  ? denotes a single character
+
+C-Kermit/OS-9 also expands wildcards itself, using the same notation, for
+example:
+
+  C-Kermit>send ck*.\?
+
+(Note: the question mark must be prefixed by "\" to override its normal
+function of giving a help message.)
+
+OS-9/68k files are sequential streams of 8-bit bytes, just like in UNIX,
+except that carriage return (CR, ASCII 13) is the line terminator, rather than
+linefeed (LF, ASCII 10).  Binary files are simply streams of arbitrary 8-bit
+bytes.  The OS-9 operating system and utilities are "8-bit clean", so text
+files can use any ASCII-based character set that is compatible with your
+display and data entry devices, for example ISO 8859-1 Latin Alphabet 1.
+
+Unlike UNIX, OS-9/68k has a built-in method to gain exclusive access to
+devices, so no lock files are needed.  The user will be told if the device is
+already in use.
+
+
+TO BUILD C-KERMIT FOR OS-9:
+
+Collect all the C-Kermit source files into a directory:
+
+  ckc*.c, ckc*.h, cku*.c, cku*.h, ckwart.c, ckcpro.w, ck9*.*
+
+There are two makefiles: ck9ker.mak and ck9ker.gcc.  If you have a running
+version of the GNU C compiler, use ck9ker.gcc (it produces smaller, more
+efficient code); otherwise use ck9ker.mak which uses the standard OS-9/68k C
+compiler.  Read the appropropriate makefile, edit the necessary changes
+mentioned there, create the subdirectories, and make the new Kermit by typing:
+
+  make -f=ck9ker.mak
+
+or:
+
+  make -f=ck9ker.gcc
+
+Read the "beware file" ck9ker.bwr for hints relating to the OS-9 terminal
+driver.
+
+
+USING OS-9 C-KERMIT
+
+The commands and operation of OS-9 C-Kermit should be identical to those of
+UNIX C-Kermit, with the exceptions noted above and in the "beware file".  The
+user documentation for C-Kermit is:
+
+  Frank da Cruz and Christine M. Gianone, "Using C-Kermit", Digital Press,
+  Burlington, MA, 1993, approx. 500 pages.  
+
+    Order Number: EY-J896E-DP
+    Digital Press ISBN: 1-55558-108-0
+    Prentice Hall ISBN: 0-13-037490-3
+
+  US single-copy price: $34.95; quantity discounts available.  Available in
+  computer bookstores or directly from Digital Press.  In the USA, call
+  Digital Press toll-free 1-800-344-4825 to order; major credit cards
+  accepted.  Overseas, order through your bookstore or your local Digital
+  Equipment Corporation branch.  Can also be ordered from:
+
+    Kermit Development and Distribution
+    Columbia University Center for Computing Activities
+    612 West 115th Street
+    New York, NY  10025  USA
+    Telephone: (USA) 212 854-3703
+
+
+(END OF CK9KER.DOC)

@@ -1,0 +1,970 @@
+CKUKER.BWR          "Beware File" for C-Kermit Version 5A        -*- text -*-
+
+				 UNIX VERSION
+
+Applies to 5A(189)
+Last update: Tue Sep  7 10:19:34 1993
+
+Authors: Frank da Cruz, Christine M. Gianone, Columbia University.
+
+  Copyright (C) 1985, 1993, Trustees of Columbia University in the City of New
+  York.  Permission is granted to any individual or institution to use this
+  software as long as it is not sold for profit.  This copyright notice must be
+  retained.  This software may not be included in commercial products without
+  written permission of Columbia University.
+
+Report problems, suggestions, fixes, etc, to Frank da Cruz:
+
+ Internet: fdc@watsun.cc.columbia.edu  (or)  fdc@columbia.edu
+ BITNET/EARN: FDCCU@CUVMA
+
+Columbia University Academic Information Systems
+612 West 115th Street, New York, NY  10025  USA
+
+
+DOCUMENTATION
+
+C-Kermit 5A is documented in the book "Using C-Kermit" by Frank da Cruz
+and Christine M. Gianone, Digital Press, Burlington, MA, USA.  Digital
+Press ISBN: 1-55558-108-0; Prentice-Hall ISBN: 0-13-037490-3.  Price: US
+$34.95.  In USA, call DECdirect at 1-800-344-4825, refer to order number
+EY-J896E-DP.
+
+
+FILES
+
+File naming conventions are listed in ckaaaa.hlp.
+
+UNIX installation instructions are in the make file (makefile or ckuker.mak),
+with further details in ckuins.doc and ckccfg.doc.
+
+Updates to the software are listed in ckc*.upd.
+
+BINARIES
+
+Warning: It is often dangerous to run a binary C-Kermit (or any other)
+program built on a different computer.  Particularly if that computer had a
+different C compiler, libraries, operating system version, processor features,
+etc, and especially if the program was built with shared libraries.  
+
+It is often OK to run a binary built on an earlier OS version, but it is
+rarely possible (or safe) to run a binary built on a later one, for example
+a to run binary built under SunOS 4.1.2 on a SunOS 4.1.1 system.
+
+When in doubt, build C-Kermit from the source code on the system where it is
+to be run.
+
+
+KNOWN BUGS AND LIMITATIONS
+
+C-Kermit does not work correctly on certain UNIX workstations in certain
+environments:
+
+ - On the NeXT when invoked directly from the NeXTSTEP File Viewer or Dock.
+   You must invoke Kermit from a "terminal", Stuart, or xterm window.
+ - On a NeXT with NeXTSTEP 3.0 to which you have established an rlogin
+   connection, due to a bug in NeXTSTEP 3.0, which has been reported to NeXT.
+ - On a SUN SPARCstation in an Open Windows window with scrolling enabled.
+   Disable scrolling, or else invoke Kermit in a terminal emulation window
+   (xterm, crttool, vttool) under SunView.
+ - On a remote UNIX system, when used through the GNU "screen" program.  In
+   this case, terminal connections to the remote UNIX system work, but
+   attempts to transfer files fail because the screen optimization (or at
+   least, line wrapping, control-character absorption) done by this package
+   interferes with Kermit's packets. 
+
+The (first) problem on the NeXT is that terminal-oriented gtty, stty, & ioctl
+calls don't work on the little window that NeXTSTEP pops up for non-NeXTSTEP
+applications like Kermit.  CBREAK and No-ECHO settings do not take effect in
+the command parser -- commands are parsed strictly line at a time.  "set line
+/dev/cua" works.  During CONNECT mode, the console stays in cooked mode, so
+characters are not transmitted until carriage return or linefeed is typed, and
+you can't escape back.  If you want to run Kermit directly from the File
+Viewer, then launch it from a shell script that puts it in the desired kind of
+window, something like this (for "terminal"):
+
+  Terminal -Lines 24 -Columns 80 -WinLocX 100 -WinLocY 100 $FONT $FONTSIZE \
+  -SourceDotLogin -Shell /usr/local/bin/kermit &
+
+On the Sun with Open Windows, an additional symptom has been reported:
+outbound SunLink X.25 connections "magically" translate CR typed at the
+keyboard into LF before transmission to the remote host.  This doesn't happen
+under SunView.
+
+On UNIX workstations equipped with DOS simulators like SoftPC, watch out for
+what these simulators do to the serial port drivers.  After using a DOS
+simulator, particularly if you use it to run DOS communications software, you
+might have to reconfigure the serial ports for use by UNIX.
+
+Under the bash shell (versions prior to 1.07 from CWRU), "pushing" to an
+inferior shell and then exiting back to Kermit leaves Kermit in the background
+such that it must be explicitly fg'd.  This is reportedly fixed in version
+1.07 of bash.
+
+Interruption by Ctrl-Z makes UNIX C-Kermit try to suspend itself with
+kill(0,SIGSTOP), but only on systems that support job control, as determined
+by whether the symbol SIGTSTP is defined (or on POSIX or SVR4 systems, if
+syconf(_SC_JOB_CONTROL) or _POSIX_JOB_CONTROL in addition to SIGTSTP).
+However, if Kermit is running under a login shell (such as the original Bourne
+shell) that does not support job control, the user's session hangs and must be
+logged out from another terminal, or hung up on.  There is no way Kermit can
+defend itself against this.  If you use a non-job control shell on a computer
+that supports job control, give a command like "stty susp undef" to fix it so
+the suspend signal is not attached to any particular key, or give the command
+SET SUSPEND OFF to C-Kermit, or build C-Kermit with -DNOJC.
+
+Reportedly, DEC ULTRIX 4.3 is immune to C-Kermit's disabling of SIGQUIT,
+that is the signal that is generated when the user types Ctrl-\, which kills
+the current process (i.e. C-Kermit) and dumps core.  Diagnosis and cure
+unknown.  Workaround: before starting C-Kermit -- or for that matter, when you
+first log in because this applies to all processes, not just Kermit -- give
+the following UNIX command:
+
+  stty quit undef
+
+The RS/6000 version does not do anything about SIGDANGER, an AIX-specific
+signal sent to all processes when system memory or swap space begins to run
+short.  To avoid being killed under these conditions, C-Kermit should catch
+SIGDANGER.  More info needed about how to do this.
+
+Running sz or rz for Zmodem transfers under C-Kermit ("run rz", "run sz file")
+does not work on System V/386 R4, and perhaps also other System V UNIX
+implementations.  Reason unknown, no known workaround.  The same operation
+works OK in Berkeley-based UNIX versions, for example SunOS 4.x.
+
+
+INITIALIZATION FILE
+
+C-Kermit's initialization file for UNIX is .kermrc (lowercase, starts with
+period) in your home directory.  C-Kermit identifies your home directory based
+on the environment variable, HOME.  Most UNIX systems set this variable
+automatically when you log in.  If C-Kermit can't find your initialization
+file, check your HOME variable:
+
+  echo $HOME      (at the UNIX prompt)
+
+or:
+
+  echo \$(HOME)   (at the C-Kermit prompt)
+
+If HOME is not defined, or is defined incorrectly, add the appropriate
+definition to your UNIX .profile or .login file, depending on your shell:
+
+  setenv HOME full-pathname-of-your-home-directory  (C-Shell, .login file)
+
+or:
+
+  set HOME=full-pathname-of-your-home-directory     (sh, ksh, .profile file)
+  export HOME
+
+NOTE: Various other operations depend on the correct definition of HOME.
+These include the "tilde-expansion" feature, which allows you to refer to
+your home directory as "~" in filenames used in C-Kermit commands, e.g.
+
+  send ~/.kermrc
+
+as well as the \v(home) variable.
+
+The TAKE command does not search your UNIX PATH for command files.
+
+
+COMMUNICATION SPEED SELECTION
+
+Version 7 based UNIX implementations, including 4.3 BSD and earlier and
+UNIX systems based upon BSD, use a 4-bit field to record a serial device's
+terminal speed.  This leaves room for 16 speeds, which are normally:
+
+  0, 50, 75, 110, 134.5, 150, 200, 300, 600, 1200, 1800, 2400, 4800, and 9600
+
+The remaining two are usually called EXTA and EXTB, and are defined by the
+particular UNIX implementation.  C-Kermit determines which speeds are
+available on your system based on whether symbols for them are defined in your
+terminal device header files.  EXTA is generally assumed to be 19200 and EXTB
+38400, but these assumptions might be wrong, or they might not apply to a
+particular device that does not support these speeds.  Presumably, if you try
+to set a speed that is not legal on a particular device, the driver will
+return an error, but this can not be guaranteed.
+
+On these systems, it is usually not possible to select a speed of 14400 bps
+for use with V.32bis modems.  In that case, use 19200 or 38400 bps, configure
+your modem to lock its interface speed and to use RTS/CTS flow control, and
+tell C-Kermit to SET SPEED RTS/CTS and SET DIAL SPEED-MATCHING OFF.
+
+Reportedly some recent versions of UNIX, and/or terminal device drivers that
+come with certain third-party add-in high-speed serial communication
+interfaces, use the low "baud rates" to stand for higher ones.  For example,
+SET SPEED 50 gets you 57600 bps; SET SPEED 75 gets you 76800; SET SPEED 110
+gets 115200.
+
+The situation is similar, but different, in System V.  SVID Third Edition
+lists the same speeds, 0 through 38400.
+
+
+COMMUNICATIONS AND DIALING
+
+First, make sure your dialout line is correctly configured for dialing out
+(as opposed to login).  The method for doing this is different for each kind
+of UNIX system.  Consult your system documentation for configuring lines for
+dialing out (for example, SUN SparcStation IPC users should read the section
+"Setting up Modem Software" in the Desktop SPARC Sun System & Network
+Manager's Guide).
+
+Certain operations driven by RS-232 modem signal do not work on DECstations or
+other DEC platforms whose serial interfaces use MMP connectors (DEC version of
+RJ45 telephone jack with with offset tab).  These connectors convey only the
+DSR and DTR modem signals, but not carrier (CD), RTS, CTS, or RI.  Use SET
+CARRIER OFF to enable communication, or "hotwire" DSR to CD.
+
+Symptom: DIAL works, but a subsequent CONNECT command does not.  Diagnosis:
+the modem is not asserting Carrier Detect (CD) after the connection is made,
+or the cable does not convey the CD signal.  Cure: Reconfigure the modem,
+replace the cable.  Workaround: SET CARRIER OFF (at least in System-V based
+UNIX versions).
+
+Kermit tries to use the 8th bit for data when parity is NONE, and this
+generally works on real UNIX terminal (tty) devices, but it often does not
+work when the UNIX system is accessed over a network via telnet or rlogin
+protocols, including (in many cases) through terminal servers.  For example,
+an Encore computer with Annex terminal servers only gives a 7-bit path if
+the rlogin protocol is selected in the terminal server but it gives the full
+8 bits if the proprietary RDP protocol is used.
+
+If file transfer does not work through a host to which you have rlogin'd,
+use "rlogin -8" rather than "rlogin".  If that doesn't work, tell both Kermit
+programs to "set parity space".
+
+The Encore TELNET server does not allow long bursts of input.  When you have
+a TELNET connection to an Encore, tell C-Kermit on the Encore to SET RECEIVE
+PACKET-LENGTH 200 or thereabouts.
+
+For Berkeley-UNIX-based systems (4.3BSD and earlier), Kermit includes code to
+use LPASS8 mode when parity is none, which is supposed to allow 8-bit data and
+Xon/Xoff flow control at the same time.  However, as of edit 174, this code is
+entirely disabled because it is unreliable: even though the host operating
+system might (or might not) support LPASS8 mode correctly, the host access
+protocols (terminal servers, telnet, rlogin, etc) generally have no way of
+finding out about it and therefore render it ineffective, causing file
+transfer failures.  So as of edit 174, Kermit once again uses rawmode for
+8-bit data, and so there is no Xon/Xoff flow control during file transfer or
+terminal emulation.
+
+Also on Berkeley-based systems (4.3 and earlier), there is apparently no way
+to configure a dialout line for proper carrier handling, i.e. ignore carrier
+during dialing, require carrier thereafter, get a fatal error on any attempt
+to read from the device after carrier drops (this is handled nicely in System
+V by manipulation of the CLOCAL flag).  The symptom is that carrier loss does
+not make C-Kermit pop back to the prompt automatically.  This is evident on
+the NeXT, for example, but not on SUNOS, which supports the CLOCAL flag.  This
+is not a Kermit problem, but a limitation of the underlying operating system.
+For example, the cu program on the NeXT doesn't notice carrier loss either,
+whereas cu on the SUN does.
+
+DIAL might not work.  If it doesn't, try SET DIAL HANGUP OFF before the DIAL
+command.  Also, SET DIAL DISPLAY ON to watch what's happening.  See section 8
+of ckuins.doc.  As a last resort, don't use the DIAL command at all; SET
+CARRIER OFF and CONNECT to the modem and dial interactively, or write a script
+program to dial the modem.
+
+On certain AT&T UNIX systems equipped with AT&T modems, DIAL and HANGUP don't
+work right.  Workarounds: (1) SET DIAL HANGUP OFF before attempting to dial;
+(2) If HANGUP doesn't work, SET LINE, and then SET LINE <device> to totally
+close and reopen the device.  If all else fails, SET CARRIER OFF.
+
+C-Kermit does not contain any particular support for AT&T DataKit devices.
+You can use Kermit software to dial in to a DataKit line, but C-Kermit does
+not contain the specialized code required to dial out from a DataKit line.  If
+the UNIX system is connected to DataKit via serial ports, dialout should work
+normally (e.g. set line /dev/ttym1, set speed 19200, connect, and then see the
+DESTINATION: prompt, from which you can connect to another computer on the
+DataKit network or to an outgoing modem pool, etc).  But if the UNIX system
+is connected to the DataKit network through the special DataKit interface
+board, then SET LINE to a DataKit pseudodevice (such as /dev/dk031t) will not
+work (you must use the DataKit "dk" or "dkcu" program instead).
+
+In some BSD-based UNIX C-Kermit versions, SET LINE to a port that has nothing
+plugged in to it with SET CARRIER ON will hang the program (as it should), but
+it can't be interrupted with Ctrl-C.  The interrupt trap is correctly armed,
+but apparently the UNIX open() call cannot be interrupted in this case.  When
+SET CARRIER is OFF or AUTO, the SET LINE will eventually return, but then the
+program hangs (uninterruptibly) when the EXIT or QUIT command (or, presumably,
+another SET LINE command) is given.  The latter is probably because of the
+attempt to hang up the modem.  (In edit 169, a timeout alarm was placed around
+this operation.)
+
+SET CARRIER ON, when used on the SUNOS 4.1 version of C-Kermit (compiled in
+the BSD universe), causes the program to hang uninterruptibly when SET LINE
+is issued for a device that is not asserting carrier.  When Kermit is built
+in the Sys V universe on the same computer, there is no problem (it can be
+interrupted with Ctrl-C).  This is apparently a limitation of the BSD-style
+tty driver.
+
+SunOS 4.1 C-Kermit has been observed to dump core when running a complicated
+script program under cron.  The dump invariably occurs in ttoc(), while trying
+to output a character to a TCP/IP TELNET connection.  ttoc() contains a
+write() call, and when the system or the network is very busy, the write()
+call can get stuck for long periods of time.  To break out of deadlocks caused
+by stuck write() calls, there is an alarm around the write().  It is possible
+that the core dump occurs when this alarm signal is caught.
+
+One user of C-Kermit 5A(179) on an RS/6000 with AIX 3.2.0 reported that (at
+least on TCP/IP connections, i.e. SET HOST out of C-Kermit) escaping back
+works only once.  After connecting a second time, the escape character is
+ignored.  Other users of the AIX 3.2.0 report that this does not happen.  For
+now, a mystery.  This behavior is not observed on AIX 3.1 or AIX 3.2.1.
+
+Many problems reported with bidirectional terminal lines on AIX 3.2.x on the
+RS/6000.  Workaround: don't use bidirectional terminal lines, or write some
+kind of shell script that turns getty off on the line before starting Kermit,
+or before Kermit attempts to do the SET LINE.
+
+Or use vendor-provided utilities for switching the directionality of a modem
+line, such as SCO's "enable" and "disable" commands.  For example, to dial
+out on tty1a, which is normally set up for logins:
+
+  disable tty1a
+  kermit -l /dev/tty1a
+  enable tty1a
+
+In SCO Xenix, you must use SET CARRIER ON *and* use the upper-case tty device
+name in order to have carrier detection.  SET CARRIER OFF should work with
+either upper or lowercase tty devices.  SET CARRIER AUTO is the same as OFF.
+
+With SET DIAL HANGUP OFF in effect, the DIAL command might work only once,
+but not again on the same device.  In that case, give a SET LINE command
+with no arguments to close the device, and then another SET LINE command for
+the desired device.  Or rebuild your version of Kermit with the -DCLSOPN
+compile-time switch (see ckuins.doc).
+
+The DIAL command does not always seem to wait the full announced interval for
+the call to complete.  Probably something to do with alarms stomping over each
+other.  Try SET DIAL TIMEOUT <sec> to increase the interval.
+
+The DIAL command says "To cancel: Type your interrupt character (normally
+Ctrl-C)."  This is just one example of where program messages and
+documentation assume your interrupt character is Ctrl-C.  But it might be
+something else.  In most (but not necessarily all) cases, the character
+referred to is the one that generates the SIGINT signal.  If Ctrl-C doesn't
+act as an interrupt character for you, type the Unix command "stty -a" or
+"stty all" or "stty everything" to see what your interrupt character is.
+(Kermit could be made to find out what the interrupt character is, but this
+would require a lot of system-dependent coding and #ifdefs, and a new routine
+and interface between the system-dependent and system-independent parts of the
+program.)
+
+(On a similar note, Kermit could find out what your erase, line-delete,
+word-delete, etc, characters are and use them in the command parser instead of
+hardwired DEC-style editing characters.  This is on the list of things to do.)
+
+Reportedly, all versions of IBM AIX use the same (undocumented) lockfile
+conventions as RTAIX.  If this is true, the "makes" for PS/2 AIX, AIX/370,
+and RS/6000 will have to be changed to use the RTAIX convention (it may be
+sufficient to simply add -DRTAIX to the make entry).
+
+C-Kermit SET HOST or TELNET from AIX on an RS/6000 to another RS/6000 won't
+work right unless you set your local terminal type to something other than
+AIXTERM.  When your terminal type is AIXTERM, AIX TELNET sends two escapes
+whenever you type one, and the AIX telnet server swallows one of them.
+This has something to do with "hft" device.  This behavior is reportedly
+removed in AIX 3.2.
+
+In general, the hangup operation on a serial communication device is prone
+to failure.  C-Kermit tries to support many, many different kinds of
+computers, and there seems to be no portable method for hanging up a modem
+connection (i.e. turning off the RS-232 DTR signal and then turning it back on
+again).  If HANGUP, DIAL, and/or Ctrl-\H do not work for you, and you are a
+programmer, look at the tthang() function in ckutio.c and see if you can add
+code to make it work correctly for your system, and send the code to the
+address above.
+
+Even when Kermit's modem-control software is configured correctly for your
+computer, it can only work right if your modem is also configured to assert
+the CD signal when it is connected to the remote modem and to hang up the
+connection when your computer drops the DTR signal.  So before deciding Kermit
+doesn't work with your modem, check your modem configuration AND the cable
+connecting your modem to the computer -- it should be a straight-through modem
+cable conducting the signals FG, SG, TD, RD, RTS, CTS, DSR, DTR, CD, and RI.
+
+Certain UNIX systems, such as SCO Xenix, provide different names for the same
+device.  In Xenix, /dev/tty1a refers to a terminal device that has no modem
+control; open, read, write, and close operations do not depend on carrier.  On
+the other hand, /dev/tty1A (same name, but with final letter upper case), is
+the same device with modem control, in which carrier is required (the SET LINE
+command does not complete until carrier appears, read/write operations fail if
+there is no carrier, etc).
+
+The SET FLOW-CONTROL KEEP option should be given *before* any communication
+(dialing, terminal emulation, file transfer, INPUT/OUTPUT/TRANSMIT, etc) is
+attempted, if you want C-Kermit to use all of the device's preexisting
+flow-control related settings.  The default flow-control setting is XON/XOFF,
+and it will take effect when the first communication-related command is given,
+and a subsequent SET FLOW KEEP command will not necessarily know how to
+restore *all* of the device's original flow-control settings.
+
+On the NeXT, Kermit reportedly (by TimeMon) causes the kernel to use a lot of
+CPU time when using a "set line" connection.  That's because there is no DMA
+channel for the NeXT serial port, so the port must interrupt the kernel for
+each character in or out.
+
+Under BSD UNIX versions, it takes a long time to complete operations that
+involve changing TTY modes.  This is because the BSD stty calls do not wait
+for pending i/o to complete before returning, and so Kermit must sleep
+before invoking these functions.  System V versions don't have this problem.
+
+
+HARDWARE FLOW CONTROL
+
+SET FLOW RTS/CTS is available in UNIX C-Kermit only when the underlying
+operating system provides an API for turning this feature on and off under
+program control, which turns out to be a rather rare feature among UNIX
+systems.  Other common situations include:
+
+ . The API is available, so "set flow rts/cts" appears as a valid C-Kermit
+   command, but it doesn't do anything because the device driver (part of
+   the operating system) was never coded to do hardware flow control.  This
+   is common among System V R4 implementations (details below).
+
+ . The API is not available, so "set flow rts/cts" does NOT appear as a valid
+   C-Kermit command, but you can still get RTS/CTS flow control by selecting
+   a specially named device in your SET LINE command.  Examples:
+
+     NeXTSTEP: /dev/cufa instead of /dev/cua, /dev/cufb instead of /dev/cub.
+     IRIX: /dev/ttyf2 instead of /dev/ttyd2 or /dev/ttym2.
+
+ . No API and no special device drivers.  Hardware flow control is completely
+   unavailable.
+
+On Sun computers with SunOS 4.0 or 4.1, SET FLOW RTS/CTS works only if the
+carrier signal is present from the communication device at the time when
+C-Kermit enters packet mode or CONNECT mode.  If carrier is not sensed (e.g.
+when dialing), C-Kermit does not attempt to turn on RTS/CTS flow control.
+This is because the SunOS serial device driver does not allow characters to
+be output if RTS/CTS is set (CRTSCTS) but carrier (and DSR) are not present.
+
+System V R4 based UNIXes are supposed to supply a <termiox.h> or
+<sys/termiox.h> file, which gives Kermit the necessary interface to command
+the terminal driver to enable/disable hardware flow control.  Thus if you
+build C-Kermit with any of the makefile entries that contain -DTERMIOX or
+-DSTERMIOX, C-Kermit will have "set flow rts/cts" and possibly other hardware
+flow-control related commands.  BUT...  That does not necessarily mean that
+they will work.  In some cases, the underlying functions are simply not coded
+into the operating system.
+
+
+TERMINAL CONNECTION
+
+UNIX C-Kermit's SET KEY command currently can not be used with keys that
+generate "wide" scan codes or multibyte sequences, such as workstation 
+function or arrow keys.  More about this is CKCKER.BWR.
+
+
+FILE TRANSFER
+
+Optimum file transfer performance is a matter of tuning parameters like packet
+length and window size, and, on serial connections, of ensuring there is an
+effective flow control method, preferably hardware (such as RTS/CTS).
+However, a fully-configured C-Kermit program can be slower than than a
+minimally configured one simply because of its size.  A command-line-only
+version that is stripped of every conceivable feature not affecting file
+transfer (such as "sunos41m" for the Sun or "dellsys5r4m" for Dell) can move
+files considerably faster than a full-featured one.  Thus, it might make sense
+to keep a minimal version available as well as a full-featured one.  See the
+files ckuins.doc and ckccfg.doc as well as the makefile for how to do this.
+
+UNIX C-Kermit does not reject incoming files on the basis of size.  There
+appears to be no good (reliable, portable) way to determine in advance how
+much disk space is available.
+
+File transfer will fail if the incoming file is bigger than your ULIMIT.
+Use the UNIX ulimit command to examine or change your ULIMIT (the number is
+in 512-byte blocks, i.e. 0.5K).
+
+UNIX C-Kermit discards all carriage returns from incoming files when in text
+mode.
+
+If a file arrives that has the same name as a directory, and C-Kermit's FILE
+COLLISION setting is BACKUP, C-Kermit will either: (a) rename the directory,
+or (b) not be able to rename the directory and so will refuse the incoming
+file with the message "Can't transform filename".  Similarly, if C-Kermit's
+FILE COLLISION setting is OVERWRITE, C-Kermit will, hopefully (!), not be able
+to delete the directory, and so will refuse the incoming file.
+
+If you SET FILE DISPLAY FULLSCREEN, and C-Kermit complains "Sorry, terminal
+type not supported", it means that the terminal library (termcap or termlib)
+that C-Kermit was built for does not know about a terminal whose name is the
+current value of your TERM environment variable.  If this happens, EXIT from
+C-Kermit and set a UNIX terminal type from among the supported values, or else
+have an entry for your terminal type added to the system termcap and/or
+terminfo database.
+
+If you attempt to suspend C-Kermit during local-mode file transfer and then
+continue it in the background (via bg), it will block for "tty output" if
+you are using the FULLSCREEN file transfer display.  This is apparently
+a problem with curses.  Moving a local-mode file transfer back and forth
+between foreground and background works correctly, however, with the SERIAL,
+CRT, or NONE file transfer displays.
+
+Reportedly, when using "MSEND *" from a 14-character filename UNIX system to
+another system (e.g. BSD) that allows longer names, with SET FILE NAMES
+LITERAL, any files with 14-character names will have a space added to the end
+of the name on the receiving machine.
+
+One user of C-Kermit on SCO UNIX 3.2.4 reports that C-Kermit core dumps when
+receiving files in local mode.  The crash invariably occurs when the 16384th
+byte arrives, obviously indicating some kind of int/long, or short/int, or
+similar mismatch in argument-passing -- no doubt the byte count.  Other users
+of SCO UNIX 3.2.4, built using the same makefile entry, report that they can
+receive files much longer than 16384 with no problem at all.  Maybe it depends
+on which file transfer display is being used?  If this happens to you, try
+using a different file transfer display (SET FILE DISPLAY NONE, SERIAL, CRT,
+or FULLSCREEN).
+
+
+EXTERNAL FILE TRANSFER PROTOCOLS
+
+UNIX C-Kermit can be used in conjunction with other communications software
+in various ways.  C-Kermit can be invoked from another communications program
+as an "external protocol", and C-Kermit can also invoke other communication
+software to perform external protocols.
+
+This sort of operation makes sense only when you are dialing out from your
+UNIX system.  If the UNIX system is the one you have dialed in to, you don't
+need any of these tricks.  Just run the desired software on your UNIX system
+instead of Kermit.  When dialing out from a UNIX system, the difficulty is
+getting two programs to share the same communication device in spite of the
+UNIX UUCP lockfile mechanism, which would normally prevent any sharing.
+
+  1. C-Kermit as an External Protocol
+
+"pcomm" is a general-purpose terminal program that provides file transfer
+capabilities itself (X- and YMODEM variations) and the ability to call on
+external programs to do file transfers (ZMODEM and Kermit, for example).  You
+can tell pcomm the command to execute to send or receive a file with an
+external protocol:
+			send				receive
+	ZMODEM		sz <filename>			rz
+	Kermit		kermit -s <filename>		kermit -r
+
+pcomm runs external programs for file transfer by making stdin and stdout
+point to the modem port, and then exec-ing "/bin/sh -c xxx" (where xxx is the
+appropriate command).  However, C-Kermit does not treat stdin and stdout as
+the communication device unless you instruct it:
+
+			send				receive
+	Kermit		kermit -l 0 -s <filename>	kermit -l 0 -r
+
+The "-l 0" option means to use file descriptor 0 for the communication device.
+
+In general, any program can pass any open file descriptor to C-Kermit for the
+communication device in the "-l" command-line option.
+
+  2. Invoking External Protocols from C-Kermit
+
+After you have opened a communication link with C-Kermit's SET LINE (SET PORT)
+or SET HOST (TELNET) command, C-Kermit makes its file descriptor available to
+you in the \v(ttyfd) variable so you can make it available to other programs
+that you RUN from C-Kermit.  Here, for example, C-Kermit runs itself as an
+external protocol:
+
+  C-Kermit>set modem hayes
+  C-Kermit>set line /dev/acu
+  C-Kermit>set speed 2400
+  C-Kermit>dial 7654321
+   Call complete.
+  C-Kermit>echo \v(ttyfd)
+   3
+  C-Kermit>run kermit -l \v(ttyfd)
+
+Other programs that accept open file descriptors on the command line can be
+started in the same way.
+
+You can also use your shell's i/o redirection facilities to assign C-Kermit's
+open file descriptor (ttyfd) to stdin or stdout.  For example, the UNIX ZMODEM
+programs, sz and rz, when invoked as external protocols, expect to find the
+communication device assigned to stdin and stdout with no option for
+specifying any other file descriptor on the sz or rz command line.  However,
+you can still invoke sz and rz as exterior protocols from C-Kermit if your
+current shell ($SHELL variable) is ksh (the Korn shell) or bash (the
+Bourne-Again shell), which allows assignment of arbitrary file descriptors to
+stdin and stdout:
+
+  C-Kermit> run rz <&\v(ttyfd) >&\v(ttyfd)
+
+Here are some macros from Rick Calder <rick@rick.att.com> for invoking
+external protocols from C-Kermit.  These assume your shell is ksh or bash, and
+that the sz, rz, sx, rx, etc, programs are in /usr/local/bin:
+
+; Send specified file(s) with ZMODEM
+;
+define sz if = \v(argc) 1 FATAL {Send what file ?}, -
+  if not exist \%1 FATAL {File \%1 not found.}, -
+  run /usr/local/bin/sz -
+    \%1 \%2 \%3 \%4 \%5 \%6 \%7 \%8 \%9 <&\v(ttyfd) >&\v(ttyfd), -
+  connect
+
+; Receive file or files with ZMODEM
+;
+define rz run /usr/local/bin/rz <&\v(ttyfd) >&\v(ttyfd), connect
+
+; Send specified file(s) with YMODEM
+;
+define sb if = \v(argc) 1 FATAL {Send what file ?}, -
+  if not exist \%1 FATAL {File \%1 not found.}, -
+  run /usr/local/bin/sb -
+    \%1 \%2 \%3 \%4 \%5 \%6 \%7 \%8 \%9 <&\v(ttyfd) >&\v(ttyfd), -
+  connect
+
+; Receive with YMODEM
+;
+define rb run /usr/local/bin/rb <&\v(ttyfd) >&\v(ttyfd), connect
+
+; Send a single file with XMODEM
+;
+define sx if = \v(argc) 1 FATAL {Send what file ?}, -
+  if not exist \%1 FATAL {File \%1 not found.}, -
+  run /usr/local/bin/sx \%1 \%2 \%3 \%4 \%5 \%6 \%7 \v(ttyfd) >&\v(ttyfd), -
+  connect
+
+; Receive with XMODEM (receiver must be told the filename too)
+;
+define rx if = \v(argc) 1 FATAL {Receive what file ?}, -
+  run /usr/local/bin/rx \%1 <&\v(ttyfd) >&\v(ttyfd), -
+  connect
+
+Put these definitions in your .mykermrc file and use them like this:
+
+  C-Kermit>rz
+  C-Kermit>sz oofa.txt
+
+etc.  As Rick says, "This now gives me one terminal emulator to use for both
+my UNIX and my MSDOS systems, with full file transfer protocol options,
+regardless of what the remote offers.  Finally, one size fits all!"  To that,
+we should add that X-, Y-, and ZMODEM need be used only when Kermit transfers
+are not available, since with long packets, sliding windows, and
+control-character unprefixing, Kermit is just as fast -- and almost always
+faster -- than X-, Y-, and ZMODEM.
+
+
+MISCELLANEOUS
+
+One user reported trouble running C-Kermit on a NeXT from within NeXT's
+Subprocess class under NeXTstep 3.0, and/or when rlogin'd from one NeXT to
+another: Error opening /dev/tty:, congm: No such device or address.  Diagnosis:
+Bug in NeXTSTEP 3.0, cure unknown.
+
+If C-Kermit has problems opening files in writable directories when it is
+installed setuid or setgid on BSD-based versions of UNIX such
+as NeXT Mach 3.0, it probably needs to be rebuild with the -DSW_ACC_ID
+comilation switch (see ckuins.doc).
+
+Reportedly, when coming into a Sequent UNIX (DYNIX) system through an X.25
+connection, Kermit doesn't work right because the Sequent's FIONREAD ioctl
+returns incorrect data.  To work around, use the 1-character-at-a-time version
+of myread() in ckutio.c (i.e. undefine MYREAD in ckutio.c and rebuild the
+program).
+
+There have been reports of file transfer failures on SUN 3 systems when using
+long packets and/or large window sizes.  One user says that when this happens,
+the console issues many copies of this message:
+
+  chaos vmunix: zs1: ring buffer overflow
+
+This means that SunOS (UNIX) is not scheduling Kermit frequently enough to
+service interrupts from the zs serial device (Zilog 8350 SCC serial
+communication port) before its input silo overflows.  Workaround: use smaller
+packets and/or a smaller window size, or use "nice" to increase Kermit's
+priority.  Use hardware flow control if available, or remove other active
+processes before running Kermit.
+
+One user reports that C-Kermit built on SCO UNIX 3.2.4 (ODT 2.0) consistently
+crashes as soon as it receives the 16384th byte of an incoming file, which
+seems to indicate a short-vs-int conversion problem (file length becoming
+negative).  Another user, who built and runs the same version of C-Kermit in
+exactly the same environment, reports that this problem does not occur.  The
+difference is thought to be a compiler bug for which an SCO patch was
+installed on the latter system, but not the former.
+
+------------------------------
+
+USER REPORTS -
+
+Date: Thu, 12 Mar 92 1:59:25 MEZ
+From: Walter Mecky <walter@rent-a-guru.de>
+Subject: Help.Unix.sw
+To: svr4@pcsbst.pcs.com, source@usl.com
+
+PRODUCT:	Unix
+RELEASE:	Dell SVR4 V2.1 (is USL V3.0)
+MACHINE:	AT-386
+PATHNAME:	/usr/lib/libc.so.1
+		/usr/ccs/lib/libc.a
+ABSTRACT:	Function ttyname() does not close its file descriptor
+DESCRIPTION:
+	ttyname(3C) opens /dev but never closes it. So if it is called
+	often enough the open(2) in ttyname() fails. Because the broken
+	ttyname() is in the shared lib too all programs using it can
+	fail if they call it often enough. One important program is
+	uucico which calls ttyname for every file it transfers.
+
+Here is a little test program if your system has the bug:
+
+#include <stdlib.h>
+#include <stdio.h>
+main() {
+    int i = 0;
+    while (ttyname(0) != NULL)
+      i++;
+    perror("ttyname");
+    printf("i=%d\n", i);
+}
+
+If this program runs longer than some seconds you don't have the bug.
+
+WORKAROUND:
+	None
+FIX:
+	Very easy if you have source code.
+
+Another user reports some more explicit symptoms and recoveries:
+
+> What happens is when invoking ckermit we get one of the following
+> error messages:
+>   You must set line
+>   Not a tty
+>   No more processes.
+> One of the following three actions clears the peoblem:
+>   shutdown -y -g0 -i6
+>   kill -9 the ttymon with the highest PID
+>   Invoke sysadm and disable then enable the line you want to use.
+> Turning off respawn of sac -t 300 and going to getty's and uugetty's 
+> does not help.
+> 
+> Also C-Kermit reports "?timed out closing /dev/ttyxx".
+> If this happens all is well.
+
+------------------------------
+
+Date: Wed, 6 Jun 90 23:51:10 PDT
+From: dunlap@apl-em.apl.washington.edu (John Dunlap)
+To: fdc@watsun.cc.columbia.edu
+Subject: Re:  C-Kermit 5A Edit 144
+
+I should mention that I have discovered a bug in C-Kermit using HP-UX version
+5.21 on the HP-9000 series 500 computers.  This bug seems to have been present
+at least as far back as version 095.  It only occurs when the controlling
+terminal is using an HP-27140 six port modem mux.  The problem is not present
+if the controlling terminal is logged into an HP-27130 eight port mux.  The
+symptom is that just after dialing successfully and connecting Kermit locks up
+and the port is unusable until both forks of Kermit and the login shell are
+killed.
+
+This may be why some people are saying that Kermit won't work for them on the
+series 800 HP computers -- the 27140 6 port modem mux is used on that computer
+while the 27140 8 port mux cannot be used.
+
+One of these months I may be able to test this a bit more, but for the time
+being I just moved my terminal port to the 8 port mux!
+
+------------------------------
+
+Date: Mon, 15 Jun 92 17:16:21 -0400
+From: fuller@wccs (Charles S. Fuller)
+Subject: kermit under HP-UX -- solved!
+
+To make C-Kermit work on HP-UX 8.05 on an HP720, obtain and install HP-UX
+patch PHNE_0899.  This patch deals with a lot of driver issues, particularly
+related to communication at higher speeds.
+
+------------------------------
+
+Date: Tue, 16 Oct 90 23:35:26 -0400
+From: wbader@scarecrow.csee.lehigh.edu (William Bader)
+To: fdc@watsun.cc.columbia.edu
+Subject: ckermit 159 notes
+
+The changes to the update file mentioned something about putting alarms
+on some I/O calls to prevent flow control deadlocks.  Device drivers in
+Xenix (and possibly other ports of versions of AT&T Unix V.2 and V.3) have a
+higher priority than signals, which means that an alarm (or any signal
+including SIGKILL!) will not always interrupt a deadlocked read.
+When you turn off flow control on Xenix, there is a short window where an
+incoming ^S can get accepted, but no ^Q can be sent because flow control
+was turned off slightly after the ^S.
+
+[C-Kermit 4C would sometimes hang for this reason, and we could kill
+the shell to use that terminal, but the kermit process itself would
+become a zombie.]
+
+It might be possible (although not portable) to use select().
+
+------------------------------
+
+(Note: the following problem also occurs on SGI and probably many other
+UNIX systems):
+
+From: James Spath <spath@jhunix.hcf.jhu.edu>
+To: Info-Kermit-Request@cunixf.cc.columbia.edu
+Date: Wed, 9 Sep 1992 20:20:28 -0400
+Subject: C-Kermit vs uugetty (or init) on Sperry 5000
+
+We have sucessfully compiled the above release on a Unisys/Sperry 5000/95.  We
+used the sys5r3 option, rather than sys5r2 since we have VR3 running on our
+system.  In order to allow dialout access to non-superusers, we had to do
+"chmod 666 /dev/tty###", where it had been -rw--w--w- (owned by uucp), and to
+do "chmod +w /usr/spool/locks".  We have done text and binary file transfers
+through local and remote connections.
+
+The problem concerning uucp ownership and permissions is worse than I thought
+at first.  Apparently init or uugetty changes the file permissions after each
+session.  So I wrote the following C program to open a set of requested tty
+lines.  I run this for any required outgoing line prior to a Kermit session.
+
+   ------ cut here -------
+/* opentty.c -- force allow read on tty lines for modem i/o */
+/* idea from: restrict.c -- Systsem 5 Admin book Thomas/Farrow p. 605 */
+/* /jes jim spath {spath@jhunix.hcj.jhu.edu } */
+/* 08-Sep-92 NO COPYRIGHT. */
+/* this must be suid to open other tty lines */
+
+/* #define DEBUG */
+#define TTY "/dev/tty"
+#define LOK "/usr/spool/locks/LCK..tty"
+#include <stdio.h>
+
+/* allowable lines: */
+#define TOTAL_LINES 3
+static char allowable[TOTAL_LINES][4] = { "200", "201", "300" };
+static int total=TOTAL_LINES;
+int allow;
+
+/* states: */
+#define TTY_UNDEF 0
+#define TTY_LOCK  1
+#define TTY_OKAY  2
+
+main(argc, argv)
+int argc; char *argv[]; {
+    char device[512];
+    char lockdev[512];
+    int i;
+    if (argc == 1) {
+	fprintf(stderr, "usage: open 200 [...]\n");
+    }
+    while (--argc > 0 && (*++argv) != NULL ) {
+#ifdef DEBUG
+	fprintf(stderr, "TRYING: %s%s\n", TTY, *argv);
+#endif
+	sprintf(device, "%s%s", TTY, *argv);
+	sprintf(lockdev, "%s%s", LOK, *argv);
+	allow = TTY_UNDEF; i = 0;
+	while (i <= total) { /* look at all defined lines */
+#ifdef DEBUG
+	    fprintf(stderr, "LOCKFILE? %s?\n", lockdev);
+#endif
+	    if (access(lockdev, 00) == 0) {
+		allow=TTY_LOCK;
+		break;
+	    }
+#ifdef DEBUG
+	    fprintf(stderr, "DOES:%s==%s?\n", allowable[i], *argv);
+#endif
+	    if (strcmp(allowable[i], *argv) == 0)
+	      allow=TTY_OKAY;
+	    i++;
+	}
+#ifdef DEBUG
+	fprintf(stderr, "allow=%d\n", allow);
+#endif
+	switch (allow) {
+	  case TTY_UNDEF:
+	    fprintf (stderr, "open: not allowed on %s\n", *argv);
+	    break;
+	  case TTY_LOCK:
+	    fprintf (stderr, "open: device locked: %s\n", lockdev);
+	    break;
+	  case TTY_OKAY:
+	    /* attempt to change mode on device */
+	    if (chmod (device, 00666) < 0)
+	      fprintf (stderr, "open: cannot chmod on %s\n", device);
+	    break;
+	  default:
+	    fprintf (stderr, "open: FAULT\n");
+	}
+    }
+    exit (0);
+}
+
+------------------------------
+
+Date: Fri, 30 Oct 92 10:59:51 +0100
+From: fulvio@ssuxos.ICO.OLIVETTI.COM (Fulvio Marino)
+To: fdc@watsun.cc.columbia.edu
+Subject: Re: C-Kermit 5A(185) Ready for Testing
+
+Some telnetd are broken (in some releases of Sun, Hitachi and X/OS Unixes):
+byte BUFSIZ (i.e., buf[BUFSIZ-1]) is not passed to the attached processes.
+Two side effects:
+
+ a. if the receive packet-len (on remote server) is >= BUFSIZ, there is no way
+    to send a packet of data (the BUFSIZ-th byte is always lost)
+
+ b. if the receive packet-len (on remote server) is < BUFSIZ, then you can
+    *hope* to send some packet of data: remote kernel could ``cat'' the
+    received data so that to give telnetd a bigger input buffer (see "a.").
+
+Possible solutions:
+
+  - Patch telnetd -- the best way
+
+  - Use *very* short packets (speed is slowing down) -- the middle way
+
+  - Change ckutio.c.  I added code to ttol(); actually, the line:
+
+	    x = write(ttyfd,s,n);	/* Write string to device */
+
+    is writing a full packet (or a piece of it, in case of partial writes).
+    My idea is to split this up into many little writes, sleeping between
+    them; I use an "extern int splitted_bsz" to know if a ``splitting'' is
+    required or not; the msecs for msleep() are computed in a way that is
+    giving good results on X/OS.  splitted_bsz (and, possibly, the msecs to
+    sleep) should be set by the user only in our special case.  This code
+    works.  I suggest to insert it in ckutio.c only if you know that this
+    kind of problem is common.
+
+	if (splitted_bsz == 0 || n <= splitted_bsz ) {
+	    x = write(ttyfd,s,n);	/* Write string to device */
+	} else {
+	    extern int	wslots;
+	    char	*buf;
+	    int		thiswrite, remaining;
+
+	    buf = s;
+	    remaining = n;
+	    for ( ; ; ) {
+		thiswrite = remaining > splitted_bsz ?
+		  splitted_bsz : remaining;
+		if ((x = write(ttyfd, buf, thiswrite)) > 0)
+		  msleep(x/(wslots > 1 ? 5 : 10));
+		debug(F101,"ttol splitted","",x);
+		if (x != thiswrite) {
+		    if (x < 0 && remaining < n)
+			x = 0; /* i.e. report error only on 1st write */
+		    if (x >= 0)
+			x += n - remaining;
+		    break; /* error, or partial write */
+		}
+		buf += x;
+		if ((remaining -= x) == 0) {
+		    x = n;
+		    break; /* success */
+		}
+	    }
+	}
+-- 
+Fulvio MARINO (Tel.#: +39-125-52-8493)
+Ing. C. Olivetti & C.
+OS&N/R&D/MV Progetto X/OS, n.ico 2p.
+via Jervis 77
+I-10015 Ivrea (TO)
+ITALY
+
+------------------------------

@@ -1,0 +1,314 @@
+CKVKER.BWR          "Beware File" for C-Kermit Version 5A        -*- text -*-
+
+		    (Open)VMS VERSION FOR DEC VAX AND AXP
+
+Applies to 5A(189)
+Last update: Tue Jul  6 11:14:18 1993
+
+Authors: Frank da Cruz, Christine M. Gianone (Columbia University, NYC);
+         Terry Kennedy (Saint Peters College, Jersey City, NJ).
+
+  Copyright (C) 1985, 1993, Trustees of Columbia University in the City of New
+  York.  The C-Kermit software may not be, in whole or in part, licensed or
+  sold for profit as a software product itself, nor may it be included in or
+  distributed with commercial products or otherwise distributed by commercial
+  concerns to their clients or customers without written permission of the
+  Office of Kermit Development and Distribution, Columbia University.  This
+  copyright notice must not be removed, altered, or obscured.
+
+Report problems, suggestions, fixes, etc, to:
+
+  Frank da Cruz
+  Columbia University
+  Academic Information Systems (AcIS)
+  612 West 115th Street
+  New York, NY  10025  USA
+
+  Internet:         fdc@columbia.edu
+  BITNET/EARN/CREN: FDCCU@CUVMA
+  Fax:              +1 212 662-6442
+
+VMS C-Kermit installation instructions are in the file CKVKER.INS.  Please
+be sure you have read that file before concluding that C-Kermit isn't working
+right on VMS.
+
+Note: "VMS" as used in this document refers to both VMS and OpenVMS on both
+VAX and AXP (Alpha) processors.  Most of the words in the previous sentence
+are trademarks (TM) of Digital Equipment Corporation.
+
+
+DOCUMENTATION
+
+C-Kermit 5A is documented in the book "Using C-Kermit" by Frank da Cruz
+and Christine M. Gianone, Digital Press, Burlington, MA, USA.  Digital
+Press ISBN: 1-55558-108-0; Prentice-Hall ISBN: 0-13-037490-3.  Price: US
+$34.95.  In USA, call DECdirect at 1-800-344-4825, refer to order number
+EY-J896E-DP.  Available: January 1993.
+
+
+COMMAND PARSER
+
+VMS-style command-line editing (arrow keys, etc) is not supported.  Kermit
+does not use the VMS F$PARSE facility -- it has its own command parser that
+lacks certain features of F$PARSE (arrow-key editing, command recall, etc) but
+has many other features that F$PARSE lacks: "?"-help, keyword and filename
+completion, filename menus, variables, macros, etc.
+
+Contrary to expectations of VMS users, the MSEND command does NOT use
+commas to separate file specifications.  E.g. say this:
+
+  C-Kermit>msend ckc*.% cku*.% ckv*.%
+
+not this:
+
+  C-Kermit>msend ckc*.%, cku*.%, ckv*.%
+
+CD (Change Directory) to a DECnet node does not work in VMS C-Kermit.
+
+OPEN !WRITE does not work in VMS C-Kermit.
+
+APPEND operations (such as OPEN APPEND and SET FILE COLLISION APPEND) do
+not work in VMS; they always create a new version of the file rather than
+appending to the most recent version.
+
+VMS C-Kermit does NOT provide program status codes in the normal VMS manner.
+Rather, it returns the codes described on pp. 323-324 of "Using C-Kermit", by
+assigning them to the symbol CKERMIT_STATUS.  For example, if a RECEIVE
+operation failed:
+
+  $ show symbol ckermit_status
+    CKERMIT_STATUS == "4"
+  $
+
+Arguments supplied to the EXIT (or QUIT) commands take precedence:
+
+  C-Kermit>exit 1234
+  $ show symbol ckermit_status
+    CKERMIT_STATUS == "1234"
+  $
+
+If C-Kermit encounters no execution errors, and EXIT (QUIT) is given without
+an operand, then:
+
+  C-Kermit>exit
+  $ show symbol ckermit_status
+    CKERMIT_STATUS == "0"
+  $
+
+You can use the CKERMIT_STATUS symbol as in this DCL example:
+
+  $ kermit -s oofa.txt
+  $ if ckermit_status .eq. 0 then goto ok
+
+
+GENERAL FAILURES
+
+...can occur for many reasons beyond Kermit's control, many of them related to
+VMS system parameters or limits on the user or process: disk quotas, user
+pagefile quotas (AUTHORIZE parameter PGFLQUO), system pagefile space filling
+up, etc.  See CKVINS.DOC (installation instructions) for details.
+
+To increase a user's pagefile quota, tell AUTHORIZE to MODIFY
+username/PGFLQUO=number.  If the system itself is running out of pagefile
+space (which would cause the system to grind to a halt and eventually crash).
+You can check the system pagefiles with SHOW MEMORY/FILE: add up the "Free"
+numbers for the [*]*PAGEFILE.SYS files and see if the total is big enough
+(there should normally be at least 100K free pages on an active system).  If
+not, the system manager would use the procedure @SYS$UPDATE:SWAPFILES to
+resize the files.
+
+
+FILE TRANSFER
+
+File transfer modes (TEXT vs BINARY) are set automatically for each when
+sending.  The SET FILE TYPE BINARY and SET FILE TYPE TEXT commands are ignored
+when sending files.
+
+Incoming files are rejected if the available space on the disk device is less
+than the size of the file.  However, the user's disk quota is not checked.
+Quota checking could erroneously report that a user couldn't store a file for
+a number of reasons: for example, the user has the EXQUOTA privilege, C-Kermit
+is installed with EXQUOTA privilege (not recommended!), overdraft, etc.
+Because of the large potential for denying a transfer that would fit, the file
+is accepted regardless of the disk quota.  This is consistent with the way
+other VMS utilities work.
+
+The file size shown in the file transfer display when sending a file might
+be incorrect under certain conditions (but the file is still transferred
+correctly).
+
+Incoming files, if accepted, are always stored as a new file with the next
+highest version number, even when FILE COLLISION is set to OVERWRITE or
+or RENAME.
+
+Transfer of VFC (Variable with Fixed Control) files, such as those created
+by DCL, is problematic, since the meaning of the control bytes is defined by
+the application.
+
+ZIP files: If you have trouble transferring ZIP files into or out of VMS
+using BINARY mode, use IMAGE mode instead (SET FILE TYPE IMAGE).  The same
+applies to binary files created by VMS UNZIP.
+
+When transferring files in LABELED mode, the file transfer display will show
+the name the file was sent as, not the "true" name within the labeled file.
+Also, note that a transfer may fail with an obscure error (can't create output
+file) if there is something incorrect with the label information (for example,
+if you specified that the file should be restored to the original directory
+and you don't have privilege to write to that directory on this system).
+
+DEC PATHWORKS file services normally create files in stream mode,  but
+this can be overridden when the file service is created:
+
+  $ ADMIN/PCSA
+  PCSA> SET FILE_SERVER SERVICE service-name/ATTRIBUTES=SEQUENTIAL_FIXED
+
+The normal stream files will be treated as TEXT by Kermit.  To transfer
+PATHWORKS files that are really binary, such as executables, use IMAGE mode.
+
+Reportedly, when transferring files TO a VMS system over a LAT connection (for
+example, from a PC equipped with PATHWORKS and MS-DOS Kermit), packet sizes
+greater than 255 (some reports say 70!) cannot be used, irrespective of the
+VMS SYSGEN parameters regarding MAXBUF, etc.  The problem seems to lay in the
+LAT protocol itself, or DEC's implementation of it, whereby applications are
+not informed of -- and cannot find out -- limits on transmission.
+
+
+SERIAL COMMUNICATIONS
+
+If your terminal is set to /ESCAPE (validate escape sequences), C-Kermit gives
+an error message, "contti.iosb invalid escape sequence", because it is doing
+byte-by-byte output and VMS wants to see the whole sequence in one gulp.  The
+workaround is to set the terminal to /NOESCAPE before starting C-Kermit.  The
+fix is to add /NOESCAPE to the list of modes saved/restored for communication.
+(NOTE: This was done in edit 189).
+
+If you CONNECT to a modem or other device, and see a neverending stream of
+messages, the terminal device probably has the /LOCAL_ECHO characteristic.
+As of edit 189, C-Kermit attempts to turn off this characteristic, but since
+it is a /PERMANENT characteristic, some degree of privilege might be required,
+and this operation might fail for nonprivileged users.
+
+The SET CARRIER and SET FLOW RTS/CTS commands are not supported in the
+VMS version of C-Kermit.
+
+Certain operations driven by RS-232 modem signal do not work on VAXstations or
+other DEC platforms whose serial interfaces use MMP connectors (DEC version of
+RJ45 telephone jack with with offset tab).  These connectors convey only the
+DSR and DTR modem signals, but not carrier (CD), RTS, CTS, or RI.
+
+When used on a serial communication device, the HANGUP command (as well as
+the CONNECT-mode escape command, H, and the HANGUP done by the DIAL command
+when DIAL HANGUP is ON) takes at least 3 seconds.  This is a FEATURE of VMS.
+
+During terminal connection (SET LINE) and file transfer over a serial device,
+buffer-overrun or BYTLM-quota-exceeded messages might appear.  It is essential
+that any VMS system that needs to use Kermit or any other program to transfer
+files over serial devices, especially when long packets or sliding windows are
+to be used, be SYSGEN'd with large typehead buffers, and that user accounts
+be given large BYTLM quotas.  See CKVINS.DOC.
+
+  Note that LATmaster software (optional as of VMS V5.4-1, mandatory as of 
+  VMS V5.5) requires a minimum alt-typeahead buffer of 2064 bytes. Thus, you 
+  may already have increased the size.  Kermit needs packet-size times window-
+  size plus a small amount of overhead.
+
+To get around problems on systems where users have small BYTLM quotas, the
+txbufr() routine in CKVTIO.C has been limited to reading 512-byte chunks at
+a time from the communication device.  This does not appear to have an adverse
+affect on performance, but time will tell.  If it does, a quick fix is to
+recompile CKVTIO.C, defining CKV_IO_SIZE to be something bigger, e.g.
+
+  /define=("CKV_IO_SIZE=8192")
+
+or whatever.  A better fix might be to have txbufr() check the user's
+remaining BYTLM quota before doing each read.  But that might be more expense
+(overhead) than it is worth.
+
+It is possible to SET LINE to an LTA (LAT) device, but correct operation
+is reportedly dependent on the version of DECserver code and the VMS
+version, and which patches have been applied.  Correct operation has been
+verified for DECserver 200 software V3.1-37 and VMS V5.4-3, unpatched.
+
+If you use C-Kermit to SET LINE to an LTA device and receive a hangup message
+immediately:
+
+  contti: ttiosb.status: %SYSTEM-F-HANGUP, data set hang-up
+
+then:
+
+ . Make sure you've created an LTA port on your VMS system which is
+   mapped to the DECserver port that the modem is connected to.
+
+ . Can you use the VMS SET HOST/DTE command to connect to that line? If you
+   get the same error (which you should) there's a configuration problem in
+   the DECserver setup for that port.
+
+ . Are you trying to use that modem for both dial-in and dial-out
+   configurations?  Try configuring different ports for dial-in and dial-out.
+
+ . In order for VMS to connect to the dial-out modem, it needs to see the
+   carrier detect signal asserted.  If that signal isn't asserted, the server
+   will return a "hangup" error on the first character sent to the port.
+   C-Kermit's SET CARRIER command has no effect in VMS.
+
+ . Additionally, some modems want to see various settings on RTS/CTS and
+   DSR/DTR before they will accept input.  If you have a breakout box and
+   someone who is skilled at using it, you can usually resolve these problems.
+
+Reportedly, if you have CONNECTed out through a LAT device, the CONNECT-mode
+escape command to hang up (<esc-char>H) does not work.  Reason: unknown.
+Cure: unknown (The LAT programming interface is very poorly documented).
+Workaround: SET LINE <cr> to close the SET LINE device.
+
+
+NETWORK COMMUNICATIONS
+
+There is (as yet) no support for initiating connections over DECnet, nor for
+VAX/PSI.  Certain types of TCP/IP are supported (including DEC TCP/IP (UCX),
+TGV MultiNet, and Wollongong WIN/TCP), other types: not yet (Fusion, CMU/Tek).
+
+If you enter the VAX from elsewhere through a TELNET connection, and the VAX
+is running CMU/Tek, Fusion, or DEC TCP/IP (UCX), you might notice that file
+transfers into the VAX fail almost immediately.  If this happens, it is most
+likely the result of small VMS typeahead buffers.  See CKVINS.DOC for how to
+increase typeahead buffer sizes, or work around the problem by telling VMS
+C-Kermit to ask for smaller packets, for example:
+
+  C-Kermit>set receive packet-length 65  ; (Use the longest length that works)
+
+Reportedly, when building C-Kermit with WIN/TCP support with older versions
+(5.1 and earlier?) of WIN/TCP, the symbol WIN$PERROR is undefined at link
+time and the build fails.  Workaround: change the one reference to
+win$perror(), which occurs in the contti() function in CKVTIO.C, to be
+simply perror().
+
+Although VMS C-Kermit can be built on the Alpha with TGV Multinet support,
+TCP/IP connections cannot be made.  The problem has not yet been isolated, but
+probably has to do with Alpha's underlying architecture -- word/byte
+configuration vs Internet addresses, or somesuch.  In the meantime, it is
+possible to run the Alpha AXP UCX version on a MultiNet system -- it works
+automatically in "UCX compatibility mode".  You can also use the non-network
+version of C-Kermit on a MultiNet system to make TCP/IP connections as
+follows:
+
+$ telnet/create foo.bar.baz.com
+Trying... 
+TELNET session now connected to _NTY5:
+%DCL-I-ALLOC, _$4$NTY5: allocated
+
+$ kermit
+C-Kermit 5A(189), 30 June 93, OpenVMS AXP
+Type ? or HELP for help
+C-Kermit>set line telnet_nty
+C-Kermit>connect
+etc...
+
+MISCELLANEOUS
+
+When C-Kermit is run "in a mailbox" (i.e. has been spawned by another
+program), it can't transfer files because it doesn't think the controlling
+terminal is a terminal.  Workaround: before attempting to transfer files, tell
+C-Kermit to "SET LINE SYS$OUTPUT".
+
+
+(End of CKVKER.BWR)

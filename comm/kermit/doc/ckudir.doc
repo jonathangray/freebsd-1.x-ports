@@ -1,0 +1,203 @@
+Date: Fri, 22 Jun 90 20:15:30 EDT
+From: Frank da Cruz <fdc@watsun.cc.columbia.edu>
+Subject: dirent.h vs dir.h
+
+I'm attacking C-Kermit's problems with long filenames and wildcard expansion
+now.  These problems have been most noticable on HP-UX, MIPS, RTU, and other
+System-V based systems.  Berkeley-based systems seem to have no problem.
+
+I think I'm beginning to understand what's going on.  My theory is that most
+of the System-V based systems on which Kermit's wildcard expansion is broken
+are using <sys/dir.h> with open(), read(), and close() to access the
+directory, which up till now has been what you got if UXIII was defined.
+
+But according to SVID (R2 and R3), not to mention POSIX, we should be using
+<dirent.h> with opendir(), readdir(), and closedir().  Does anybody know when
+<dirent.h> entered the picture?  Was it a Sys V R2 invention?  Was it Sys V R0
+(was there such a thing?  -- I mean, is <dirent.h> one of the things that
+distinguishes System III from System V?)  Is <dirent.h> available on Xenix
+systems?
+
+I've looked on vanilla Berkeley 4.2 and 4.3 systems and can't find <dirent.h>,
+so I'm assuming it's an AT&Tism and we needn't bother about in BSD-based
+Kermit implementations.  Among the hybrids, <dirent.h> is available in SUNOS
+4.x and AIX/370, but not Encore UMAX 4.3, not Ultrix 2.0, ... so we take our
+chances.
+
+There also seem to be at least three examples of AT&T Unixes with BSD file
+systems, which do NOT use <dirent.h>: HP-UX (6.2 and later?), Silicon Graphics
+Iris, and Masscomp RTU.  These will need a special notation in the makefile,
+if indeed <dirent.h> is truly not available.
+
+I think I have developed a relatively clean way to handle all these variations
+in the makefile.  The main rule is: if your system has <dirent.h>, use it.  So
+I'm mostly interested now in finding out which systems can be expected to
+supply /usr/include/dirent.h.
+
+Thanks!  - Frank
+
+------------------------------
+
+Date: Fri, 22 Jun 90 19:59:40 PDT
+From: andy@csvax.caltech.edu (Andy Fyfe)
+To: fdc@watsun.cc.columbia.edu
+Subject: Re:  dirent.h vs dir.h
+
+The UnixPC comes with no directory-reading routines.  I have the dirent
+library (from Doug Gwyn) installed.  Here's the NOTES file from the
+distribution -- it has some background on where it came from.
+
+--andy
+
+
+NOTES FOR NEARLY-POSIX-COMPATIBLE C LIBRARY DIRECTORY-ACCESS ROUTINES
+
+
+Older UNIX C libraries lacked support for reading directories, so historically
+programs had knowledge of UNIX directory structure hard-coded into them.  When
+Berkeley changed the format of directories for 4.2BSD, it became necessary to
+change programs to work with the new structure.  Fortunately, Berkeley designed
+a small set of directory access routines to encapsulate knowledge of the new
+directory format so that user programs could deal with directory entries as an
+abstract data type.  (Unfortunately, they didn't get it quite right.)  The
+interface to these routines was nearly independent of the particular
+implementation of directories on any given UNIX system; this has become a
+particularly important requirement with the advent of heterogeneous network
+filesystems such as NFS.
+
+It has consequently become possible to write portable applications that search
+directories by restricting all directory access to use these new interface
+routines.  The sources supplied here are a total rewrite of Berkeley's code,
+incorporating ideas from a variety of sources and conforming as closely to
+published standards as possible, and are in the PUBLIC DOMAIN to encourage
+their widespread adoption.  They support four methods of access to system
+directories: the original UNIX filesystem via read(), the 4.2BSD filesystem via
+read(), NFS and native filesystems via getdirentries(), and SVR3 getdents().
+The other three types are accomplished by appropriate emulation of the SVR3
+getdents() system call, which attains portability at the cost of slightly more
+data movement than absolutely necessary for some systems.  These routines
+should be added to the standard C library on all UNIX systems, and all existing
+and future applications should be changed to use this interface.  Once this is
+done, there should be no portability problems due to differences in underlying
+directory structures among UNIX systems.  (When porting your applications to
+other UNIX systems, you can always carry this package around with you.)
+
+An additional benefit of these routines is that they buffer directory input,
+which provides improved access speed over raw read()s of one entry at a time.
+
+One annoying compatibility problem has arisen along the way, namely that the
+original Berkeley interface used the same name, struct direct, for the new data
+structure as had been used for the original UNIX filesystem directory record
+structure.  This name was changed by the IEEE 1003.1 (POSIX) Working Group to
+"struct dirent" and was picked up for SVR3 under the new name; it is also the
+name used in this portable package.  I believe it is necessary to bite the
+bullet and adopt the new non-conflicting name.  Code using a 4.2BSD-compatible
+package needs to be slightly revised to work with this new package, as follows:
+	Change
+		#include <ndir.h>	/* Ninth Edition UNIX */
+	or
+		#include <sys/dir.h>	/* 4.2BSD */
+	or
+		#include <dir.h>	/* BRL System V emulation */
+	to
+		#include <sys/types.h>	/* if not already #included */
+		#include <dirent.h>
+
+	Change
+		struct direct
+	to
+		struct dirent
+
+	Change
+		(anything)->d_namlen
+	to
+		strlen( (anything)->d_name )
+
+There is a minor compatibility problem in that the closedir() function was
+originally defined to have type void, but IEEE 1003.1 changed this to type int,
+which is what this implementation supports (even though I disagree with the
+change).  However, the difference does not affect most applications.
+
+Another minor problem is that IEEE 1003.1 defined the d_name member of a struct
+dirent to be an array of maximum length; this does not permit use of compact
+variable-length entries directly from a directory block buffer.  This part of
+the specification is incompatible with efficient use of the getdents() system
+call, and I have therefore chosen to follow the SVID specification instead of
+IEEE 1003.1 (which I hope is changed for the final-use standard).  This
+deviation should have little or no impact on sensibly-coded applications, since
+the relevant d_name length is that given by strlen(), not the declared array
+size.
+
+Error handling is not completely satisfactory, due to the variety of possible
+failure modes in a general setting.  For example, the rewinddir() function
+might fail, but there is no good way to indicate this.  I have tried to
+follow the specifications in IEEE 1003.1 and the SVID as closely as possible,
+but there are minor deviations in this regard.  Applications should not rely
+too heavily on exact failure mode semantics.
+
+Please do not change the new standard interface in any way, as that would
+defeat the major purpose of this package!  (It's okay to alter the internal
+implementation if you really have to, although I tried to make this unnecessary
+for the vast majority of UNIX variants.)
+
+Installation instructions can be found in the file named INSTALL.
+
+This implementation is provided by:
+
+	Douglas A. Gwyn
+	U.S. Army Ballistic Research Laboratory
+	SLCBR-VL-V
+	Aberdeen Proving Ground, MD 21005-5066
+
+	(301)278-6647
+
+	Gwyn@BRL.MIL or seismo!brl!gwyn
+
+This is UNSUPPORTED, use-at-your-own-risk, free software in the public domain.
+However, I would appreciate hearing of any actual bugs you find in this
+implementation and/or any improvements you come up with.
+
+------------------------------
+
+Date: Sat, 23 Jun 90 00:01:58 -0400
+From: djm@eng.umd.edu (David J. MacKenzie)
+To: fdc@watsun.cc.columbia.edu
+Subject: dirent.h vs dir.h
+
+> But according to SVID (R2 and R3), not to mention POSIX, we should be using
+> <dirent.h> with opendir(), readdir(), and closedir().  Does anybody know when
+> <dirent.h> entered the picture?
+
+There are several variations on the opendir et al. directory library:
+
+The first portable directory access library was introduced in 4.2BSD,
+along with the BSD Fast Filesystem (according to The Design and
+Implementation of the 4.3BSD Unix Operating System).  The same library
+is used in 4.3BSD.  It uses `struct direct' and <sys/dir.h>.
+
+SVR2 (I believe) introduced to System V an early version of Doug
+Gwynn's public domain reimplementation of the BSD library for the old
+(14 character filename) filesystem.  It uses `struct direct' and <ndir.h>.
+
+SVR3 renamed `struct direct' to `struct dirent' to fix a conflict with
+a different `struct direct' in the old 14-character filesystem's
+<sys/dir.h> header file and changed the header file to <dirent.h>.  It
+also removed the d_namlen structure member.  I think these changes
+were because they were proposed by POSIX (and eventually approved).
+Doug Gwynn later revised his public domain library to conform to the
+POSIX/SVR3 scheme.
+
+Early Xenix systems have `struct direct' and <sys/ndir.h> (I think
+Xenix is unique in the placement of the ndir.h file in
+/usr/include/sys), accessed by linking with -lx.  More recent Xenix
+systems also have the SVR3/POSIX `struct dirent' and <dirent.h>,
+accessed by linking with -ldir.  I think some intermediate Xenix
+systems have both libraries but have a buggy version of the <dirent.h>
+one.  On Xenix, only the <dirent.h> library can access network drives.
+
+SunOS started out as BSD with <sys/dir.h> but in later versions added
+the POSIX/SVR3 <dirent.h> as well.  Other merged BSD/SysV systems have
+various combinations of available headers.
+
+New systems, like 4.4BSD and GNU, will have <dirent.h>.
+
