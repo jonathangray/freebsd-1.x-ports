@@ -2,7 +2,7 @@
 # $XConsortium: imake.c,v 1.65 91/07/25 17:50:17 rws Exp $
 
 # -------------------------------------------------------------------------
-# Makefile generated from "Imake.tmpl" and </tmp/IIf.009111>
+# Makefile generated from "Imake.tmpl" and </tmp/IIf.012422>
 # $XFree86: mit/config/Imake.tmpl,v 2.6 1993/10/02 07:11:59 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
@@ -435,7 +435,7 @@ backup:
 package: pkg_bin
 
 pkg_bin: pkg/+DESC pkg/+ONELINE pkg/+PLIST pkg/+REQ all install install.man
-	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST xboing_bin
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST -r pkg/+REQ xboing_bin
 
 # End of the XBoing Imakefile :-)
 
