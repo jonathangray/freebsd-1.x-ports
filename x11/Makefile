@@ -17,18 +17,7 @@ SUBDIR += urt
 SUBDIR += xlock
 SUBDIR += xv
 SUBDIR += ezd
-
-.if !defined(AVOID)
-G_SUBDIR += xview
-#	(cd xview3.2; xmkmf)
-#	mv Makefile Makefile.bak
-#	imake -DUseInstalled -I/usr/X386/lib/X11/config
-#	In file included from /usr/X386/lib/X11/config/Imake.tmpl:1004, from :3:
-#	./Imakefile:1: XView.tmpl: No such file or directory
-#	imake: Exit code 33. Stop.
-#	make World 	ar: notifydata.o: Too many open files
-#	even make clean blows up :-(
-.endif
+SUBDIR += xview
 
 .if !defined(AVOID)
 SUBDIR += xxgdb
