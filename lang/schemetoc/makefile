@@ -5,11 +5,13 @@
 # Architecture specific directories and links to the source files are
 # constructed by the following commands which follow:
 
-all:
-	-make forFREEBSD
+all: FREEBSD
 	(cd FREEBSD; make port)
 	(cd FREEBSD/cdecl; make all)
 	(cd FREEBSD/xlib; make all)
+
+FREEBSD:
+	make forFREEBSD
 
 install:
 	(cd FREEBSD; make "DESTDIR=/usr/local" install-private)
@@ -18,6 +20,9 @@ install:
 	-mkdir -p /usr/local/man/man1
 	install -c -m 444 doc/scc.l /usr/local/man/man1/scc.1
 	install -c -m 444 doc/sci.l /usr/local/man/man1/sci.1
+
+pkg: install
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST schemetoc_bin
 
 forANY:
 	-mkdir ${CPU}
@@ -179,4 +184,3 @@ tarZ:
 	make "TARTAPE=tartape-${DATE}" "TARLOG=tartapelog-${DATE}" tarlog
 	cp tartape-${DATE} tt-${DATE}
 	compress tt-${DATE}
-
