@@ -26,24 +26,8 @@ clean :
 lint :
 	lint midifile.c mf1to0.c
 
-midtouu :
-	for i in example*.mid ; \
-	do \
-		echo $$i ; \
-		uuencode $$i $$i > `basename $$i .mid`.uu ; \
-		if [ $$? -eq 0 ] ; then  rm -f $$i ; fi ; \
-	done
-
-uutomid :
-	for i in example*.uu ; \
-	do \
-		echo $$i ; \
-		uudecode $$i ; \
-		if [ $$? -eq 0 ] ; then  rm -f $$i ; fi ; \
-	done
-
 test : mftext
-	for i in example*.mid ; \
+	for i in /usr/ports/audio/music/midi/example*.mid ; \
 	do \
 		echo $$i ; \
 		mftext $$i > /dev/null ; \
