@@ -119,7 +119,7 @@ FEATURE_DEVS=filter.dev dps.dev level2.dev
 
 # Choose the device(s) to include.  See devs.mak for details.
 
-DEVICE_DEVS=x11.dev epson.dev ljet2p.dev tiffg3.dev
+DEVICE_DEVS=x11.dev epson.dev ljet2p.dev ljet3.dev tiffg3.dev
 DEVICE_DEVS9=pbm.dev pbmraw.dev pgm.dev pgmraw.dev ppm.dev ppmraw.dev bit.dev
 
 # ---------------------------- End of options --------------------------- #
