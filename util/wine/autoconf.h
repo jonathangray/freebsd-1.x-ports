@@ -2,5 +2,5 @@
 
 
 
-#define WINE_INI_GLOBAL "/usr/ports/util/wine/wine.ini"
+#define WINE_INI_GLOBAL "/usr/local/etc/wine.ini"
 #define AutoDefines  
