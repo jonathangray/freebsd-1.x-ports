@@ -1,0 +1,178 @@
+#
+# Tests for "toaster" example
+# ----------------------------------------------------------------------
+#   AUTHOR:  Michael J. McLennan       Phone: (610)712-2842
+#            AT&T Bell Laboratories   E-mail: michael.mclennan@att.com
+#
+#      RCS:  toaster.test,v 1.1.1.1 1994/03/21 22:09:50 mmc Exp
+# ----------------------------------------------------------------------
+#               Copyright (c) 1993  AT&T Bell Laboratories
+# ======================================================================
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted,
+# provided that the above copyright notice appear in all copies and that
+# both that the copyright notice and warranty disclaimer appear in
+# supporting documentation, and that the names of AT&T Bell Laboratories
+# any of their entities not be used in advertising or publicity
+# pertaining to distribution of the software without specific, written
+# prior permission.
+#
+# AT&T disclaims all warranties with regard to this software, including
+# all implied warranties of merchantability and fitness.  In no event
+# shall AT&T be liable for any special, indirect or consequential
+# damages or any damages whatsoever resulting from loss of use, data or
+# profits, whether in an action of contract, negligence or other
+# tortuous action, arising out of or in connection with the use or
+# performance of this software.
+# ======================================================================
+
+# ----------------------------------------------------------------------
+#  Get toaster classes from "demos" directory.
+# ----------------------------------------------------------------------
+lappend auto_path ../demos/toasters
+
+# ----------------------------------------------------------------------
+#  Outlets send bills to an e-mail address.  Determine this address.
+# ----------------------------------------------------------------------
+if {[info exists env(USER)]} {
+	set Owner $env(USER)
+} elseif {[info exists env(LOGNAME)]} {
+	set Owner $env(LOGNAME)
+} else {
+	set Owner [exec logname]
+}
+
+# ----------------------------------------------------------------------
+#  TOASTERS
+# ----------------------------------------------------------------------
+test {Create a toaster and plug it in} {
+	global Owner
+	Toaster original -heat 1 -outlet [Outlet #auto -owner $Owner]
+} {
+	$result == "original"
+}
+
+test {Turn up the heat setting on the toaster} {
+	original config -heat 5
+} {
+	$result == ""
+}
+
+test {Toast a few slices of bread} {
+	original toast 2
+} {
+	$result == "crumb tray: 25% full"
+}
+
+test {Clean the toaster} {
+	original clean
+} {
+	$result == "crumb tray: 0% full"
+}
+
+test {Toast a few slices of bread a few different times} {
+	original clean
+	original toast 2
+	original toast 1
+} {
+	$result == "crumb tray: 38% full"
+}
+
+test {Toast too many slices of bread and cause a fire} {
+	puts stdout ">>> should say \"== FIRE! FIRE! ==\""
+	original clean
+	original toast 2
+	original toast 2
+	original toast 2
+	original toast 2
+} {
+	$result == "crumb tray: 100% full"
+}
+
+test {Destroy the toaster} {
+	original clean
+	original toast 2
+	original toast 1
+	puts stdout ">>> should say \"15 crumbs ... what a mess!\""
+	original delete
+} {
+	$result == ""
+}
+
+# ----------------------------------------------------------------------
+#  SMART TOASTERS
+# ----------------------------------------------------------------------
+test {Create a toaster and plug it in} {
+	global Owner
+	SmartToaster deluxe -heat 4 -outlet [Outlet #auto -owner $Owner]
+} {
+	$result == "deluxe"
+}
+
+test {Toast a few slices of bread} {
+	deluxe toast 2
+} {
+	$result == "crumb tray: 20% full"
+}
+
+test {Toast a few slices of bread and look for auto-clean} {
+	deluxe clean
+	deluxe toast 2
+	deluxe toast 2
+	deluxe toast 2
+	deluxe toast 2
+	deluxe toast 2
+} {
+	$result == "crumb tray: 20% full"
+}
+
+# ----------------------------------------------------------------------
+#  PRODUCT STATISTICS
+# ----------------------------------------------------------------------
+test {Check statistics gathered by Hazard base class} {
+	set tmp [Toaster #auto]
+	set stats [Hazard :: report Toaster]
+	$tmp delete
+	set stats
+} {
+	$result == "Toaster: 2 produced, 1 active, 1 accidents"
+}
+
+test {Check statistics gathered by Hazard base class} {
+	Hazard :: report SmartToaster
+} {
+	$result == "SmartToaster: 1 produced, 1 active, 0 accidents"
+}
+
+test {Destroy all Toasters} {
+	foreach toaster [itcl_info objects -isa Toaster] {
+		$toaster clean
+		$toaster delete
+	}
+} {
+	$result == ""
+}
+
+test {SmartToasters should have been destroyed along with Toasters} {
+	itcl_info objects -class SmartToaster
+} {
+	$result == ""
+}
+
+# ----------------------------------------------------------------------
+#  OUTLETS
+# ----------------------------------------------------------------------
+test {Bill all customers for outlet charges} {
+	Outlet :: bill
+	puts stdout ">>> should send two bills for outlets via e-mail"
+} {
+	$result == ""
+}
+
+test {Destroy all outlets} {
+	foreach outlet [itcl_info objects -class Outlet] {
+		$outlet delete
+	}
+} {
+	$result == ""
+}

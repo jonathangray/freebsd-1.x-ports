@@ -1,0 +1,137 @@
+#!itcl_wish -f
+# ----------------------------------------------------------------------
+#  PURPOSE:  editor for application foreground/background colors
+#
+#   AUTHOR:  Michael J. McLennan       Phone: (215)770-2842
+#            AT&T Bell Laboratories   E-mail: aluxpo!mmc@att.com
+#
+#     SCCS:  %W% (%G%)
+# ----------------------------------------------------------------------
+#            Copyright (c) 1993  AT&T  All Rights Reserved
+# ======================================================================
+
+# ----------------------------------------------------------------------
+# Set path for autoloader...
+# ----------------------------------------------------------------------
+if {![file exists ./widgets]} {
+	puts stderr "== This demo must be executed in the \"demos\" directory =="
+	exit 1
+}
+lappend auto_path ./widgets
+
+# ----------------------------------------------------------------------
+# Query for all available applications...
+# ----------------------------------------------------------------------
+set applist {}
+foreach app [winfo interps] {
+	set cmd {
+		proc coloredit_get_wins {win} {
+			set winlist $win
+			foreach w [winfo children $win] {
+				eval lappend winlist [coloredit_get_wins $w]
+			}
+			return $winlist
+		}
+	}
+	if {[catch [list send $app \{$cmd\}]] == 0} {
+		lappend applist $app
+	}
+}
+
+# ----------------------------------------------------------------------
+# USAGE: select_app
+#
+# Invoked whenever a new application (interpreter) is selected.
+# Queries the application for a list of windows and updates the
+# window display box with the new list.
+# ----------------------------------------------------------------------
+proc select_app {app state} {
+	switch $state {
+		on {
+			if {[catch [list send $app coloredit_get_wins .] winlist] == 0} {
+				.wins config -list $winlist
+			}
+		}
+		off {
+			.wins config -list {}
+		}
+	}
+}
+
+# ----------------------------------------------------------------------
+# USAGE: apply_color
+#
+# Queries the current color from the color editor and the current
+# window from the window list, and sends a configuration message
+# over to that window to change colors.
+# ----------------------------------------------------------------------
+proc apply_color {} {
+	global Aspect
+
+	set app [.apps get selected]
+	set wins [.wins get selected]
+	set color [.hsv get]
+
+	if {$app != ""} {
+		foreach w $wins {
+			catch [list send $app $w config -$Aspect $color]
+		}
+	}
+}
+
+# ----------------------------------------------------------------------
+#  Build main window...
+# ----------------------------------------------------------------------
+message .intro -aspect 200 -bg seashell -text "This application can be used to modify the colors associated with widgets in another Tcl/Tk application.  Select an application from the \"Applications\" box, and select one or more widgets from the \"Windows\" box.  Compose a color using the HSV color editor, and then press \"Apply\" to transmit the new color value to the selected widgets.\n\nThis is an example of how a simple application can be constructed using \"mega-widgets\" written in \[incr Tcl\].  This window contains three \"mega-widgets\":\n\n     - a FilteredBox displaying application names (.apps)\n     - a FilteredBox displaying window names (.wins)\n     - a ColorEditor for composing color samples (.hsv)\n\nThese widgets were constructed by combining other primitive widgets.  Their control syntax is such that they look exactly like normal Tk widgets.  (Examine the source code for this application for example usage.)"
+
+FilteredBox .apps -title "Applications" -list $applist \
+	-mode single -action select_app
+
+FilteredBox .wins -title "Windows" -mode multi
+
+ColorEditor .hsv -size 2i
+
+frame .aspect -borderwidth 4
+radiobutton .aspect.fg -text "Foreground" -relief flat \
+	-variable Aspect -value "foreground"
+radiobutton .aspect.bg -text "Background" -relief flat \
+	-variable Aspect -value "background"
+radiobutton .aspect.af -text "Active Foreground" -relief flat \
+	-variable Aspect -value "activeforeground"
+radiobutton .aspect.ab -text "Active Background" -relief flat \
+	-variable Aspect -value "activebackground"
+pack append .aspect \
+	.aspect.fg {top frame w} \
+	.aspect.bg {top frame w} \
+	.aspect.af {top frame w} \
+	.aspect.ab {top frame w}
+.aspect.fg select
+
+frame .control -borderwidth 2 -relief raised
+frame .control.buttons -borderwidth 5 -relief flat
+button .control.apply -text " Apply " -command "apply_color"
+button .control.quit -text " Quit " -command "exit"
+pack append .control.buttons \
+	.control.apply {left padx 20} \
+	.control.quit {left padx 20}
+pack append .control .control.buttons {top frame c}
+
+frame .appstuff
+lower .appstuff
+pack append .appstuff \
+	.apps {left expand fill} \
+	.wins {left expand fill}
+
+frame .colorstuff
+lower .colorstuff
+pack append .colorstuff \
+	.hsv {left fill} \
+	.aspect {left frame c}
+
+pack append . \
+	.intro {top expand fill} \
+	.appstuff {top expand fill} \
+	.colorstuff {top frame c} \
+	.control {bottom fillx}
+
+wm min . 0 0

@@ -1,0 +1,166 @@
+#!itcl_wish -f
+# ----------------------------------------------------------------------
+#  PURPOSE:  color selection lists (demo for [incr Tcl] facilities)
+#
+#   AUTHOR:  Michael J. McLennan       Phone: (215)770-2842
+#            AT&T Bell Laboratories   E-mail: aluxpo!mmc@att.com
+#
+#     SCCS:  %W% (%G%)
+# ----------------------------------------------------------------------
+#            Copyright (c) 1993  AT&T  All Rights Reserved
+# ======================================================================
+
+# ----------------------------------------------------------------------
+# Set path for autoloader...
+# ----------------------------------------------------------------------
+if {![file exists ./widgets]} {
+	puts stderr "== This demo must be executed in the \"demos\" directory =="
+	exit 1
+}
+lappend auto_path ./widgets
+
+# ----------------------------------------------------------------------
+# Define two color lists to illustrate "config" methods...
+# ----------------------------------------------------------------------
+set simplecolors [list black white yellow blue red green purple orange]
+
+set allcolors [list \
+	snow GhostWhite WhiteSmoke gainsboro FloralWhite OldLace linen \
+	AntiqueWhite PapayaWhip BlanchedAlmond bisque PeachPuff NavajoWhite \
+	moccasin cornsilk ivory LemonChiffon seashell honeydew MintCream \
+	azure AliceBlue lavender LavenderBlush MistyRose white black \
+	DarkSlateGray DimGray SlateGray LightSlateGray gray LightGray \
+	MidnightBlue NavyBlue CornflowerBlue DarkSlateBlue SlateBlue \
+	MediumSlateBlue LightSlateBlue MediumBlue RoyalBlue blue DodgerBlue \
+	DeepSkyBlue SkyBlue LightSkyBlue SteelBlue LightSteelBlue LightBlue \
+	PowderBlue PaleTurquoise DarkTurquoise MediumTurquoise turquoise \
+	cyan LightCyan CadetBlue MediumAquamarine aquamarine DarkGreen \
+	DarkOliveGreen DarkSeaGreen SeaGreen MediumSeaGreen LightSeaGreen \
+	PaleGreen SpringGreen LawnGreen green chartreuse MediumSpringGreen \
+	GreenYellow LimeGreen YellowGreen ForestGreen OliveDrab DarkKhaki \
+	khaki PaleGoldenrod LightGoldenrodYellow LightYellow yellow gold \
+	LightGoldenrod goldenrod DarkGoldenrod RosyBrown IndianRed SaddleBrown \
+	sienna peru burlywood beige wheat SandyBrown tan chocolate firebrick \
+	brown DarkSalmon salmon LightSalmon orange DarkOrange coral LightCoral \
+	tomato OrangeRed red HotPink DeepPink pink LightPink PaleVioletRed \
+	maroon MediumVioletRed VioletRed magenta violet plum orchid MediumOrchid \
+	DarkOrchid DarkViolet BlueViolet purple MediumPurple thistle \
+]
+
+# ----------------------------------------------------------------------
+#  PROC:  update_color_sample sampleFrame colorName state
+#
+#  Used as the action for SelectBox and FilteredBox widgets.
+#  Invoked whenever an entry in the list is selected/deselected to update
+#  a bar of color samples drawn above the selection list.  Illustrates
+#  how action commands can be associated with list selection.
+# ----------------------------------------------------------------------
+proc update_color_sample {sample color state} {
+	switch $state {
+		on {
+			if {[catch "frame $sample.x$color -bg $color \
+						-geometry 3x20 -borderwidth 2 \
+						-relief raised"] == 0} {
+				pack append $sample $sample.x$color {left expand fill}
+			}
+		}
+		off {
+			catch "destroy $sample.x$color"
+		}
+	}
+}
+
+# ----------------------------------------------------------------------
+#  Build main window...
+# ----------------------------------------------------------------------
+message .intro -aspect 800 -bg seashell -text "This is a simple demonstration of three new widgets created entirely with Tcl code using \[incr Tcl\].  It demonstrates the following:\n  - new widget classes can be created by combining simple widgets into a \"mega-widget\", without introducing new C code\n  - inheritance allows widgets to be specialized\n\nNote that \[incr Tcl\] is more than a mega-widget builder.  Object-oriented programming techniques can be used to better encapsulate Tcl code in all kinds of applications."
+
+# ----------------------------------------------------------------------
+#  Make a plain display list of color names...
+# ----------------------------------------------------------------------
+frame .plain
+frame .plain.sample -borderwidth 5 -geometry 50x30
+frame .plain.mesg -borderwidth 5
+message .plain.mesg.text -justify center -width 300 -bg seashell \
+	-text "class: ListBox\n\nDisplays a list of items with a scrollbar that appears automatically whenever list is longer than display area.\n\n"
+pack append .plain.mesg .plain.mesg.text {top fill}
+
+ListBox .plain.box -list $allcolors
+
+pack append .plain \
+	.plain.sample {top fillx} \
+	.plain.mesg {top filly} \
+	.plain.box {top expand fill}
+
+# ----------------------------------------------------------------------
+#  Make a selection box with color names...
+# ----------------------------------------------------------------------
+frame .select
+frame .select.sample -borderwidth 5 -geometry 50x30
+frame .select.mesg -borderwidth 5
+message .select.mesg.text -justify center -width 300 -bg seashell \
+	-text "class: SelectBox\nDerived from class ListBox\n\nAdds interactive selection of list items.  Can be configured for \"single\" or \"multi\" select, and can have a Tcl command associated with the selection action."
+pack append .select.mesg .select.mesg.text {top fill}
+
+SelectBox .select.box -list $allcolors \
+	-action "update_color_sample .select.sample"
+
+pack append .select \
+	.select.sample {top fillx} \
+	.select.mesg {top filly} \
+	.select.box {top expand fill}
+
+# ----------------------------------------------------------------------
+#  Make a filtered selection box with color names...
+# ----------------------------------------------------------------------
+frame .filtered
+frame .filtered.sample -borderwidth 5 -geometry 50x30
+frame .filtered.mesg -borderwidth 5
+message .filtered.mesg.text -justify center -width 300 -bg seashell \
+	-text "class: FilteredBox\nContains a SelectBox\n\nAdds filtering facilities which restrict the list of displayed items to those matching a string pattern.\n"
+pack append .filtered.mesg .filtered.mesg.text {top fill}
+
+FilteredBox .filtered.box -list $allcolors \
+	-action "update_color_sample .filtered.sample" \
+	-title "Select colors" -filter "*"
+
+pack append .filtered \
+	.filtered.sample {top fillx} \
+	.filtered.mesg {top filly} \
+	.filtered.box {top expand fill}
+
+# ----------------------------------------------------------------------
+#  Pack into main window
+# ----------------------------------------------------------------------
+frame .boxes -borderwidth 5
+lower .boxes
+pack append .boxes \
+	.plain {left expand fill} \
+	.select {left expand fill} \
+	.filtered {left expand fill}
+
+button .all -text "All Colors" -command \
+	".plain.box config -list [list $allcolors]; \
+	 .select.box config -list [list $allcolors]; \
+	 .filtered.box config -list [list $allcolors]"
+
+button .simple -text "Simple Colors" -command \
+	".plain.box config -list [list $simplecolors]; \
+	 .select.box config -list [list $simplecolors]; \
+	 .filtered.box config -list [list $simplecolors]"
+
+button .quit -text "Quit" -command "exit"
+
+frame .controls -borderwidth 5
+lower .controls
+pack append .controls \
+	.simple {left padx 5} \
+	.all {left padx 5} \
+	.quit {left padx 10}
+
+pack append . \
+	.intro {top fill} \
+	.boxes {top expand fill} \
+	.controls {top frame n fillx}
+
+wm min . 0 0

@@ -1,0 +1,168 @@
+#
+# Tests for "uplevel" across interpreter boundaries
+# ----------------------------------------------------------------------
+#   AUTHOR:  Michael J. McLennan       Phone: (610)712-2842
+#            AT&T Bell Laboratories   E-mail: michael.mclennan@att.com
+#
+#      RCS:  uplevel.test,v 1.1.1.1 1994/03/21 22:09:52 mmc Exp
+# ----------------------------------------------------------------------
+#               Copyright (c) 1993  AT&T Bell Laboratories
+# ======================================================================
+# Permission to use, copy, modify, and distribute this software and its
+# documentation for any purpose and without fee is hereby granted,
+# provided that the above copyright notice appear in all copies and that
+# both that the copyright notice and warranty disclaimer appear in
+# supporting documentation, and that the names of AT&T Bell Laboratories
+# any of their entities not be used in advertising or publicity
+# pertaining to distribution of the software without specific, written
+# prior permission.
+#
+# AT&T disclaims all warranties with regard to this software, including
+# all implied warranties of merchantability and fitness.  In no event
+# shall AT&T be liable for any special, indirect or consequential
+# damages or any damages whatsoever resulting from loss of use, data or
+# profits, whether in an action of contract, negligence or other
+# tortuous action, arising out of or in connection with the use or
+# performance of this software.
+# ======================================================================
+
+# ----------------------------------------------------------------------
+#  DEFINE SOME USEFUL ROUTINES
+# ----------------------------------------------------------------------
+proc uplevelTest_show_var {level var} {
+	return "$var>>[uplevel $level set $var]"
+}
+
+proc uplevelTest_do {cmd} {
+	eval $cmd
+}
+
+# ----------------------------------------------------------------------
+#  CREATE SOME OBJECTS
+# ----------------------------------------------------------------------
+Foo foo
+Baz baz
+
+# ----------------------------------------------------------------------
+#  UPLEVEL TESTS (main interp)
+# ----------------------------------------------------------------------
+test {"uplevel" can access global variables (via relative level)} {
+	set globalvar "global value"
+	uplevelTest_show_var 1 globalvar
+} {
+	$result == "globalvar>>global value"
+}
+
+test {"uplevel" can access global variables (via "#0")} {
+	set globalvar "global value"
+	uplevelTest_show_var #0 globalvar
+} {
+	$result == "globalvar>>global value"
+}
+
+test {"uplevel" can access local variables (via relative level)} {
+	uplevelTest_do {
+		set localvar "local value"
+		uplevelTest_show_var 1 localvar
+	}
+} {
+	$result == "localvar>>local value"
+}
+
+test {"uplevel" can access local variables (via relative level)} {
+	uplevelTest_do {
+		set localvar "proper value"
+		uplevelTest_do {
+			set localvar "not this one"
+			uplevelTest_show_var 2 localvar
+		}
+	}
+} {
+	$result == "localvar>>proper value"
+}
+
+test {"uplevel" can access local variables (via explicit level)} {
+	uplevelTest_do {
+		set localvar "local value"
+		uplevelTest_show_var #1 localvar
+	}
+} {
+	$result == "localvar>>local value"
+}
+
+# ----------------------------------------------------------------------
+#  UPLEVEL TESTS (across class interps)
+# ----------------------------------------------------------------------
+test {"uplevel" can cross class interps to access global variables} {
+	set globalvar "global value"
+	foo do {
+		uplevel #0 uplevelTest_show_var 1 globalvar
+	}
+} {
+	$result == "Foo says 'globalvar>>global value'"
+}
+
+test {"uplevel" can cross several class interps to access global variables} {
+	set globalvar "global value"
+	baz do {
+		foo do {
+			uplevel 2 uplevelTest_show_var #0 globalvar
+		}
+	}
+} {
+	$result == "Baz says 'Foo says 'globalvar>>global value''"
+}
+
+test {"uplevel" finds proper interp for execution} {
+	baz do {
+		foo do {
+			uplevel do {{info class}}
+		}
+	}
+} {
+	$result == "Baz says 'Foo says 'Baz says 'Baz'''"
+}
+
+test {"uplevel" finds proper interp for execution,
+and works in conjunction with "unknown" to access
+commands at the global scope with local call frames} {
+	baz do {
+		set bazvar "value in Baz"
+		foo do {
+			uplevel ::info locals
+		}
+	}
+} {
+	$result == "Baz says 'Foo says 'bazvar cmds''"
+}
+
+# ----------------------------------------------------------------------
+#  LEVEL TESTS (across class interps)
+# ----------------------------------------------------------------------
+test {"info level" works across interp boundaries} {
+	baz do {
+		foo do {
+			info level
+		}
+	}
+} {
+	$result == "Baz says 'Foo says '2''"
+}
+
+test {"info level" works across interp boundaries} {
+	baz do {
+		foo do {
+			info level 0
+		}
+	}
+} {
+	$result == "Baz says 'Foo says 'do {
+			info level 0
+		}''"
+}
+
+# ----------------------------------------------------------------------
+#  CLEAN UP
+# ----------------------------------------------------------------------
+foo delete
+baz delete
