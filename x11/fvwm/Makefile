@@ -316,7 +316,7 @@ install_icons:
 	(cd fvwm_icons ; umask 22 ; cp *.xpm /usr/X386/lib/X11/fvwm/pixmaps;)
 
 install_fvwmrc:
-	(umask 22; cd sample.fvwmrc ; cp * /usr/X386/lib/X11/fvwm ; )
+	(umask 22; cd sample.fvwmrc ; cp *.fvwmrc /usr/X386/lib/X11/fvwm ; )
 
 # -------------------------------------------------------------------------
 # common rules for all Makefiles - do not edit
