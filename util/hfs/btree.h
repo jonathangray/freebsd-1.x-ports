@@ -19,10 +19,17 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: btree.h,v 1.1 1994/05/15 05:44:51 rich Exp $
+// $Id: btree.h,v 1.2 1994/05/15 06:19:12 rich Exp $
 // $Log: btree.h,v $
-// Revision 1.1  1994/05/15 05:44:51  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:12  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:52  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.8  1994/01/11  00:37:39  craigs
 // Removed declaration of ResumeSearch
@@ -57,7 +64,7 @@
 #ifndef _BTREE_H
 #define _BTREE_H
 
-#include "ostream.h"
+#include "iostream.h"
 #include "misc.h"
 #include "mac.h"
 #include "file.h"

@@ -57,7 +57,7 @@ static char sccsid[] = "@(#)glob.c	5.12 (Berkeley) 6/24/91";
 
 #include <sys/types.h>
 
-#if defined(_MSDOS) || defined(WIN32)
+#if defined(_MSDOS) || defined(WIN32) || defined(__FreeBSD__)
 #ifdef _MSC_VER
 #pragma warning(disable:4131) /* Disable warning on K&R headers */
 #pragma warning(disable:4135) /* Disable conversion between integral types (Char -> char) */
@@ -67,10 +67,14 @@ static char sccsid[] = "@(#)glob.c	5.12 (Berkeley) 6/24/91";
 #endif
 
 /* replace stat call */
-/* #include <sys/stat.h> */
+#if defined(__FreeBSD__)
+#include <sys/stat.h>
+#endif
 
 /* implement malloc-style functions */
+#if !defined(__FreeBSD__)
 #include <malloc.h>
+#endif
 #define	xmalloc		malloc
 #define	xrealloc	realloc
 #define	xfree		free
@@ -79,12 +83,14 @@ static char sccsid[] = "@(#)glob.c	5.12 (Berkeley) 6/24/91";
 #include <stdlib.h>
 
 /* include fake "dirent" header */
+#if !defined(__FreeBSD__)
+#include <dirent.h>
+#else
 #include "mdirent.h"
-/* #include <dirent.h>  */
+#endif
 
 #include <ctype.h>
 typedef void * ptr_t;
-/* #endif */
 
 #define Char __Char
 

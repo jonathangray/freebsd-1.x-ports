@@ -19,10 +19,17 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: copy.cxx,v 1.1 1994/05/15 05:44:51 rich Exp $
+// $Id: copy.cxx,v 1.2 1994/05/15 06:19:17 rich Exp $
 // $Log: copy.cxx,v $
-// Revision 1.1  1994/05/15 05:44:51  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:17  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:52  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.8  1994/01/11  00:41:50  craigs
 // Added additional name mangling for MSDOS/NT
@@ -50,11 +57,15 @@
 //
 //
 
-#include <ostream.h>
+#include <iostream.h>
 #include <iomanip.h>
 #include <stdlib.h>
 #include <time.h>
 #include <ctype.h>
+#if defined(__FreeBSD__)
+#include <stdio.h>
+#include <sys/types.h>
+#endif
 #include <sys/stat.h>
 
 #if defined(_MSDOS) || defined(WIN32)

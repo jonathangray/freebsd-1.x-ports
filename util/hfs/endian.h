@@ -19,10 +19,17 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: endian.h,v 1.1 1994/05/15 05:44:51 rich Exp $
+// $Id: endian.h,v 1.2 1994/05/15 06:19:19 rich Exp $
 // $Log: endian.h,v $
-// Revision 1.1  1994/05/15 05:44:51  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:19  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:52  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.3  1994/01/06  03:05:08  craigs
 // Final checkin to include GNU header
@@ -38,19 +45,19 @@
 //
 
 /*
- *  This file defines the primitive data types used to access
- *  data structures on macintosh disks. As the 680x0 class of
- *  of microprocssors is big-endian, we have to ensure that
- *  we access data in this manner.
- *  Also note that the internal storage of these structures is
- *  ALWAYS in terms of "char". This is necessary so that that
- *  compilers won't attempt to move the elements of the structures
- *  out to word boundaries. Similiarly, none of the member functions
- *  in these classes can be made virtual as this would imply a
- *  vtable ptr, adding four bytes (probably) to the size of each
- *  class
- *
- */
+//  This file defines the primitive data types used to access
+//  data structures on macintosh disks. As the 680x0 class of
+//  of microprocssors is big-endian, we have to ensure that
+//  we access data in this manner.
+//  Also note that the internal storage of these structures is
+//  ALWAYS in terms of "char". This is necessary so that that
+//  compilers won't attempt to move the elements of the structures
+//  out to word boundaries. Similiarly, none of the member functions
+//  in these classes can be made virtual as this would imply a
+//  vtable ptr, adding four bytes (probably) to the size of each
+//  class
+//
+*/
 
 #ifndef _ENDIAN_H
 

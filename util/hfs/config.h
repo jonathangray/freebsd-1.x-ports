@@ -19,10 +19,17 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: config.h,v 1.1 1994/05/15 05:44:51 rich Exp $
+// $Id: config.h,v 1.2 1994/05/15 06:19:16 rich Exp $
 // $Log: config.h,v $
-// Revision 1.1  1994/05/15 05:44:51  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:16  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:52  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.5  1994/01/11  00:41:01  craigs
 // Added STRNICMP macro to make strncasecmp portable
@@ -55,7 +62,7 @@
 // default disk device if not set in Makefile
 //
 #ifndef DEFAULT_DISK_DEVICE
-#define DEFAULT_DISK_DEVICE "a:"
+#define DEFAULT_DISK_DEVICE "/dev/rfd0a"
 #endif
 
 //

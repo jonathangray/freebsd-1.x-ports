@@ -19,10 +19,17 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: volume.h,v 1.1 1994/05/15 05:44:53 rich Exp $
+// $Id: volume.h,v 1.2 1994/05/15 06:19:36 rich Exp $
 // $Log: volume.h,v $
-// Revision 1.1  1994/05/15 05:44:53  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:36  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:54  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.5  1994/01/11  00:45:48  craigs
 // Added InvalidateCache call so Filesystem::Unmount will work properly

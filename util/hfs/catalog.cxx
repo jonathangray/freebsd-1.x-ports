@@ -19,10 +19,17 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: catalog.cxx,v 1.1 1994/05/15 05:44:51 rich Exp $
+// $Id: catalog.cxx,v 1.2 1994/05/15 06:19:13 rich Exp $
 // $Log: catalog.cxx,v $
-// Revision 1.1  1994/05/15 05:44:51  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:13  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:52  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.11  1994/01/11  00:38:27  craigs
 // Fixed problem with halting catalog searches on finding filename that
@@ -73,8 +80,16 @@
 #include "fs.h"
 #include "config.h"
 #include <string.h>
+#if defined(__FreeBSD__)
+#include <stdlib.h>
+#include <string.h>
+// strncasecmp is from /usr/include/string.h but is missing in g++/string.h.
+__BEGIN_DECLS
+int	 strncasecmp (const char *, const char *, size_t);
+__END_DECLS
+#else
 #include <malloc.h>
-
+#endif
 
 ///////////////////////////////////////////////////////
 //

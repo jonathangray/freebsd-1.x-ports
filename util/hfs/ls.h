@@ -19,10 +19,17 @@
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
 //
-// $Id: ls.h,v 1.1 1994/05/15 05:44:52 rich Exp $
+// $Id: ls.h,v 1.2 1994/05/15 06:19:28 rich Exp $
 // $Log: ls.h,v $
-// Revision 1.1  1994/05/15 05:44:52  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:28  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:53  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.2  1994/01/06  03:05:08  craigs
 // Final checkin to include GNU header

@@ -18,10 +18,17 @@
 // along with hfs; see the file COPYING.  If not, write to
 // the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.  
 //
-// $Id: mdirent.cxx,v 1.1 1994/05/15 05:44:52 rich Exp $
+// $Id: mdirent.cxx,v 1.2 1994/05/15 06:19:31 rich Exp $
 // $Log: mdirent.cxx,v $
-// Revision 1.1  1994/05/15 05:44:52  rich
-// Initial revision
+// Revision 1.2  1994/05/15 06:19:31  rich
+// hfs for FreeBSD.
+//
+// hfs allows files to be copied off a Macintosh HFS disk on a
+// non-Macintosh computer.  Written by Craig Southeren,
+// geoffw@extro.ucc.su.oz.au.
+//
+// Revision 1.1.1.1  1994/05/15  05:44:53  rich
+// hfs 0.3 from sunsite
 //
 // Revision 1.2  1994/01/06  03:05:08  craigs
 // Final checkin to include GNU header
@@ -34,7 +41,9 @@
 #include "mdir.h"
 #include "status.h"
 #include "fs.h"
+#if !defined(__FreeBSD__)
 #include "malloc.h"
+#endif
 #include "cmd.h"
 
 static Filesystem * mdir_fs;
