@@ -1,0 +1,9 @@
+source $PointTclLibrary/browserMenu.tcl
+source $PointTclLibrary/cmd.tcl
+source $PointTclLibrary/macros.tcl
+source $PointTclLibrary/makeBoxes.tcl
+source $PointTclLibrary/makeMenus.tcl
+source $PointTclLibrary/saveOptions.tcl
+source $PointTclLibrary/subs.tcl
+source $PointTclLibrary/textMenu.tcl
+source $PointTclLibrary/windows.tcl

@@ -1,0 +1,3449 @@
+\documentstyle{article}
+
+% $Header: /a/cvs/386BSD/ports/editor/point/doc/userman.tex,v 1.1 1994/02/15 22:12:47 jkh Exp $
+
+\sloppy
+
+\textwidth      6.5in
+\oddsidemargin  0in
+\evensidemargin 0in
+
+\topmargin      0in
+\headheight     0in
+\headsep        0in
+\textheight     8.5in
+\topskip        0in
+
+\parindent      0in
+\parskip        5pt
+
+\begin{document}
+
+\thispagestyle{empty}
+
+\vspace*{2in}
+
+\begin{center}
+\Huge
+The Point Text Editor for X \\
+\vspace{0.35in}
+\Large
+Version 1.63 \\
+13 Jan 1994 \\
+\vspace{1in}
+Charles Crowley \\
+Computer Science Department \\
+University of New Mexico \\
+Albuquerque, New Mexico 87131 \\
+505-277-5446 (office) or 505-277-3112 (messages) \\
+crowley@cs.unm.edu
+\end{center}
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+
+
+\section{Getting Started}
+
+I like to do most editing tasks with a mouse rather than with the
+keyboard.
+It is easy to find editors that allow you to do all your editing from
+the keyboard but it is much harder to find an editor that will
+allow you to do all your editing with the mouse.
+Point is a text editor for X that uses the mouse much more extensively
+than most text editors.
+You can do almost all editing using only the mouse
+(the one exception is entering new text).
+You can also do almost everything for the keyboard if you prefer.
+I find that a combination of mouse commands and keyboard commands
+allows for the fastest editing,
+The editor was designed for programmers and hence it is optimized
+for browsing programs.
+I find that I spend much more time looking at programs,
+comparing programs and searching for text strings
+than actually editing them in the sense of modifying their text.
+
+Point supports any number of windows and makes it easy to move and copy
+text within and between windows and provides a range of
+search commands.
+Point uses Tcl (tool command language) in its implementation.
+Tcl is the macro language of the editor and provides an interprocess
+communication mechanism as well.
+
+
+
+\subsection{Building Point}
+
+The README file in the Point distribution tells how to build Point.
+It uses the Tk toolkit which should be available from the same ftp
+site you obtained Point from (and from allspice.Berkeley.edu).
+It requires X11 R4 (or R5) but does not use the Xt intrinsics
+or any Xt-based widget set.
+
+
+
+\subsection{Learning about Point}
+
+I recommend you start by reading the manual page and try Point out first.
+The manual page has everything you need to get started using Point
+in a more concise form than here in the reference manual which is
+very detailed (as reference manuals tend to be).
+
+In  sections \ref{sect:browser} and \ref{sect:text}
+I will describe the default configuration of Point.
+This will show you almost all of the features of Point but after
+you are familiar with it you will probably want to customize
+Point to your own tastes.
+In sections \ref{sect:customize1} and \ref{sect:customize2}
+I describe how to customize Point.
+
+
+\subsection{Starting Point}
+
+You start Point with the command:
+\begin{verbatim}
+     point [-nobrowser] [-nb] [file ...]
+\end{verbatim}
+
+Point starts with a file browser (unless you specified the
+{\tt -nobrowser} or {\tt -nb} command line option) and zero
+or more text windows (depending on how many file names you
+put on the command line).
+
+When Point begins it looks for a configuration file first in {\tt .ptrc}
+in your home directory.
+Normally this file consists of the single line of the form:
+\begin{verbatim}
+     source pathName/ptsetup.tcl
+\end{verbatim}
+If Point does not find {\tt .ptrc} then it looks for {\tt ptsetup.tcl}
+in the current directory.
+If Point fails to find that it uses the default {\tt ptsetup.tcl}
+file which is set up when Point is installed.
+
+After reading its startup file, Point looks for a local (per directory)
+setup file named {\tt .ptdirrc} in the current directory.
+If this file is found, it is also read and interpreted.
+
+In fact, whenever Point changes directories, it looks for a {\tt .ptdirrc}
+file in the new directory and reads and interprets it if it is present.
+For example, you might want to change the text colors so you could tell
+from looking at the colors in a window which directory it was started from.
+Or you could open a window displaying an information file for the directory
+you are changing to.
+
+The idea behind this is that that in general you will use
+{\tt .ptrc} so you can start Point from any directory
+and still get your customized version of {\tt ptsetup.tcl}.
+But when you are just starting to use Point it is easiest just
+to have {\tt ptsetup.tcl} in the current directory and Point will
+find it there.
+
+The file {\tt ptsetup.tcl} contains setup information that 
+Point requires to run correctly.
+Point will not work if this file is not found
+and that is why there is a default version for Point
+to use if if cannot find a custom one.
+You can change parts of this file to reconfigure Point.
+The descriptions that follow describe one configuration of Point.
+Most of the behaviors described can be changed by editing {\tt ptsetup.tcl}
+or while Point is running through the PREFS pull down menu.
+This is explained in more detail
+in sections \ref{sect:customize1} and \ref{sect:customize2}.
+
+
+
+\subsection{Communicating with Point While It Is Running}
+
+It is faster to start Point once and always leave it running
+because it takes a fairly long time to start (5 to 15 seconds).
+When Point starts it creates a file browser that can stay on
+your screen.
+When you want to edit a new file you can select it from the
+file browser while point is running.
+
+If the Point executable is named {\tt pt} then it does not start up
+Point but instead tries to communicate with an already running
+copy of Point.\footnote{
+	Thus the Point executable is really two programs in one.
+	I do it this way since separate copies of the executables
+	shared so much library code that it was more efficient
+	in disk space to combine them into one program.}
+The command to use Point this way looks like this:
+\begin{verbatim}
+     pt [-wait] [-w] [-create] [-c] [-digit] [-interp name] [file ...]
+\end{verbatim}
+This command sends a message to Point telling it to open
+a window on each of the specified files.
+The command line options modify the details of how it does this.
+
+Normally {\tt pt} sends a message to {\tt point} to open the windows
+and then exits but
+if {\tt -wait} (or {\tt -w}, its abbreviation) is specified
+{\tt pt} waits for all of the windows it requested to be closed
+and then {\tt pt} will exit.
+If the {\tt -interp} option is specified the next argument is the
+name of the interpreter to which {\tt pt} will send messages.
+The default value is {\tt point}.
+This is only necessary if you rename the Point executable from
+{\tt point} to something else.
+
+Point normally asks the user for verification before it creates
+a new file.
+This verification can be suppressed by the use of the {\tt -create}
+(or {\tt -c}, its abbreviation) option which causes Point to create
+the file without asking (for this file only).
+
+The Point startup file {\tt ptsetup.tcl} defines three variables
+{\tt location1}, {\tt location2} and {\tt location3} which
+specify three window geometries.
+By default, {\tt pt} puts new windows at {\tt location1},
+but {\tt pt} also takes arguments of the form {\tt -1}, {\tt -2}, ...
+{\tt -9} and will place the windows of subsequent file names
+in the respective {\tt locationN}.
+You can specify as many of these {\tt -N} flags and filenames
+as arguments.
+Each {\tt locationN} applies to all files that follow it until another
+{\tt locationN} option is encountered.
+
+There are two major uses of {\tt pt}.
+The first is to open a group of files that is easy to specify
+with the shell filename wild card specifications.
+For example you might execute:
+\begin{verbatim}
+     pt *.c
+\end{verbatim}
+as a fast way of opening windows on all the {\tt .c} files.
+The second use of {\tt pt} is to use Point as an editor
+that is called as a subprocess of another program to
+edit a file.
+A primary example is a mail program such as {\tt mail},
+{\tt elm} or {\tt xmail}.
+For such programs you specify ``{\tt pt -w -c}'' as your editor of choice.
+It will start {\tt pt} with a file name of a temporary file
+(for the body of a mail message for example) and {\tt pt} will
+open a Point window on the file and wait until the window is closed.
+
+
+
+
+\section{File Browser Window} \label{sect:browser}
+
+A file browser comes up when Point begins
+(unless you specified the {\tt -nobrowser} command line option).
+You can create new file browsers at any time.
+You can create a file browser from the text window menu.
+If you close all the file browsers and all the text windows
+you can still start up new ones with the {\tt pt} command.
+
+The directory the browser is displaying is the current directory in Point.
+Some Point commands use the current directory.
+For example, the tags command looks in the current directory for
+the {\tt tags} file to use.
+If you open a code file and then change the browser directory,
+the tags command will not find the correct (or any) {\tt tags} file.
+
+It is possible to have several browsers open at the same time.
+If this is the case, the last browser the mouse entered determines
+the current directory.
+This is shown visually by the string {\tt CD:} in front of the directory
+name in the browser title bar.
+
+
+
+\subsection{Screen Layout}
+
+Point puts up two types of main windows: file browsers and text windows.
+A file browser contains a list of all open windows and a list of
+files in the current directory (plus some titles and menus).
+The contents of these windows are described in detail in this and the
+next section.
+
+The defaults for window locations are set up with the following
+screen layout in mind.
+(This can all be changed by the user with setup files.)
+There are four main places for windows:
+the northeast, northwest, southeast and southwest quadrants of the screen.
+The southeast and southwest quadrants contain xterm windows,
+a file browser is in the upper middle between the northwest quadrant and the
+northeast quadrant
+and the northwest and northeast quadrants contains stacks of text windows.
+Normally you only look at one text window at a time so they are
+stacked on top of one another.
+When you need to look at two windows simultaneously you put one
+in the northeast quadrant and the other in the northwest quadrant.
+You can zoom the windows vertically while you are working on
+them to see more text.
+
+
+
+\subsection{Title bar}
+
+Point assumes the window manager will provide a title bar for
+each file browser.
+The name of the window is set to the name of the directory
+displayed in the file browser window.
+The ``\verb+~+'' notation for your home directory is used in
+the directory name in the title bar.\footnote{
+	The format of the title line can be specified by the user.
+	See the {\it titleFormat} and {\it browserIconFormat} options.}
+
+
+
+\subsection{Open window list}
+
+This pane shows the names of the files in the open windows.
+This list is both for your reference and for topping and moving the
+listed windows.
+Clicking on the name of an open window with the left mouse button
+will bring that window to the top of the stacking order
+and move it to geometry 502x460+0+0.
+The middle and right mouse buttons will move the window to different
+predefined locations on the screen.
+Clicking on a file name in the open window pane with the middle
+(or right) mouse button causes the window to be moved to the second (or third)
+predefined window locations with geometry 502x460-200+465
+(or 502x460-0+0).\footnote{These geometries and the effect each each
+mouse button can be redefined using the ptsetup.tcl startup file
+or through the PREFS menu.}
+
+An asterisk ({\tt *}) is put at the end of the file name
+if the file has been edited but not yet saved.
+
+The open window list is made three lines long when the browsers is created.
+It has a scroll bar so you can scroll if there there more than three
+lines but sometimes you want to have more or fewer lines.
+You can increase the number of lines in the open window list by
+clicking on the two arrow buttons above the list.
+The up arrow reduced the size of the open window list and the down
+arrow increases it.
+The extra lines are taken from (or given to) the file list.
+
+
+
+\subsection{File browser menu bar}
+
+A menu of file selection commands appears above the list of files.
+In this section we will go through each menu and item and
+give (in parentheses) the Point name
+for the command and a short description of the command.
+A later section in this manual describes all the Point commands in detail.
+
+This describes the file browser menu using the default Point
+configuration file {\tt ptsetup.tcl}.
+The menu bar contains only three items because the browser is
+is a single column list of file names and is thin.
+
+\begin{description}
+
+\item[MENU] (pull down menu)
+This menu provides access to most of the other menus.
+They are all pull right menus and are described below.
+
+\item[DIRS] (pull down menu)
+This is the same as the DIRS pull right menu described below.
+
+\item[New Browser] (Browser)
+This command allows you to create new browsers.
+Each browser will display the current directory.
+If you click with the middle mouse button you get a browser right
+next to the initial one.
+If you click with the right mouse button you get a browser one browser
+width away from the initial one.
+If you click with the left mouse button you get a browser in the same
+position as the initial one.
+
+
+\item[PREFS] (pull right menu)
+This pull right menu contains a number of cascaded submenus which are
+noted by a {\tt =>} at the end of the item name.
+When the mouse is moved to such an item the submenu appears beside
+the item.
+An item ending in ``{\tt ...}'' will bring up a dialogue box
+and is used for options that require you to type in a string.
+There are also check boxes for boolean options and radio buttons
+for ``one-of-several'' options.
+Most Point options can be changed (or examined) from this menu.
+
+\item[SHELL/PTY] (pull right menu)
+This pull right menu contains four commands that allow you to
+run other Unix programs inside a Point window.
+``{\tt Run csh in window}'' creates anew window and runs a csh in it.
+``{\tt Run csh in file}'' runs a csh in the window containing the selection.
+``{\tt Run and replace selection}'' and ``{\tt Run selection in file}''
+both run the selected Unix command in the window containing the
+selection.
+While the program is running all input to the window (e.g., keystrokes)
+is sent to the program running in the window and all output from
+that program is inserted in the file in the window.
+
+\item[New Window] (OpenFileOrCD)
+This uses the current X selection as the name of a file or a directory.
+If it is a file, Point will open a new window on that file.
+If it is a directory then the file browser will change to that directory.
+The X selection is the one made most recently and can be
+from any program that can claim the X selection.
+For example you can select a name in an {\tt xterm} window
+and open the file (or change to the directory) with this command.
+The list of files in the file browser claims the X selection for
+a file name you select so if you click on a file name and
+the click on this command that file will be opened.
+
+\item[DIRS] (pull right menu) (CD directoryName)
+This is a menu of directories you can jump to by selecting a menu item.
+You will want to put the directories you go to frequently
+on this list.
+You can do that by editing the {\tt ptsetup.tcl} file.
+
+\item[MISC] (pull right menu)
+This is a menu of commands that are used  infrequently.
+	\begin{description}
+
+	\item[Change key bindings ...] (MakeKeyBindingsBox)
+	Pops up a dialogue box that allows you to change the
+	bindings of any key.
+	First you specify the command to bind to the key.
+	There is a scrolling list of common ones but you can type
+	in any command into the text box.
+	Arguments are shown for the commands but this is only for
+	your reference; the arguments will not be copied into
+	the text entry field when you click on the command.
+	Only the command is given in the first text box so if you
+	want to give the command some arguments.
+	These must be fixed arguments because you will be invoking the
+	command with a keystroke.
+	Finally you give the key to bind to.
+	The scrolling list has almost all of the keys you are likely to
+	want to bind.
+	Remember that you can find out the ``official'' X windows
+	name of any key on your keyboard by running {\tt xev}, moving
+	the mouse inside the xev window, pressing the key and noting
+	the name in the information printed in the {\tt xterm} window you
+	started {\tt xev} from.
+
+	\item[Save Point Options ...] (MakeSaveOptionsBox)
+	This allows you to write a file that contains the current
+	setting of all Point options.
+	This is a tcl file that can be read at startup to reestablish
+	these options.
+
+	\item[Load scratch file] (OpenWindow scratch \$location1 doNotAsk)
+	This is a convenience function to pop up a window with a scratch
+	file in it.
+
+	\item[About Point ...] (MakeAboutBox)
+	Pop up a dialogue box giving information about
+	the version of Point you are using.
+
+	\item[Cancel copy mode] (CancelModes)
+	Cancel duplicate (also called copy) mode.
+
+	\item[Print Statistics] (PrintStats)
+	Print some statistics about the effectiveness of Point's caches.
+
+	\item[Delete File] (exec rm [selection get])
+	Delete the selected file.  A convenience function.
+
+	\item[Insert ASCII ...] (MakeAsciiBox)
+	Begin up a dialogue box that allows you to insert
+	a character using its numerical ASCII code in decimal.
+
+	\item[Save All Unsaved Files] (SaveAllFiles)
+	Save all files that have been edited but not yet saved.
+
+	\item[Set debug ...] (MakeDebugBox)
+	Set an internal debugging variable.
+	This usually has no effect in distributed versions.
+
+	\item[Information] (print [Sel get])
+	Display (in the {\tt xterm} window Point was started in)
+	the character position
+	of the first and last characters of the selection.
+
+	\item[6x13] (BrowserFont 6x13)
+	Change the font used in the file browser for displaying
+	file names to {\tt 6x13}.
+
+	\item[6x13bold] (BrowserFont 6x13bold)
+	Change the font used in the file browser for displaying
+	file names to {\tt 6x13bold}.
+
+	\item[5x8] (BrowserFont 5x8)
+	Change the font used in the file browser for displaying
+	file names to {\tt 5x8}.
+
+	\item[*clean-medium-r*6*50*] (BrowserFont *clean-medium-r*6*50*)
+	Change the font used in the file browser for displaying
+	file names to a font that is about the smallest font in
+	X that might be considered legible by some people.
+	This will allow you to see a LOT of file names.
+
+	\item[8x13] (BrowserFont 8x13)
+	Change the font used in the file browser for displaying
+	file names to {\tt 8x13}.
+
+	\end{description}
+
+\item[ Refresh w/* ] (Option set filePattern *)
+This causes the list of files to be regenerated.
+It is used when you know the directory has changed.
+Point does not monitor changes in the directory being
+displayed so this allows you to be sure you are seeing
+an accurate file name list.
+
+\item[New Browser] (Browser)
+Creates a new file browser.
+
+\item[Del file] (exec rm [selection get])
+Deletes the selected file.
+
+\item[Close] (CloseBrowser)
+Close this file browser but do not exit Point.
+
+\item[QUIT] (pull right menu)
+This command brings up a menu that allows you to choose one of
+three ways of quitting Point.
+You can automatically save all unsaved files,
+discard the edits for all unsaved files
+or have Point ask you individually whether to save
+each unsaved file.
+
+\end{description}
+
+
+
+\subsection{File list}
+
+The largest pane of the file browser window contains a list of files
+and directories in the current directory.
+The directories are listed first and are displayed with a ``{\tt /}''
+appended to the directory name.
+You can change directories by double clicking on the directory name
+in the file list.
+(You can also jump directly to some directories using the ``DIRS''
+menu from the menu line.)
+If you double click with the left mouse button the browser changes its
+display to that directory.
+If you double click with the middle mouse button a new browser is created
+in the position next to the initial browser.
+That new browser will display the directory you double clicked on.
+If you double click with the right mouse button a new browser is created
+in the position one browser width over from the position
+of the initial browser.
+
+If you select a file name from the list, it is highlighted,
+and it the object of the next command from the menu bar.
+It also becomes the X (primary) selection and can be pasted
+into an {\tt xterm} window by clicking the middle mouse button.
+If you double click on a file name a new window is created
+that shows that file.
+Double clicking on a file name is the most common way to open a new window.
+
+If you double click on the file name with the left
+mouse button the new window is placed in the first predefined
+location (geometry of 502x460+0+0).
+If you click with the middle mouse button you get the second
+predefined location (geometry of 502x460-200+465) and the right mouse
+button gets you the third predefined location (geometry of 502x460-0+0).
+These are the same locations you get for existing windows by clicking
+on their names in the open window list.\footnote{
+Remember that these locations and the meaning of the various mouse
+button clicks can be changed by editing the startup file ptsetup.tcl.}
+
+The scroll bar in the file list (and the open window list) can
+work in two distinct ways.
+See \ref{sect:scrolling} for more information on this.
+
+
+
+\subsection{Typical usage of the file browser window}
+
+The main use of a file browser is to select file names of files to open.
+Double clicking on a file name opens a window on that file.
+The {\tt twm} window manager has a vertical zoom function
+that is handy for quickly expanding and reducing
+the file browser window.
+
+Typically I open most windows in the NW position ---
+my main position for windows.
+I usually zoom vertically the NW window I am currently looking at and unzoom
+it when I finish using the window or
+when I need to use the SW quadrant.
+Zooming and unzooming is easy with the {\tt twm} window manager
+or with the Point {\tt Zoom} command.
+I open a window in the NE quadrant when I want to use it
+together with the window in the NW quadrant.
+For example, if I am copying code from one window to another
+or if I am looking up a definition of a procedure or global
+data object.
+
+A typical situation would be the case where I want to add a
+timeout to some part of the code (say to do auto-repeating).
+I get the window in which I want to put the timeout in the NW quadrant
+and in the NE quadrant I put up a window containing a file where
+I have already implemented a timeout facility.
+Rather than look up how to use the facility in the manual,
+I just copy the setup calls and the timeout callback procedures
+and modify them for the current situation.
+Then I might bring up the resource file in the NE quadrant
+and modify it by adding resources for the new widgets I am adding.
+
+If I need to look at three files at the same time or if I need
+to quickly look at another file while already looking at two files,
+I use the SE quadrant location.
+
+The ``New Window'' command can be used if you have the name of the
+desired file in a window somewhere, either in a Point text
+window or in an {\tt xterm} window or any window that sets the
+X primary selection.
+{\it But remember:} relative path name must be relative to the directory
+shown in the file browser window since that is Point's
+working directory.
+
+The DIRS menu allows you to move around the file tree
+by jumps --- it contains the names of directories
+you use a lot.\footnote{
+Point caches directory listings so if you jump to a directory
+that you have seen before (and it hasn't changed since then)
+it should come up pretty fast.}
+You can also move up and down the directory tree
+by clicking on directory names (including {\tt ../}) in the file name listing.
+
+
+\subsection{ Tk Window Hierarchy for a Browser Window}
+
+It is sometimes useful to know the names of the parts of a browser
+window.
+In the following hierarchy the Tk window name is given first and
+then the Tk widget type in parentheses.
+
+.bwNNNNN (toplevel) --- The ``NNNNN'' is a window number.
+	Window numbers are unique across both browser
+	and text windows and start with ``00001''.
+	\begin{itemize}
+	\item .bwNNNNN.openList (frame) --- the list of open windows
+		\begin{itemize}
+		\item .bwNNNNN.openList.scroll (scrollbar)
+		\item .bwNNNNN.openList.list (listbox)
+		\end{itemize}
+	\item .bwNNNNN.menu (frame) --- this contains some number of buttons:
+		\begin{itemize}
+		\item .bwNNNNN.menu.buttonName (button) ---
+			``buttonName'' is given in the menu specification
+		\item .bwNNNNN.menu.menuName (menubutton) ---
+			``menuName'' is given in the menu specification
+			\begin{itemize}
+			\item .bwNNNNN.menu.menuName.m (menu)
+			\end{itemize}
+		\end{itemize}
+	\item .bwNNNNN.fileList (frame) --- the list of files in
+			the directory
+		\begin{itemize}
+		\item .bwNNNNN.fileList.scroll (scrollbar)
+		\item .bwNNNNN.fileList.list (listbox)
+		\end{itemize}
+	\end{itemize}
+
+
+
+\section{Text Windows} \label{sect:text}
+
+Each open file is displayed in a text window.
+A file can be displayed in several windows at the same time.
+Point will keep the display in each window consistent
+with the other windows showing the same file.
+Text windows can be moved and resized with the window manager.
+
+\subsection{The Active Window}
+
+One of the text windows on the screen will be the {\em active window}.
+This is the window that commands act on.
+The last window the mouse sprite entered is the active window.
+If you execute a command from the menu in a window then the commands
+will always affect that window
+(because the mouse cursor must be in that window in order to
+access the menu).
+The active window has a ``@'' as the first character of its
+title bar.
+
+
+\subsection{Text Window Menu Bar}
+
+The menu bar contains both direct commands and pull-down menus.
+Here I will list the commands on the menu bar and briefly
+indicate their function.
+In this section I will describes the menu bar of the default
+Point configuration as specified in the file {\tt ptsetup.tcl}
+distributed with Point.
+All of these commands are described in more detail in a later section.
+The Point command names are in parentheses.
+
+\begin{description}
+
+\item[FILE] A menu of file and window related commands.
+	\begin{description}
+
+	\item[Set text colors ...] (MakeColorBox)
+	A dialogue box is opened which will allow you to
+	change the foreground and background color of normal
+	text and of selected text.
+
+	\item[Set text font $=>$] (pull right menu)
+	A submenu of fonts to change the text font of this window
+	(only).
+
+	\item[PREFS] (pull right menu)
+	This pull right menu contains a number of cascaded submenus which are
+	noted by a {\tt =>} at the end of the item name.
+	When the mouse is moved to such an item the submenu appears beside
+	the item.
+	An item ending in ``{\tt ...}'' will bring up a dialogue box
+	and is used for options that require you to type in a string.
+	There are also check boxes for boolean options and radio buttons
+	for ``one-of-several'' options.
+	Most Point options can be changed (or examined) from this menu.
+
+	\item[Zoom vertical] (Zoom)
+	The window is resized to be the full height
+	of the screen (and the same width as it was before).
+
+	\item[Zoom full] (Zoom \{\} full)
+	The window is resized to be the full size of the screen.
+
+	\item[Move window $=>$] (pull right menu)
+	A submenu is displayed allowing you to move
+	the window to one of the four quadrants of
+	the screen.
+	\begin{description}
+
+		\item[Move to NE] (MoveWindow 502x460+0+0)
+
+		\item[Move to NW] (MoveWindow 502x460-200+465)
+
+		\item[Move to SE] (MoveWindow 502x460-0+0)
+
+		\item[Move to SW] (MoveWindow 502x460+0+485)
+
+	\end{description}
+
+	\item[Save file] (SaveFile)
+	The file in the active window is saved to disk.
+
+	\item[Save as ...] (SaveAs)
+	A new name is requested (with a dialogue box)
+	and the file is written to disk with that name.
+
+	\item[Open selected file name] (OpenWindow [selection get])
+	The X selection is used as the name of a file 
+	and a window is opened to display that file.
+	A new window is created even if there is an existing
+	window open on that file.
+
+	\item[Open New Browser ...] (Browser 135x445+510+0)
+	A file browser is created with the specified geometry.
+
+	\item[Close window $=>$] (pull right menu)
+	The window is closed and the submenu selection determines
+	whether the file in the window is automatically saved
+	(if it has been changed), is not saved (even if it has
+	been changed) or if the user is asked whether to save
+	the file (if it has been changed).
+	\begin{description}
+
+		\item[and save] (CloseWindow save)
+
+		\item[and ask] (CloseWindow ask)
+
+		\item[and discard edits] (CloseWindow nosave)
+
+	\end{description}
+
+	\item[About Point ...] (MakeAboutBox)
+	Pop up a dialogue box giving information about
+	the version of Point you are using.
+
+	\item[Quit Point $=>$] (pull right menu)
+	Point is exited and the submenu selection determines
+	whether the changed files are automatically saved
+	(if they have been changed), not saved (even if they have
+	been changed) or if the user is asked whether to save
+	each file (if it has been changed).
+	\begin{description}
+
+		\item[And save all] (QuitPoint save)
+
+		\item[And ask] (MakeQuitBox)
+
+		\item[And discard edits] (QuitPoint discard)
+
+	\end{description}
+
+	\end{description}
+
+\item[EDIT] A menu of editing related commands.
+	\begin{description}
+
+	\item[Insert X selection] (InsertSelectedString)
+	The X (primary) selection is inserted at the
+	insertion point.
+
+	\item[Cancel copy mode] (CancelModes)
+	Cancel copy (also called duplicate) mode.
+
+	\item[Execute Selection as Tcl] (ExecSel)
+		The selection is interpreted by Point's tcl
+		interpreter.  This can be used to define
+		(or redefine) a macro (if the selected text
+		is a macro definition).
+
+	\item[Define Selected Macro] (DefineMacro)
+		The selection will be used as the name of the
+		macro that the {\tt ExecMacro} will run.
+
+	\item[Execute Macro] (ExecMacro)
+		Execute the macro whose name was defined by the
+		{\tt DefineMacro} command.
+
+	\item[Search and Replace ...] (MakeReplaceBox)
+	The command pops up a dialogue box that allows you to search
+	for a string and replace it with another string.
+	The search and replace operation can be interactive
+	(asking you for verification of each replace) or batch.
+
+	\item[Regex Search and Replace ...] (MakeRegexReplaceBox)
+	The command pops up a dialogue box that allows you to search
+	for a string that matches a regular expression
+	and replace it with another string.
+	The search and replace operation can be interactive
+	(asking you for verification of each replace) or batch.
+
+	\item[Indent selected lines] (IndentSelection)
+		A macro that indents (by one tab) every line that
+		is spanned by the selection.
+
+	\item[Outdent selected lines] (IndentSelection 1)
+		A macro that removes the first character of
+		every line that is spanned by the selection.
+
+	\item[Delete $=>$] (pull right menu)
+	A submenu allows you to either:
+	\begin{description}
+
+		\item[Delete to end of line] (DeleteLine) deletes the
+			characters in the line from the selection to
+			the end of the line
+
+		\item[Delete entire line] (DeleteLine 1) deletes the
+			line the selection is on entirely 
+
+		\item[Delete selection] (DeleteToScrap) delete the
+			selection
+
+	\end{description}
+
+	\item[Scrap $=>$] (pull right menu)
+	A submenu allows you to either:
+	\begin{description}
+
+		\item[Insert from] (InsertFromScrap) insert the contents
+			of the scrap buffer at the insertion point
+
+		\item[Delete sel to] (DeleteToScrap) delete the selection
+			to the scrap buffer
+
+		\item[Copy sel to] (CopySelToScrap) copy the selection to
+			the scrap buffer
+
+		\item[Exchange sel with] (ExchangeScrap) exchange the
+			contents of the scrap buffer with the selection
+
+	\end{description}
+
+	\item[Copy $=>$] (pull right menu)
+	A submenu allows you to either:
+	\begin{description}
+
+		\item[Note destination] (CopyToHereMode) remember the
+			destination of the copy
+
+		\item[Sel to destination] (CopyToHereMode) copy the
+			selection to the remembered destination
+
+		\item[Cancel copy mode] (CancelModes) cancel a pending copy
+
+	\end{description}
+	The mouse sprite changes to a pointing hand when
+	you select a destination and changes back to an arrow
+	when you complete the move.
+
+	\item[Change Case $=>$] (pull right menu)
+	A submenu allows you to either:
+	\begin{description}
+
+		\item[To upper] (ChangeCaseOfSel toupper) change the case
+			of the selection to upper case
+
+		\item[To lower] (ChangeCaseOfSel tolower) change the case
+			of the selection to lower case
+
+		\item[Toggle case] (ChangeCaseOfSel toggle) to switch the
+			case of the selection
+
+	\end{description}
+	Only letters in the selection are affected.
+	All other characters in the selection are unaffected.
+
+	\item[Undo/Again/Redo $=>$] (pull right menu)
+	A submenu of commands for undoing, redoing and repeating commands:
+	\begin{description}
+		\item[Repeat last edit] (Again mostrecent)
+		The last edit is repeated but using the current selection.
+
+		\item[Last edit (this file)] (Again thisfile)
+		The last edit in this file is repeated
+		but using the current selection.
+
+		\item[Undo one edit] (Undo 1)
+		A previous edit is undone.
+		The first undo undoes the most recent edit and subsequent
+		undoes undo earlier edits.
+
+		\item[Redo one edit] (Redo 1)
+		The most recently undone edit is redone.
+
+		\item[Begin block undo] (Undo begin)
+		Mark the beginning of a sequence of edits that you want to
+		be all undone (and redone) together.
+
+		\item[End block undo] (Undo end)
+		Mark the end of a sequence of edits that you want to
+		be all undone (and redone) together.
+
+		\item[Show command history] (ShowUndoStack)
+		Pop up a dialogue box which shows the command history for
+		the file in this window.
+	\end{description}
+
+	\item[Redraw Window] (Redraw)
+	Redraws the text in the window.
+
+	\end{description}
+
+\item[GOTO] A menu of commands that move the window around in the text.
+
+	\begin{description}
+
+	\item[Goto Selected Line \#] (GotoLine [selection get] lof)
+		Go to the selected line number.  This command is useful
+		for jumping to lines mentioned in compiler error
+		messages.
+
+	\item[Goto Line \# ...] (MakeGotoBox) A dialogue box pops up
+		to allow you to type in a line number
+
+	\item[Goto Selection] (ShowSelection) move to the last place
+		you jumped from in this file
+
+	\item[Find Selected CTag] (CTag [selection get])
+		Find the selected C tag
+
+	Point implements C tags (like vi and emacs).
+	It uses the {\tt tags} file in the current directory
+	(created with the Unix {\tt ctags} command).
+	Point also will search certain files to determine which of them
+	contain a keyword.
+	The option {\tt keywordPattern} determines which files are searched.
+
+	\item[Find CTag ...] (MakeCtagBox) A dialogue box pops up
+		to allow you to type in a C tag
+
+	\item[Find Selected Keyword] (GetSelectedKeyword)
+		Find the selected keyword
+
+	\item[Find Keyword ...] (MakeKeywordBox)
+		A dialogue box pops up to allow you to
+		type in a keyword
+
+	\item[Find Matching bracket] (FindMatchingBracket)
+		If the first character of the
+		selection is a bracket then it will find the
+		matching bracket (taking nesting into consideration).
+		This works for: (, ), [, ], \{, and \}.
+			
+	\item[Search for string $=>$] (SearchForString)
+	Forward is towards the end of the file and backward to towards
+	the beginning of the file.
+	A submenu allows you to either:
+
+	\begin{description}
+
+		\item[$>>$ for selected RE] (SearchForSel 1 forward)
+			search forward for a string that matches the
+			selected regular expression
+
+		\item[$<<$ for selected RE] (SearchForSel 1 backward)
+			search backward for a string that matches the
+			selected regular expression
+
+		\item[$>>$ for last RE] (RegexSearch \{\} forward)
+			search forward for the string that
+			matches the last regular expression used
+
+		\item[$<<$ for last RE] (RegexSearch \{\} backward)
+			search backward for the string that
+			matches the last regular expression used
+
+		\item[$>>$ for last string] (RepeatSearch forward)
+			search forward for the last
+			string that was searched for
+
+		\item[$<<$ for last string] (RepeatSearch forward)
+			search backward for the last
+			string that was searched for
+
+		\item[$>>$ for selection] (SearchForSel 0 forward)
+			search forward for the next
+			instance of the selected string
+
+		\item[$<<$ for selection] (SearchForSel 0 backward)
+			search backward for the next
+			instance of the selected string
+
+		\item[For string ...] (MakeSearchBox normal)
+			a dialogue box pops
+			up which allows you to enter a string to search for.
+			The dialogue box also allows you to change two
+			search options: whether case is considered in
+			the search and whether the string can be part
+			of another string or must be a whole word.
+			The dialogue box also allows you to search
+			forward or backwards.
+
+	\end{description}
+
+	\item[Move in file to $=>$] (pull right menu)
+	A submenu allows you to either:
+
+	\begin{description}
+
+		\item[Beginning] move to the first line of the file
+			(GotoLine 1 top)
+
+		\item[End] move to the last line of the file (MoveToEndFile)
+
+		\item[Last place] move to the last place you jumped
+			from in this file (MoveToLastPlace)
+
+	\end{description}
+
+	In addition you can move the mouse sprite into the ``GOTO'' box and
+	type a line number (ending it with any non-digit) and the
+	window will go to that line number.
+	This saves waiting for a dialogue box to pop up
+	(as selecting ``Line \# ...'' would require) but you have no
+	feedback as you type the digits.
+
+	\end{description}
+
+\item[$<<$] Searching backward.
+
+	\begin{description}
+
+	\item[Left button] (SearchForSel 0 backward)
+		Search backward (towards the beginning of the file)
+		for the next occurrence of the selected string.
+
+	\item[Middle button] (MakeSearchBox normal) Bring up a dialogue box
+		asking for a string to search forward for.
+
+	\item[Right button] (RepeatSearch backward)
+		Search backward (towards the beginning of the file)
+		for the last string that was searched for.
+
+	\end{description}
+
+\item[$>>$]  Searching forward.
+
+	\begin{description}
+
+	\item[Left button] (SearchForSel 0 forward)
+		Search forward (towards	the end of the file) for
+		the next occurrence of the selected string.
+
+	\item[Middle button] (MakeSearchBox regex) Bring up a dialogue box
+		asking for a string to search forward for.
+
+	\item[Right button]  (RepeatSearch forward)
+		Search forward (towards the end of the file)
+		for the last string that was searched for.
+
+	\end{description}
+	
+In addition you can type an incremental search string into
+either ``$<<$'' or ``$>>$''.
+Move the mouse sprite inside either search button
+(no button press is necessary),
+type a non-ASCII character to clear the search string
+(a function key is usually a handy choice),
+then type in the letters of the string to search for.
+The search is incremental in that after each character of the string
+is typed, the string so far is searched for.
+If you type a backspace the last character in the search string is
+erased (although the search will {\em not} back up to where it was before
+that character was typed).
+
+\item[Close] Closing the window.
+
+	\begin{description}
+
+	\item[Left button] (CloseWindow save)
+		Close the window and save the file (if ti has been changed).
+
+	\item[Middle button] (CloseWindow ask) Close the window and ask about
+		saving the file (if it has been changed).
+
+	\item[Right button] (CloseWindow nosave)
+		Close the window and do not save the file.
+
+	\end{description}
+
+\item[Sv] Saving the file in the window.
+
+	\begin{description}
+
+	\item[Left button] (SaveFile) Save the file in the window.
+
+	\item[Middle button] (SaveAs) Save the file in the window
+		with a new name.
+
+	\item[Right button] (Redraw) Redraw the window.
+		(This doesn't fit here but there was a free slot.)
+
+	\end{description}
+
+\item[Jump] moves the window around in the file it is showing.
+
+	\begin{description}
+
+	\item[Left button] (GotoLine 1 top) Jump to the beginning
+		of the file.
+
+	\item[Middle button] (MoveToLastPlace) Jump to the last place
+		in the file that you jumped from (for any reason).
+
+	\item[Right button] (MoveToEndFile) Jump to the end of the file.
+
+	\end{description}
+
+\item[Tag] finds tags and keywords in certain files.
+	This command is described more fully in the sections that follow.
+
+	\begin{description}
+
+	\item[Left button] (CTag [selection get]) Find the selected tag.
+
+	\item[Middle button] (MakeKeywordBox)
+		Search files in the current directory for a keyword.
+		The keyword is typed into the text box (clicking the
+		middle mouse button copies in the X selection).
+		The default is to search all files but they can be
+		modified by changing the ``in files:'' text box.
+		A dialogue box is put up with a scrolling list of all
+		the files found to contain the keyword at least once.
+		You can click on the file names in this scrolling
+		list to open a window on that file or to top the window
+		continuing that file if one is already open.
+		when you click on the file name in the scrolling list
+		an asterisk will be prepended to the name so you can
+		keep track of which ones you have already looked at.
+
+	\item[Right button] (GetSelectedKeyword)
+		Search for a word in the files specified in the
+		MakeKeywordBox dialogue box.
+
+	\end{description}
+
+\item[+Do-] Again and undo.
+
+	\begin{description}
+
+	\item[Left button] (Redo 1) Redoes the last edit that was
+		undone with ``Undo'' and has not yet been redone.
+
+	\item[Middle button] (Again mostrecent) Repeats the last edit using
+		the current selection.
+
+	\item[Right button] (Undo 1) Undoes the most recent edit.
+		Repeated invocations will undo earlier and earlier
+		edits.
+
+	\end{description}
+
+\item[Zz] Affects the case of all the letters in the selection.
+
+	\begin{description}
+
+	\item[Left button] (ChangeCaseOfSel toupper) Changes them to all
+		upper case.
+
+	\item[Middle button] (ChangeCaseOfSel toggle) Switches the case
+		of each letter in the selection.
+
+	\item[Right button] (ChangeCaseOfSel tolower) Changes them to all
+		lower case.
+
+	\end{description}
+
+\item[MoveW] Moving windows to predefined locations.
+
+	\begin{description}
+
+	\item[Left button] (MoveWindow 502x460+0+0)
+		Top the window and move it to the specified geometry.
+
+	\item[Middle button] (MoveWindow 502x460-200+465)
+		Top the window and move it to the specified geometry.
+
+	\item[Right button] (MoveWindow 502x460-0+0)
+		Top the window and move it to the specified geometry.
+
+	\end{description}
+
+\item[Line\#] jumps the window to a line number.
+
+	\begin{description}
+
+	\item[Left button] (GotoLine [selection get] lof)
+		Jump to the line number indicated by the selection.
+		Either the X selection or
+		the Point selection, whichever was made more recently.
+
+	\item[Middle button] (MakeGotoBox) Bring up a dialogue box
+		to ask for a line number to go to.
+
+	\item[Right button] (SetLineNumbers) Turns line numbers on and off
+		in the display.  This is useful for finding line
+		numbers in the file.  Do not try to edit the file with
+		the line numbers on as it does not work well.
+
+	\end{description}
+
+	In addition you can move the mouse sprite into the ``Line\#'' box and
+	type a line number
+	(ending it with any non-digit---a function key is typically used
+	although {\tt vi} users might want to use {\tt G})
+	and the window will go to that line number.
+	This saves waiting for a dialogue box to pop up but you have no
+	feedback as you type the digits.
+
+\item[HELP] (HelpMenu) A menu of help topics.
+	When you select one of them, a text window is opened on a file
+	of help text about that topic.
+
+\end{description}
+
+
+
+\subsection{Text Pane}
+
+This shows a part of the file being edited.
+Usually some text will be {\it selected}.
+Selected text is shown in the selected text colors or is underlined.\footnote{
+Underlining looks nicer and is less obtrusive
+than reverse video on some monochrome displays.}
+Many commands operate on the selected text.
+The position just in front of the first selected
+character is called the {\it insertion point}.
+
+\subsubsection{Typing in text}
+
+New text is entered by typing.
+Text is inserted at the insertion point (in front of the selection).
+The backspace or delete keys both erase the previous character.
+Shift-backspace and shift-delete erase the previous word.
+The backspace, delete, shift-backspace and shift-delete keys
+work any time, not just during text insertion.\footnote{
+	All of these key bindings can be changed.}
+
+Typed text is entered in front of the insertion point even
+if the mouse cursor is in a different Point window than
+the selection.
+
+Typed text replaces the selection if the selection is more than
+one character and the option {\tt insertReplaces} is true.
+
+
+\subsubsection{Selecting text}
+
+The selection is the focus of almost all editing and many other commands
+in Point.
+The selection always contains at least one character.
+
+There are two methods of selecting text.
+You can select text by drawing through it:
+\begin{enumerate}
+\item move the mouse sprite to the beginning of the intended selection,
+\item press the left mouse button,
+\item move the mouse sprite to the end of the intended selection,
+\item release the left mouse button.
+\end{enumerate}
+
+Or you can select text by clicking on the two end points of the selection,
+that is, by extending the selection:
+\begin{enumerate}
+\item move the mouse sprite to the beginning of the intended selection,
+\item click (press and release) the {\em left} mouse button,
+\item move the mouse sprite to the end of the intended selection,
+\item click the {\em right} mouse button.
+\end{enumerate}
+
+Normally text is selected by character (this is called
+{\em character mode}) but
+if you double click the left mouse button
+you change to {\em word mode}, which
+means that the selection will be extended (or contracted) by full words.
+A word is either a single punctuation character or a contiguous
+string of letters, digits and underscores ({\tt \_}).
+If you triple click the mouse button you change to {\em line mode}
+and the selection is extended (or contracted) in units of whole lines.
+To use the draw through method of selection for word and line mode,
+you hold down the mouse button on the last of the multiple
+clicks (the second click for word mode and the third click for line mode)
+and drag the mouse over the words or lines you wish to select.
+If you select in word (line) mode then the selection will extend
+by words (lines) also.
+
+Triple clicking on a line not only selects the line but it also
+causes the line number to be displayed in the message line.
+This is an easy way to determine the line number of a line.\footnote{
+Another way is to turn on line numbering.}
+
+Multiple clicks must be made within a short time period to be counted
+as multiple clicks (rather than several single clicks).
+
+
+
+\subsubsection{Scrolling}				\label{sect:scrolling}
+
+Point implements two distinct kinds of scrolling.
+The first kind will be called ``line to top'' scrolling
+which is the default.
+It works as follows.
+
+\paragraph{Line to top scrolling}
+
+The scroll bar on the left indicates where you are in the file
+and how much of the file is showing in the window.
+Clicking the right mouse button on the scroll bar scrolls down
+(towards the end of the file) by a certain number of lines.
+This command scrolls the line the mouse sprite is at to the top
+of the window.
+Clicking the left mouse button scrolls up so that the top line of the
+window moves to the line the mouse sprite is on.
+
+Setting the {\tt button1ScrollsDown} option to {\tt False} will reverse
+the meaning of the left and right buttons.
+
+If you hold down either the left or right mouse buttons,
+the scrolling will continue (in units determined by where
+the mouse sprite is) as long as you hold down the button.
+
+Clicking the middle mouse button on the scroll bar jumps the
+window to that part of the file, that is, the scrollbar slider will
+move to where the mouse sprite is.
+If you press and hold down the middle mouse button you can
+drag the text up and down by moving the mouse.
+The display will follow your movements until
+you release the middle mouse button.
+
+The arrow buttons on the top and bottom of the scroll bar are not
+used in ``line to top'' scrolling and the slider is for your information
+only, it does not affect scrolling in any way.
+
+\paragraph{Macintosh scrolling}
+
+The second kind of scrolling will be called ``Macintosh'' scrolling
+and it is the usual default for Tk toolkit scrollbars.
+It uses only the left mouse button
+(although the other buttons also work and do the same thing
+as the left mouse button).
+
+The arrow buttons on the top and bottom of the scrollbar scroll
+the text by one line up or down when clicked on.
+If you press and hold down the left mouse button on an arrow button
+the scrolling will autorepeat at regular intervals after a short
+initial delay.
+
+If you click below the slider the text will scroll down
+(towards the end of the file) by one screenfull.
+Similarly a click above the scrollbar scrolls up one screenfull.
+Both of these will autorepeat as well.
+
+If you press the left mouse button on the slider and move the mouse,
+the display and the slider will scroll with the mouse
+until you release the mouse button.
+
+The default is ``line to top'' scrolling.
+If you want ``Macintosh'' scrolling you must set the Point option
+{\tt tkScrolling} to ``true''.
+
+Point does not wrap long lines.\footnote{
+	I plan to add it as an option in the near future.}
+Instead you can scroll horizontally using the scroll bar on the bottom
+of the text window.
+
+
+\subsubsection{Mouse menu commands}
+
+The middle and right mouse buttons can be used to execute commands.
+There are five commands associated with each of these two buttons:
+no motion, north (up), east (right), south (down) and west (left).
+To execute one of these five commands, you press the mouse button,
+move the mouse in one of these four directions
+(or do not move for the no-motion command).
+A menu pops up after a short delay (0.6 seconds)
+but you do not need to wait for the menu to pop up in order
+to execute a command.
+The menu comes up as a reminder if you hesitate.
+If you set the {\tt mouseSpriteMenu} option to true,
+then the mouse sprite is used to display the menu items.
+
+If you want to cancel in the middle of a mouse menu command,
+click the left mouse button.
+
+The commands on the {\bf MIDDLE MOUSE BUTTON} are:
+\begin{description}
+\item[No motion---Dup] (CopyToHereMode) this command is executed in pairs.
+	The first time you execute this command the insertion point is
+	recorded by Point.
+	Then you can select some text in this window or in another window.
+	The second time this command is executed, the selected text
+	is inserted at the insertion point recorded by the first time
+	and the new insertion point is at the end of the newly copied text.
+\item[North---Del] (DeleteToScrap) the selected text is deleted.
+\item[South---Ins] (InsertFromScrap) the text in the scrap buffer (usually
+	the last text deleted) is inserted at the insertion point.
+\item[East---Copy] (CopySelToMouse) the selected text is inserted at the
+	point where the mouse sprite was when you began the mouse menu command.
+	The insertion is by characters, words or lines depending on how
+	the text was selected.
+\item[West---Move] (MoveSelToMouse) the selected text is inserted at the
+	point where the mouse sprite was when you began the mouse menu
+	command and deleted from where it was.
+	The insertion is by characters, words or lines depending on how
+	the text was selected.
+\end{description}
+
+The commands on the {\bf RIGHT MOUSE BUTTON} are:
+\begin{description}
+\item[No motion---Ext] (ExtendSelection)
+	The selection is extended to this point.
+\item[North---$<<$] (Search [selection get] backward)
+	The selected text is searched for towards the beginning of the file.
+\item[South---$>>$] (Search [selection get] forward)
+	The selected text is searched for towards the end of the file.
+\item[East---Undo] (Undo 1) The last edit is undone.
+\item[West---Again] (Again mostrecent)
+	The last edit is repeated using the current selection.
+\end{description}
+
+
+\subsection{ Tk Window Hierarchy for a Text Window}
+
+It is sometimes useful to know the names of the parts of a browser
+window.
+In the following hierarchy the Tk window name is given first and
+then the Tk widget type in parentheses.
+
+.twNNNNN (toplevel) --- The ``NNNNN'' is a window number.
+	Window numbers are unique across both browser
+	and text windows and start with ``00001''.
+	\begin{itemize}
+	\item .twNNNNN.menu (frame) --- this contains any number of buttons:
+		\begin{itemize}
+		\item .twNNNNN.menu.buttonName (button) ---
+			``buttonName'' is given in the menu specification
+		\item .twNNNNN.menu.menuName (menubutton) ---
+			``menuName'' is given in the menu specification
+			\begin{itemize}
+			\item .twNNNNN.menu.menuName.m (menu)
+			\end{itemize}
+		\end{itemize}
+	\item .twNNNNN.msg (entry) --- the message line
+	\item .twNNNNN.vScrollAndText (frame) 
+		\begin{itemize}
+		\item .twNNNNN.vScrollAndText.vScroll (scrollbar) ---
+			the vertical scroll bar
+		\item .twNNNNN.vScrollAndText.text (frame) --- the text
+			is written in this frame
+		\end{itemize}
+	\item .twNNNNN.splitterAndHScroll (frame) 
+		\begin{itemize}
+		\item .twNNNNN.splitterAndHScroll.splitter (frame) --- just
+			a spacer for now
+		\item .twNNNNN.splitterAndHScroll.hScroll (scrollbar) ---
+			the horizontal scroll bar
+		\end{itemize}
+	\end{itemize}
+
+
+
+
+
+
+
+\section{Keystrokes} \label{sect:keys}
+
+Keystrokes meanings are defined in the startup file {\tt ptsetup.tcl}.
+Here is a table of the key bindings in the distributed {\tt ptsetup.tcl} file.
+
+\begin{tabular}{llllll}
+F1 & delete selection to scrap & F6 & redo last undone edit \\
+F2 & insert scrap buffer & F7 & scroll up \\
+F3 & repeat last search backwards & F8 & scroll down \\
+F4 & repeat last search forwards & F9 & undo last edit \\
+F5 & repeat last edit & F10 & open selected file name \\
+Up & move cursor one line up & Down & move cursor one line down \\
+Left & move cursor left & Right & move cursor right \\
+Control-Left & move left one word & Control-Right & move right one word  \\
+Meta-Left & move left one word & Meta-Right & move right one word  \\
+Home & move to beginning of line & End & move to end of line  \\
+Prior & scroll up & Next & scroll down  \\
+Control-s & begin incremental search \\
+\end{tabular}
+
+
+
+\subsection{Hints for using function keys}
+
+I have found that, in practice, I only use a few function keys
+in normal editing.
+Because the function keys are not labeled it is hard to remember
+what commands they invoke.
+For this reason it does not seem to be useful to put commands you
+do not use quite often on function keys.
+Labeling the function keys on your keyboard can help but I find
+that I use very few function keys even though I define them all.
+
+My editing style is to do certain commands exclusively from function keys.
+The function keys I use regularly are: delete (F1), insert (F2),
+repeat search forward (F4) and again (F5).
+I use them together with mouse commands to get a higher command bandwidth.
+For example, in making a number of identical changes I select the
+text to change with the mouse and use F5 (again) to make the changes.
+I sometimes use F4 (repeat last search) to select the text to change.
+Then I can get into a rhythm and make the changes quickly.\footnote{
+	This is similar to using `n' and `.' in vi to effect an
+	interactive search and (selective) replace.}
+
+I am sure you will develop a style of function key use that
+fits your editing style.
+The idea is to get the maximum command bandwidth and that is done by
+executing some commands with keys and some with the mouse.
+The right mix is a matter of personal preference.
+
+
+
+
+
+
+\section{Useful Concepts} \label{sect:concepts}
+
+In this section we will discuss a variety of things that are
+useful in understanding how Point works.
+
+
+\subsection{ Managing the Selection }
+
+When you select something in Point it also becomes the X (primary)
+selection.
+This means that you can copy Point's selection into {\tt xterm} windows
+by clicking the middle mouse button.
+Point notes when it loses the X selection but it {\it does not}
+deselect the Point selection.
+It remains the Point selection and it remains highlighted.
+But it does color the selection in a different color.
+Normal text is displayed with the {\tt textForeground} and
+{\tt textBackground} colors.
+Selected text is displayed with the {\tt selectedTextForeground} and
+{\tt selectedTextBackground} colors
+if it is also the primary X selection.\footnote{
+	X allows for several selections but almost all X software only
+	uses the primary selection.  So when you see ``X selection''
+	is almost always means the ``primary X selection''.}
+Selected text is displayed with the {\tt deSelectedTextForeground} and
+{\tt deSelectedTextBackground} colors if it is not the primary X selection.
+
+There is a command to insert the X selection into the
+text (at the insertion point in front of the selection, as always).
+This could be the Point selection but is more likely to some text
+you selected from another window.
+If Point had deselected its selection you would not be able to see
+where the X selection will be copied.
+
+All the Point commands that use the selection as an argument
+(search for selection, goto selected line number,
+find selected ctag, find selected keyword, open selected file name,
+delete selected file name and CD to selection)
+use the X selection, not necessarily the Point selection
+(although usually the Point selection will also be
+the X selection).
+
+The file browser file name list makes the file name you select
+the X selection.
+
+
+
+\subsection{ Typing in characters and replacing the selection }
+
+Normally typed characters are inserted in front of the selection
+(at the {\it insertion point}).
+If the {\it overType} option is True then typed characters replace
+characters of the text.
+
+If the {\it insertReplaces} option is True and the selection contains
+more than one character,
+then the selection is deleted before the character is inserted.
+This provides behavior that is similar to the way most Macintosh
+text editors work.
+Both replace styles are useful and the convenience of each
+depends on what you are used to.
+With {\it insertReplaces} False you can select the insertion point
+quickly with double and triple clicks but you have to hit the
+delete key (F1) before typing in replacement text.
+With {\it insertReplaces} True you can replace text easily without
+using the delete key but you have to be careful to set the
+insertion point to be a single character.
+
+
+
+
+\subsection{ Moving and Copying }
+
+Moving and copying is very common in editing code.
+Whenever I have to write new code I try to find some similar code,
+copy it over and modify it rather than starting from scratch.
+There are two kinds of copy and Point implements both kinds.
+The first I will call ``copy-to-from'' and it is implemented
+by the Point command {\tt CopyToHereMode}.
+It is where you first specify
+the destination of the copy and then the source.
+This copy is in the ``Copy $=>$'' submenu of the Edit Menu.
+It is also attached to the no-motion command of the middle
+mouse button.
+
+A typical use is to duplicate one or more lines.
+First select the line(s).
+Then execute the {\tt CopyToHereMode} command twice.
+The easiest way to do this is to click the middle mouse button twice
+(if you click quickly the mouse menu will not come up).
+The first {\tt CopyToHereMode} sets the to location as the beginning of
+the selected lines.
+The second {\tt CopyToHereMode} copies the selection to that point.
+Selecting the lines serves the dual purpose of setting the insertion
+point (the copy destination) for the first {\tt CopyToHereMode}
+and setting the selection (the text to be copied) for the
+second {\tt CopyToHereMode}.
+
+The other typical use of {\tt CopyToHereMode} is to copy in a word
+or phrase while you are typing.
+You are typing and you get to a point where you want to type a word that
+is already visible on the screen.
+Why type it again?
+Stop typing, click the middle mouse button (the first {\tt CopyToHereMode}),
+select the word (double click with the left mouse button), click
+the middle mouse button again (the second {\tt CopyToHereMode})
+and continue typing.
+Note that you do note lose the insertion point when you use
+{\tt CopyToHereMode}.
+
+The {\tt CopyToHereMode} command is, as the name implies,
+a moded command.
+It is executed in pairs and after the first execution you are in
+what is called ``copy mode'' or ``duplicate mode''.
+This is indicated by a pointing hand cursor (``hand1'')
+(there is an option to
+set the copy mode cursor to any cursor font cursor you like,
+for example you might want to use ``gumby'').
+Being in copy mode does not restrict you in any way,
+all Point commands work exactly the same and you can stay
+in copy mode for hours if you want or quit Point while in
+copy mode.
+The only effect of copy mode is that a second {\tt CopyToHereMode}
+will complete the copy and copy the selected text to the destination
+remembered when you executed the first {\tt CopyToHereMode}.
+
+There is a {\tt MoveToHereMode} which works exactly the same
+except the text is moved rather than copied.
+I rarely use this command and you will note it is not
+on the menus.
+You might find a use for it.
+
+The other type of copy I will call ``copy-from-to'' and it is
+implemented by the Point command {\tt CopySelToMouse}.
+It is attached to the move-right motion of the middle button
+mouse menu.
+To copy text: select the text to copy,
+move the mouse sprite over the destination,
+press the middle mouse button, move right a bit and then release
+to execute {\tt CopySelToMouse}.
+I use this to copy lines from one place to another.
+Note that if you select the text in line mode,
+the {\tt CopySelToMouse} command will insert the text in front of
+the line over which you execute the command.
+This means you don't have to be that accurate and select the very
+first character of the line.
+These comments also apply to word mode, {\it mutatis mutandis}.
+
+Note that both ``copy''s are on mouse menus.
+This is because I copy things a lot and like to do it quickly
+and without thinking about how to do it
+or diverting my attention from the text.
+
+There is also a {\tt MoveSelToMouse} which I use frequently
+but less often than {\tt CopySelToMouse}.
+It works just like {\tt CopySelToMouse} except the text is
+moved rather than copied.
+It is attached to the move-left motion of the middle mouse menu.
+I use it to rearrange text and I almost always use it on whole lines.
+
+
+
+\subsection{ Moving Windows Around and Screen Layout}
+
+Your window manager allows you to move windows around.
+I have move window attached to the left mouse button on the
+title bar of my windows.\footnote{Actually it is a {\it twm}
+function containing the commands \{f.move f.deltastop f.raiselower\}.}
+But in practice I rarely move Point text windows around that way.
+I have fixed on a preferred screen layout and windows go in certain
+positions in that layout.
+I use Point's move window commands to move windows between set
+locations.
+Mainly I use three locations: NE, NW and SE.
+These correspond to left, right and middle button clicks on the
+``MoveW'' command on the text window menu bar.
+(They are also on the ``Move Window $=>$'' submenu of the FILE menu.)
+I move windows around in a single jump using a mouse click.
+
+You will want to develop your own screen layouts but when you do
+I recommend using the move window commands to move windows
+between fixed window locations.
+
+
+\subsection{Backup Files}
+
+Backup files are great when you need then but a nuisance when you don't
+need them.
+The solution I have found is to store backups in a subdirectory out
+of the way.
+The option {\tt backupNameFormat} determines how the path names of
+the backup files will be determined.
+This is discussed in section \ref{sect:options}.
+This allows you to specify that backups go into a subdirectory.
+
+The option {\tt backupDepth} determines the number of backups to keep.
+I use six and have often been glad I did.
+This does use up disk space but text files are typically not that
+large so it is not a major problem.
+
+
+\subsection{Undo, Redo and Again}
+
+Each command is recorded in the command history.
+There is a pointer to the most recently executed
+(and not undone) command.
+The undo command undoes that command and moves the
+pointer back to the previous command.
+Thus another undo will undo that previous command.
+You can continue this way and undo every command you have
+executed since the file was loaded.
+You can undo edits even if you have saved the file since making
+the edit.
+
+There is a separate command history for each file
+(not each window, each file).
+This is most noticeable when undoing a move from one file to another.
+The delete is in the command history of the ``from'' file and the
+insert is in the command history of the ``to'' file.
+They must be undone separately.
+
+Undo undoes the effect of the last command:
+deleted text is inserted again,
+copied text is deleted,
+moved text is moved back,
+changed text is changed back.
+If you select text, delete it and type in new text,
+this whole action is undone as a unit.
+
+There are two cases when a single undo will undo more than
+one command.
+The first is a delete followed by an insert at the same location.
+This is taken to be a replace and is considered a single operation
+and so it is undone (and redone) as a unit.
+The second case is when a sequence of edits has been grouped
+explicitly as a block command.
+There are commands to mark the beginning and the end of a block
+of commands.
+For example, one considers a search and replace operation to be
+a single command and so they are blocked.
+
+If you undo a command and decide you really didn't want
+to undo it you can use the redo command to redo (or un-undo) it.
+In terms of the command history,
+redo moves the pointer up to the next command and redoes that
+command.
+Thus undo moves backward in the command history list and
+redo moves forward in the command history list.
+
+You can undo and redo as much as you want but as soon as you
+make an ordinary edit (not an undo or a redo),
+the edits that were undone but not redone are discarded.
+This is a bug (it is a lot of work to handle this case)
+that will be corrected in a future version.
+
+Again repeats the last command (that has not been undone)
+in the current context.
+That is, if the last edit was to delete the selection and
+replace it with some text, then redo will replace
+the current selection with that text.
+This is the most common use of the again command.
+Again is often used with search to get the effect of a
+``replace with verification on each change'' command.
+
+Again takes an optional argument that determines what
+``last command'' actually means.
+You can choose the last command overall, the last command
+in the file in the selection window or the last command
+in the file in a named window.
+The last command overall is the default.
+
+You can call up a dialogue box that lists the command
+history and allows you to undo, redo and repeat commands.
+This box can be popped up by with the menu command
+{\tt EDIT/Undo/Again/Redo/Show command history}.
+
+
+
+
+\subsection{Line numbers}
+
+The default window titles indicates the range of line number shown
+in the  window.
+If you triple click on the line, a message is displayed
+(in the message line of the browser usually, although
+this can be controlled by the user with the {\it messageFlags} option)
+showing the line number.
+This is the fastest way to determine the line number of a line.
+
+There is a command to turn line numbering on and off in a window.
+A quick way to do this is by clicking the right mouse button on the
+``Line\#'' button on the text window menu bar.
+
+There are commands to jump to a specified line number or to
+the selected line number.
+
+
+
+\subsection{Using the scrap}
+
+Deleted text goes into a buffer called the {\it scrap buffer}.
+The insert command inserts the text in the scrap buffer.
+There are commands to copy the selection into the scrap buffer
+and to exchange the selection with the scrap buffer.
+You can use these command to exchange two strings.
+These commands are all on the ``Scrap $=>$'' submenu of the EDIT menu.
+
+
+
+\subsection{Searching, C tags, and keywords}
+
+There are many searching commands in Point because searching
+is a common thing to do when looking at programs.
+
+There are two general types of searches in Point.
+In this section we discuss string search which searches for
+the next instance of a specific string.
+There are no special characters and the search string can contain
+anything (including newlines) and it must be matched exactly.
+In the next section we will discuss regular expression searching where 
+you search for an instance of a string pattern that might match
+a large number of strings.
+
+You can search forward (or backward) for the next (or previous)
+instance of the selected text.
+This is the most common form of searching and so is on a mouse menu
+(right mouse button move-down is search forward for selection
+and right mouse button move-up is search backward for selection)
+for quick access.
+These same commands are attached to the left mouse button click
+on the ``$<<$'' (for search backward) and ``$>>$'' (for search
+forward) buttons on the menu bar.
+The mouse menu is faster for a single search and the menu bar
+button is faster and easier for repeated searches for the same string.
+
+Sometimes you search for something and then after you find it you
+change the selection.
+For example you might make a small edit.
+The {\tt RepeatSearch} command will search for the last string
+you searched for without you having to select it again.
+Indeed, the edit you made might mean that that exact string is
+no longer there to select anyway.
+The {\tt RepeatSearch} command is attached to the right mouse
+button click on the ``$<<$'' (for search backward)
+and ``$>>$'' (for search forward) buttons on the menu bar.
+These commands are also attached to the F3 (search backward)
+and F4 (search forward) keys.
+
+I often use the F4 and F5 (repeat last edit) key together to do an
+impromptu search and replace with verify on each replacement.
+
+There is a search dialogue box you can bring up and type in any string
+to search for.
+Click the middle mouse button on the ``$<<$'' or ``$>>$'' menu
+bar buttons to bring up the search dialogue box.
+From the search dialogue box you can type in a search string
+and you can change the {\tt ignoreCase} and {\tt findWholeWords}
+searching options.
+
+You can also type a search string directly into the ``$<<$'' or ``$>>$''
+menu bar buttons by moving the cursor to ``$<<$'' or ``$>>$'',
+pressing any function key (or any non-ASCII key) to
+clear the string, and typing the characters to search for.
+The search is ``incremental'' (like {\tt emacs} searches) in that it searches
+for the string typed in so far after each character is typed.
+
+You can also search for a matching bracket.
+This command (and all search commands) is on the GOTO menu.
+
+Point also implements Unix tags.
+You specify the tag by selecting it or entering it into a dialogue box.
+Point then finds the file the tag is in, opens a window on that file
+(or tops an existing window on that file),
+positions the window at the tag and selects the tag.
+
+A different sort of search is the keyword search which is an internal
+form of {\tt grep}.
+You can activate a keyword search using the selection as the keyword
+or you can bring up a dialogue box and type in the keyword
+to search for.
+The keyword search looks through all the {\tt *.c and *.h} files
+in the current directory\footnote{The files to be searched are
+changed via Point options.}
+and brings up a dialogue box with a scrolling list of all the
+files that contain the keyword at least once.
+When you click on a file name on this scrolling list three things happen:
+\begin{enumerate}
+\item A window containing the file is displayed.
+If the file is in an existing open window that window will be topped.
+Otherwise a new window will be created.
+\item That window will be scrolled so that the first instance
+of the keyword is visible in the window and that instance will
+be selected (in character mode).
+\item The file name in the scrolling list will have an asterisk
+prepended to it.
+This is done so you can easily keep track of the files you have
+already looked at.
+\end{enumerate}
+
+
+\subsection{Searching for regular expressions}
+
+It is often useful to search for a string pattern rather than a
+specific string.
+For example, you might want to search for the next thing within
+parentheses.
+The regular expression for that would be:
+\begin{verbatim}
+     (.*)
+\end{verbatim}
+This pattern will not work correctly if there are two consecutive
+sets of parentheses.
+To be sure to only find the first set we would use the pattern:
+\begin{verbatim}
+     ([^)]*)
+\end{verbatim}
+
+A regular expression is represented in a special notation that
+describes the pattern you wish to search for.
+Often most of the characters in the pattern are literal characters that
+you want to match exactly but some will be special codes that match
+a class of characters or special features in the string.
+
+First let us define what a regular expression is.
+A {\it regular expression} is one of:
+
+\begin{enumerate}
+
+\item {\bf char} matches itself, unless it is a special
+                character (metacharacter): . \ [ ] * + \verb+^+ \$
+
+\item {\bf .} matches any character.
+
+\item {\bf \verb+\+} matches the character following it, except
+		when followed by a left or right round bracket,
+		a digit 1 to 9 or a left or right angle bracket. 
+		(see [7], [8] and [9])
+		It is used as an escape character for all 
+		other meta-characters, and itself. When used
+		in a set ([4]), it is treated as an ordinary
+		character.
+
+\item {\bf [set]} matches one of the characters in the set.
+                If the first character in the set is "\verb+^+",
+                it matches a character NOT in the set, i.e. 
+		complements the set. A shorthand A-E is 
+		used to specify a set of characters A up to 
+		E, inclusive. The special characters "]" and 
+		"-" have no special meaning if they appear 
+		as the first characters in the set.
+                Some examples:
+		\begin{itemize}
+                \item {\bf [a-z]} any lower case alpha
+
+                \item {\bf [\verb+^+]-]} any char except ] and -
+
+                \item {\bf [\verb+^+A-Z]} any char except upper case alpha
+
+                \item {\bf [a-zA-Z]} any alpha
+		\end{itemize}
+
+\item {\bf *} any regular expression form [1] to [4], followed by
+                closure char (*) matches zero or more matches of
+                that form.
+
+\item {\bf +} same as [5], except it matches one or more.
+
+\item a regular expression in the form [1] to [10], enclosed
+                as \verb+\+(form\verb+\+) matches what form matches.
+                The enclosure creates a set of tags, used for [8] and for
+                pattern substitution. The tagged forms are numbered
+		starting from 1.
+
+\item {\bf \verb+\+D} a \verb+\+ followed by a digit 1 to 9 matches
+		whatever a
+                previously tagged regular expression ([7]) matched.
+
+\item {\bf \verb+\+\verb+<+} a regular expression starting
+		with a \verb+\+\verb+<+ construct and/or ending
+		with a \verb+\+\verb+>+ construct, restricts the
+		pattern matching to the beginning of a word, and/or
+		the end of a word. A word is defined to be a character
+		string beginning and/or ending with the characters
+		A-Z a-z 0-9 and \_. It must also be preceded and/or
+		followed by any character outside those mentioned.
+
+\item a composite regular expression xy where x and y
+                are in the form [1] to [10] matches the longest
+                match of x followed by a match for y.
+
+\item {\bf \verb+^+} a regular expression starting with a \verb+^+ character
+		and/or ending with a \$ character, restricts the
+                pattern matching to the beginning of the line,
+                or the end of line.  Elsewhere in the
+		pattern, \verb+^+ and \$ are treated as ordinary characters.
+
+\end{enumerate}
+
+Enter the regular expression as the search string and begin the search.
+In the next section we will discuss how to use regular expression to do
+search and replace operations.
+
+
+\subsection{Regular expression search and replace}
+
+This operation is done from a dialog box.
+You specify a regular expression to search for and a replacement pattern.
+The replacement pattern allows you to replace the matched string with
+a string composes of literal text and pieces of the matched string.
+For example to find two strings inside curly braces and interchange
+them you would use the search pattern:
+\begin{verbatim}
+     {\([^}]*\)}\(.*\){\([^}]*\)}
+\end{verbatim}
+and use the replacement pattern:
+\begin{verbatim}
+     {\3}\2{\1}
+\end{verbatim}
+
+The search patterns are the same as used in regular expression search.
+The replacement patterns describe how to construct the string that
+will replace the string that was matched.
+You can construct the replacement string using parts of the matched string.
+
+The replacement string is constructed by reading the characters
+of the replacement pattern one at a time and interpreting them
+as follows:
+
+\begin{enumerate}
+
+\item {\bf char} put that character into the replacement string,
+		unless it is a special character (metachar): \& or \verb+\+.
+
+\item {\bf \&} put the entire matched string into the replacement string.
+
+\item {\bf \verb+\+D} put the Dth matched substring into the replacement
+	string.  A matched substring is a part of the search pattern
+	enclosed in \verb+\+( and \verb+\+).
+	D must be a digit from 1 to 9.
+
+\end{enumerate}
+
+After a string is matched it is replaced by the replacement string
+constructed according the replacement pattern.
+You can decide whether you want to verify each replacement by
+setting a toggle in the dialog box.
+
+
+
+
+
+\section{Hints For Using Point} \label{sect:hints}
+
+In this section I will describe how a number of common
+editing tasks are best performed in Point.
+This is to give you an idea of some styles of editing
+that the commands will support.
+I will use the notations LMB, MMB and RMB for the left,
+middle and right mouse buttons.
+
+{\bf To make many copies of a line(s):}
+\begin{enumerate}
+\item Select the line(s) to copy (triple click and drag while holding down
+the third click for multiple lines).
+\item DeleteToScrap (F1) (to copy the lines into the scrap buffer).\footnote{
+Copy to scrap would also work here but it is a less common command
+and not as instinctive as delete for most people.}
+\item InsertFromScrap (F2) to replace the deleted copy.
+\item Select an insertion point and InsertFromScrap (F2).
+\item Repeat 4 as many times as necessary.
+\end{enumerate}
+
+{\bf To make one copy of a some line(s) right next to the line(s):}
+\begin{enumerate}
+\item Select the lines.
+\item Duplicate, duplicate (Click the MMB twice).
+\end{enumerate}
+
+{\bf To make one copy of a some line(s) somewhere else:}
+\begin{enumerate}
+\item Select at the location you want to copy the lines to.
+\item Duplicate (Click the MMB).
+\item Select the lines.
+\item Duplicate (Click the MMB).
+\end{enumerate}
+
+{\bf To make one copy of a some line(s) somewhere else (another method):}
+\begin{enumerate}
+\item Select the lines.
+\item Move the mouse to the location you want to copy the lines to.
+\item CopySelToMouse (press MMB and move right)
+\end{enumerate}
+
+{\bf To see more a file:}
+\begin{itemize}
+\item Zoom the window, or
+\item Change to a smaller font (File menu ``SetTextFont $=>$'' submenu).
+\end{itemize}
+
+{\bf Note:} I zoom any window that I am going to be using for more than
+a minute or two.
+And then I unzoom it when I am finished working with it.
+I zoom and unzoom windows quite frequently.
+
+{\bf To look at two windows at the same time:}
+\begin{enumerate}
+\item Move them to different quadrants.
+\item Do this by clicking a mouse button on the ``MoveW'' menu bar item.
+(LMB for the NW quadrant, MMB for the SE quadrant, RMB for the NE quadrant)
+\end{enumerate}
+
+{\bf To go the a line number that appears on the screen:}
+\begin{enumerate}
+\item Make the line number the X selection.
+In an {\tt xterm} window this can usually be done by double clicking on it.
+\item Click on the {\tt Line\#} button on the menu bar of the window
+where the line is.
+\end{enumerate}
+
+{\bf To search for a string that appears on the screen:}
+\begin{enumerate}
+\item Make the string the X selection.
+In an {\tt xterm} window this can usually be done by double clicking on it.
+\item Click on the {\tt>>} button on the menu bar of the window
+where you want to search.
+\item Alternatively you can use the mouse menu command:
+move into the window, press the right mouse button,
+move down a bit (say an inch or more) and release the mouse button.
+\end{enumerate}
+
+{\bf To use point as your mail editor:}
+\begin{enumerate}
+\item Find out where to specify the editor command for your mail program
+(or any other program that executes an editor as a subprocess).
+\item Specify the command as {\tt pt -c -w}.
+\end{enumerate}
+
+{\bf To switch between two places in a file:}
+\begin{enumerate}
+\item Jump to the other place.
+\item Use jump to last place to switch (click the MMB on ``Jump'').
+\end{enumerate}
+{\bf or}
+\begin{enumerate}
+\item Use forward and backward search to switch between two
+instances of a name (such as the definition and a use of a procedure).
+\end{enumerate}
+
+{\bf To look at all instances of a name in a collection of files:}
+\begin{enumerate}
+\item Invoke search for selected keyword (RMB on the ``Tag'' menu bar item).
+\item Fill in the form and search.
+\end{enumerate}
+
+{\bf To move a procedure header to the top of the window:}
+\begin{enumerate}
+\item Click with the LMB on the scroll bar beside the top
+line of the procedure.
+\end{enumerate}
+
+{\bf To replace words with nearby words:}
+\begin{enumerate}
+\item Select the word to replace (double click with the LMB)
+\item Delete (F1)
+\item Duplicate (click the MMB) to mark the insertion point
+\item Select the new word
+\item Duplicate (click the MMB) to duplicate the selected word
+to the remembered insertion point
+\end{enumerate}
+
+{\bf To insert a nearby word while typing:}
+\begin{enumerate}
+\item Type up to the word
+\item Duplicate
+\item Select the word
+\item Duplicate
+\item Continue typing
+\end{enumerate}
+
+{\bf To do a search and replace:}
+\begin{enumerate}
+\item Use the replace command.
+\end{enumerate}
+
+{\bf To do a search and replace (another method):}
+\begin{enumerate}
+\item Select the string to search for and search forward and then backward
+(this Sets the remembered search string).
+\item Search for the string until you find one you want to replace.
+\item Replace the string.
+\item Search for the next one with RepeatSearch (F4).
+\item Optionally replace with Again (F5).
+\item Repeat until done.
+\end{enumerate}
+
+
+
+
+\section{ Point Options} \label{sect:options}
+
+There are a number of Point options that affect the way
+things are done in Point.
+In this section we will discuss all the Point options.
+In the next section we will discuss the various ways
+of setting these options.
+
+In the following subsections the name of the option is
+followed by a colon and its default value.
+
+
+\subsection{Browser Appearance Related Options}
+
+\begin{description}
+
+\item[browserFont:fixed]
+This sets the font used to display file names in a file browser.
+This option is the default font used for new file browsers.
+The font of an individual file browser can be set with the
+{\tt browserFont} command (several of which are available
+on the ``MISC'' menu on the browser menu bar).
+
+\item[browserGeometry:135x445+510+0]
+This is the default geometry for new file browsers.
+You can change the geometry of an existing window
+with the {\tt MoveWindow} command or with the window manager.
+
+\item[browserIconFormat:"Dir:\%d"]
+This option determines the contents of the window icon name that
+Point gives the window.
+The window manager typically uses this name as the default icon.
+The {\tt browserIconFormat} is in the same form as the
+{\tt browserTitleFormat} (see below).
+
+\item[browserTitleFormat:\%a.CD:.\%d]
+This option determines the contents of the window title that
+Point gives the window.
+The window manager typically displays this title in the title bar.
+The {\tt browserTitleFormat} is in the form of a format string similar
+in spirit to the one given to the C {\tt printf} function.
+The title is generated by going through the {\tt browserTitleFormat} string
+character by character.
+All characters except '\%' and the character following it
+are copied literally to the title.
+A '\%' indicates that some specific string related to the window
+is to be copied into the title.
+The character after the '\%' determined which string.
+The possible values are (and I am including the '\%' here for clarity):
+\begin{itemize}
+\item {\bf \%d} --- the full path name of the directory showing in the
+	browser.  C shell like ``\verb+~+'' is done of this path name.
+\item {\bf \%a/activeMsg/} --- ``activeMsg'' if the browser is the active
+		browser and ``'' otherwise.
+		The matching `/'s can be any character that does not
+		appear in "activeMsg".
+\end{itemize}
+
+\item[filePattern:*]
+This option sets the filter used in displaying file names
+in a file browser.
+
+\item[noBrowser:False]
+If this option is true then no browser will be created when Point
+starts up.
+
+\item[showDirsFirst:True]
+If this option is true, Point will list all directories first
+(in alphabetical order) and then the ordinary files
+(in alphabetical order).
+If this option is false the directories and files will
+be interspersed (in overall alphabetical order).
+
+\item[showSizes:False]
+If this option is true, the file browser will show file sizes
+next to file names.
+
+\end{description}
+
+
+
+\subsection{Text Appearance Related Options}
+
+\begin{description}
+
+\item[eofChar:1]
+This option determines which character is used to mark the end of
+the file in a text window.
+It is specified as the numerical equivalent of its ASCII code.
+The default is a small diamond in most fonts.
+
+\item[selectedTextBackground:black]
+The option determines the background color for selected text
+(if underlineSelection is 0).
+This is used only when the Point selection is also the primary X selection.
+The value must be a color name in the X color database.
+
+\item[selectedTextForeground:white]
+The option determines the foreground color for selected text
+(if underlineSelection is 0).
+This is used only when the Point selection is also the primary X selection.
+The value must be a color name in the X color database.
+
+\item[deSelectedTextBackground:black]
+The option determines the background color for selected text
+(if underlineSelection is 0).
+This is used only when the Point selection is {\it not}
+the primary X selection.
+The value must be a color name in the X color database.
+
+\item[deSelectedTextForeground:white]
+The option determines the foreground color for selected text
+(if underlineSelection is 0).
+This is used only when the Point selection is {\it not}
+the primary X selection.
+The value must be a color name in the X color database.
+
+\item[SetLineNumbers:Not an option]
+Line numbering is determined by window not by a global option.
+SetLineNumbers is really a command that changes the state
+of line number display in a window.
+See the SetLineNumbers for details.
+
+\item[showPartialLines:False]
+If only part of a line will fit at the bottom of the window
+then the line is not drawn unless this option is true.
+
+\item[textBackground:white]
+This option determines the background color for text.
+The value must be a color name in the X color database.
+
+\item[textForeground:black]
+The option determines the foreground color for text.
+The value must be a color name in the X color database.
+
+\item[textFont:fixed]
+This option sets the default font used for newly created windows.
+You can set the font of an existing window with the {\tt textFont}
+command.
+It can be any font name that can be found in the X font directories.
+
+\end{description}
+
+
+
+
+\subsection{Text Window Appearance Related Options}
+
+\begin{description}
+
+\item[autoZoom:False]
+This option causes new windows to be opened in the zoomed state.
+
+\item[busySpriteName:watch]
+The shape of the mouse sprite in text windows to indicate
+that Point is busy doing something.
+It can be the name of any character in the X cursor font.
+
+\item[copySpriteName:hand1]
+The shape of the mouse sprite in text windows to indicate
+that Point is in copy mode.
+It can be the name of any character in the X cursor font.
+
+\item[mouseMenuFont:fixed]
+The font used in the popup mouse menus.
+It can be any font name that can be found in the X font directories.
+
+\item[messageFlags:2]
+This option determines how error messages are displayed.
+It can be any number from 0 to 15 and is the sum of:
+1 if you want messages to appear in popup dialogue boxes,
+2 if you want messages to appear in the message line of all text windows,
+4 if you want messages to appear in the title bar of the active window,
+8 if you want messages to appear in the {\tt xterm} window for which Point
+was started.
+
+\item[pathNames:False]
+This option determines whether full path names are used in text window
+title bars and the open file list (if pathNames is True)
+or only the last component of the path name is used.
+
+\item[spriteBackground:white]
+The background color used for the mouse sprite in text windows.
+
+\item[spriteForeground:black]
+The foreground color used for the mouse sprite in text windows.
+
+\item[spriteName:left\_ptr]
+The shape of the mouse sprite in text windows.
+
+\item[textGeometry:502x460+0+0]
+The default geometry for new text windows
+(if one is not specified in the new window command).
+The geometry of existing text windows can be changed with the
+window manager.
+
+\item[textIconFormat:Edit:\%n]
+This option determines the contents of the window icon name that
+Point gives the window.
+The window manager typically uses this name as the default icon.
+The {\tt textIconFormat} is in the same form as the {\tt textTitleFormat}
+(see below).
+
+\item[textTitleFormat:\%a.@.\%n\%r. readOnly. [\%l-\%L]\%c. (modified).]
+This option determines the contents of the window title that
+Point gives the window.
+The window manager typically displays this title in the title bar.
+The {\t textTitleFormat} is in the form of a format string similar in spirit
+to the one given to the C {\tt printf} function.
+The title is generated by going through the {\tt textTitleFormat} string
+character by character.
+All characters except '\%' and the character following it
+are copied literally to the title.
+A '\%' indicates that some specific string related to the window
+is to be copied into the title.
+The character after the '\%' determined which string.
+The possible values are (and I am including the '\%' here for clarity):
+\begin{itemize}
+\item {\bf \%a/activeMsg/} --- ``activeMsg'' if the window is the active
+		window and ``'' otherwise.
+		The matching `/'s can be any character that does not
+		appear in "activeMsg".
+\item {\bf \%c/modMsg/} --- ``modMsg'' if the file has changed and
+		``'' otherwise.
+		The matching `/'s can be any character that does not
+		appear in ``modMsg''.
+\item {\bf \%l} --- the line number of the top line in the window.
+\item {\bf \%L} --- the line number of the bottom line in the window.
+\item {\bf \%n} --- the file name (affected by pathNames option).
+\item {\bf \%N} --- the full path name of the file.
+\item {\bf \%o/overTypeMsg/} --- ``overTypeMsg'' if Point is in over type
+		mode and ``'' otherwise.
+		The matching `/'s can be any character that does not
+		appear in ``overTypeMsg''.
+\item {\bf \%p} --- the character number (position) of the first character
+		in the window.
+\item {\bf \%P} --- the character number (position) of the last character
+		in the window.
+\item {\bf \%r/readOnlyMsg/} --- ``readOnlyMsg'' if the file is read only
+		and ``'' otherwise.
+		The matching `/'s can be any character that does not
+		appear in ``readOnlyMsg''.
+\item {\bf \%s} --- the final component of the file name.
+\item {\bf \%S} --- the size of the file (in characters).
+\item {\bf \%v} --- the column number of the leftmost column in the window.
+\item {\bf \%V} --- the column number of the rightmost column in the window.
+\end{itemize}
+
+\item[underlineSelection:0]
+This option determines how the selection is shown in text windows.
+A value of 0 causes Point to use the colors specified in the
+options {\tt [selected]text\{foreground$\mid$background\}}.
+A value of 1 causes selections to be underlined with a one pixel wide line.
+A value of 2 causes selections to be underlined with a two pixel wide line.
+
+\end{description}
+
+
+\subsection{File and Backup Related Options}
+
+\begin{description}
+
+\item[backupByCopy:False]
+If this option is true, then backups will be made by copying the
+original file contents into a backup file and then copying the
+new contents into the original file.
+This way the original file contains the newest version and
+hard links are not lost.
+If this option is false, then the original file will be
+renamed to the backup file and the new contents written to
+a new file with the same name as the original file.
+This saves one copy but loses hard links.
+
+\item[backupDepth:1]
+This option determines how many levels of backup point maintains.
+If backupDepth is set to 0 then no backups are made.
+Otherwise it must be a value from 1 to 9.
+
+\item[backupNameFormat:\%n.\%v]
+This option controls how the path name of backup files is generated.
+It is like a {\tt printf} format string.
+The backup file path name is generated by reading this format string
+one character at a time.
+All characters except ``\%'' are copied to the path name unchanged.
+Each ``\%'' is followed by a format character that indicates
+what string value should replace the \% and the format character.
+The following format characters are recognized:
+	\begin{description}
+	\item[N] Insert the name of the file (not the path name but
+		just the last component of the path name).
+	\item[n] Insert the full path name of the file.
+	\item[D] Insert the full path name of the directory the file
+		is in.
+	\item[b] Insert the base name of the file, that is, the name
+		without the extension.
+		The base name is the the name up but not including
+		the last ``.'' in the name.
+	\item[v] The version number.
+		The most recent backup will be version 1, the next
+		most recent version 2, etc.
+		Only 9 versions are supported so this will always
+		be a single digit (1 to 9).
+	\item[other] Anything else will be passed through (without the \%).
+	\end{description}
+These formats allows relative or absolute path names.
+For example you can have PC style backups with:
+\begin{verbatim}
+	set backupNameFormat %D/%b.bak
+\end{verbatim}
+You can have simple {\tt emacs} style backups with:
+\begin{verbatim}
+	set backupNameFormat %n~
+\end{verbatim}
+You can have complex {\tt emacs} style backups with:
+\begin{verbatim}
+	set backupNameFormat %n~%v~
+\end{verbatim}
+You can have a general backups directory "backups" in your login directory:
+\begin{verbatim}
+	Option set backupNameFormat "~/backups/%N.%v"
+\end{verbatim}
+You can have backups go into a backups directory in the
+same directory as the filed being backed up:
+\begin{verbatim}
+	Option set backupNameFormat "%D/backups/%N.%v"
+\end{verbatim}
+You can put backups in the same directory
+as the file being backed up:
+\begin{verbatim}
+	Option set backupNameFormat "%n.%v"
+\end{verbatim}
+I use:
+\begin{verbatim}
+	set backupNameFormat %D/bak/%N.%v
+\end{verbatim}
+It will always be true that
+\begin{verbatim}
+%D/%N=%n.
+\end{verbatim}
+
+\item[maxFiles:200]
+The maximum number of files that can be edited at one time.
+This limit will be removed soon.
+
+\item[nBuffers:100]
+This option sets the number of internal buffers Point uses for text.
+Each buffer is 1024 bytes long.
+This value must be 25 or greater.
+A small number of buffers means that Point does more I/O.
+If you have a large buffer cache in the operating system
+this will not slow you down very much and you will save
+redundant buffering.
+
+\item[readOnly:False]
+This option determines whether new windows will be marked as read-only.
+If so, no editing will be allowed.
+If the UNIX file permissions do not allow writing the file,
+the window will be marked read-only in any case.
+
+\end{description}
+
+
+
+\subsection{Interaction Style Options}
+
+\begin{description}
+
+\item[autoIndent:True]
+This option determines whether autoindenting occurs when you
+start a new line (with the Return key).
+If set to True, it causes each new line to be spaced over by exactly the
+same spaces and tabs as the previous line.
+Point will not use tabs if the previous line used spaces.
+
+\item[button1ScrollsDown:False]
+If this option is True then the scrollbars work such that
+button 1 (the left mouse button) scrolls
+down (towards the end of the file) and button 3 (the right mouse
+button) scrolls up (towards the beginning of the file).
+Setting this option to False reverses the meaning of button 1
+and button 3.
+
+\item[insertReplaces:False]
+If this option is True and the selection contains more than one
+character, then a typed character will delete the selection
+before being inserted.
+If this option is false the selection is only used to determine
+the insertion point and is not replaced by the insertion.
+
+\item[keepSelectionVisible:False]
+If this option is false then it is possible for the window on
+the file containing the selection to be scrolled so that the
+selection is not visible.
+If this option is true then scrolling the selection window
+will cause the selection to be moved so that it always remains
+visible.
+
+\item[menuDelay:600]
+This option determines the number of milliseconds of delay
+after a mouse menu button is pressed before the mouse menu
+comes up.
+
+\item[menuTolerance:10]
+This option sets the number of pixels you have to move (after pressing
+the mouse button and bringing up a mouse menu) before you leave the
+``no motion'' menu item.
+
+\item[mouseSpriteMenu:False]
+This option determines whether mouse menus are displayed using
+the mouse cursor (if mouseSpriteMenu is True) or with a circular
+menu drawn over the text (if mouseSpriteMenu is False).
+There is a delay (determined by the {\tt menuDelay} option)
+before the menu comes up
+so that fast mouse menu commands will not bring up the menu.
+
+\item[overType:False]
+This option determines whether typed characters are inserted
+at the insertion point or whether they replace the first character
+of the selection.
+Setting this to True allows you to type over text instead of inserting
+in front of it.
+
+\item[returnString:""]
+This option is used to coordinate modal dialogue boxes.
+When Point puts up a dialogue box where it needs to wait for 
+an answer, it sets {\tt returnString} to the empty string and
+then processes events while waiting for it to become non-empty.
+The {\tt WaitForReturnString} command is used to wait until the
+{\tt returnString} option is set to a non-empty value.
+
+\item[rightMargin:999]
+This option determines when typed lines will be automatically broken.
+The intention of the default of 999 is to not break lines but allow
+them to be long.
+This option also affects the margins used by the {\tt JustifySel} command.
+In fact, that command will only be useful if this option is set to the
+line length you want to justify to.
+
+\item[tabWidth:8]
+This option sets the location of the tab stops in the text.
+Tab stops are every {\tt tabWidth} characters.
+Tabs must be equally spaced.
+
+\item[tkScrolling:False]
+Determines the scrolling style in text window.
+If this option is true the ``Macintosh'' scrolling style is used.
+If this option is false the ``line to top'' scrolling style is used.
+
+\item[undoMotion:False]
+Point records motion in the file (scrolling and jumping) in its
+undo history but normally it is ignored.
+If this option is True then undo will undo motion as well
+as edits.
+
+\end{description}
+
+
+
+\subsection{Search Options}
+
+\begin{description}
+
+\item[findWholeWords:False]
+This option determines whether searched for strings can be surrounded
+by alphanumeric character.
+Setting {\tt findWholeWords} to True is useful when looking for variable
+names like {\it i} which occur frequently within other names.
+
+\item[ignoreCase:True]
+This option determines whether case is considered in searches.
+
+\item[keywordPattern:*]
+This option specifies the files that are scanned for keywords in the
+keyword search commands.
+
+\item[linesOverFind:999]
+When a string is searched for and the window must by jumped in
+order to show the string just found,
+Point needs to know how to position the window
+in relation to the line the found string is on.
+This option determines how many lines down from the top of the
+window a found string will be placed.
+A value of 0 means that it will be placed on the top line.
+If the value is greater than the number of lines in the window,
+the found string will be placed in the middle of the window
+(this is the default case).
+This option also affects text positioning in the window after a
+{\tt GotoLine} command if the {\tt lof} argument is specified.
+
+\item[wrapAroundSearches:False]
+If this option is set to True then forward searches will
+wrap around the end of the file, that is,
+a search started in the middle of a file will search
+to the end of the file then continue searching at the
+beginning of the file until it either finds the word
+or has searched the entire file.
+
+\end{description}
+
+
+
+\subsection{Mouse Menu Options}
+
+\begin{description}
+
+\item[lmm1: Ext]
+The text in the no-motion entry of mouse menu 1.
+
+\item[cmm1:ExtendSelection]
+The command executed by the no-motion entry of mouse menu 1.
+
+\item[lmm1n: $<<$]
+The text in the move-north entry of mouse menu 1.
+
+\item[cmm1n:Search backward [selection get]]
+The command executed by the move-north entry of mouse menu 1.
+
+\item[lmm1e:Undo]
+The text in the move-east entry of mouse menu 1.
+
+\item[cmm1e:Undo]
+The command executed by the move-east entry of mouse menu 1.
+
+\item[lmm1s: $>>$]
+The text in the move-south entry of mouse menu 1.
+
+\item[cmm1s:Search forward [selection get]]
+The command executed by the move-south entry of mouse menu 1.
+
+\item[lmm1w:Again]
+The text in the move-west entry of mouse menu 1.
+
+\item[cmm1w:Again]
+The command executed by the move-west entry of mouse menu 1.
+
+\item[lmm2: Dup]
+The text in the no-motion entry of mouse menu 2.
+
+\item[cmm2:CopyToHereMode]
+The command executed by the no-motion entry of mouse menu 2.
+
+\item[lmm2n:Del ]
+The text in the move-north of mouse menu 2.
+
+\item[cmm2n:Delete]
+The command executed by the move-north of mouse menu 2.
+
+\item[lmm2e:Copy]
+The text in the move-east entry of mouse menu 2.
+
+\item[cmm2e:CopySelToMouse]
+The command executed by the move-east entry of mouse menu 2.
+
+\item[lmm2s:Ins ]
+The text in the move-south entry of mouse menu 2.
+
+\item[cmm2s:Insert]
+The command executed by the move-south entry of mouse menu 2.
+
+\item[lmm2w:Move]
+The text in the move-west entry of mouse menu 2.
+
+\item[cmm2w:MoveSelToMouse]
+The command executed by the move-west entry of mouse menu 2.
+
+\end{description}
+
+
+
+
+
+
+\section{Customizing Point with Point Options} \label{sect:customize1}
+
+The simplest way to customize Point is to change the values
+of the Point options.
+There are several times when Point options are set.
+We will look at these times in order.
+Note that the latest setting is the one the will apply so options
+that are set and later reset will lose all setting except the
+last one.
+
+\begin{enumerate}
+
+\item {\it Point source code} ---
+defaults for all the options are compiled into the Point code.
+The values of these defaults are described in the previous section.
+You can change these defaults only by changing the Point source
+code and recompiling.
+There are easier ways to set the options.
+
+\item {\it X resource database} ---
+as Point is initializing it looks for each Point option in the X
+resource database and sets the option to the resource database
+value if it finds it.
+It looks for exact matches between the X resource database resource
+name and the Point option name with three exceptions.
+Point looks for a resource named {\tt font} and if found,
+uses it to set the options {\tt browserFont} and {\tt textFont}.
+Point looks for a resource named {\tt foreground} and if found,
+uses it to set the options {\tt textForeground}
+and {\tt selectedTextBackground}.
+Point looks for a resource named {\tt background} and if found,
+uses it to set the options {\tt textBackground}
+and {\tt selectedTextForeground}.
+These three exceptions are done before exact matches in the
+resource database are searched for so an exact match will
+override one of these exceptions.
+
+\item {\it tclLib/options.tcl} ---
+{\tt ptsetup.tcl} reads in the file {\tt tclLib/options.tcl}
+which sets almost all the options using tcl commands which set
+Point options.  Here is an example:
+\begin{verbatim}
+     Option set textForeground blue
+\end{verbatim}
+The {\tt tclLib/options.tcl} file can be created by Point while
+it is running with the command ``MENU/MISC/Save Point Options ...''.
+This is used to save the current option setting and preserve them
+for later Point sessions.
+{\bf Important point:}
+Note that this file, as written by Point, sets almost every option
+and so will override any options set in the code or in the X
+resource database.
+You should delete option setting lines from {\tt tclLib/options.tcl}
+if you would rather set these options from the X resource database.
+
+\item {\it ptsetup.tcl} ---
+Specific option settings can go in this file (after the call
+to read in {\tt tclLib/options.tcl}).
+
+\item {\it PREFS Menu} ---
+Most Point options can be set while Point is running through the
+PREFS menu (available from both the text window and the browser
+menu bars).
+These setting only affect the current Point session but you can
+save the options in {\tt tclLib/options.tcl} and have them
+read in each time Point is started.
+
+\end{enumerate}
+
+
+
+\subsection{Options you may want to change}
+
+There are many Point options and in this section I want to list the ones
+that you are most likely to want to change.
+
+\begin{itemize}
+
+\item {\bf tkScrolling}
+I prefer line-to-top style scrolling myself since I use it to exactly
+position code where I can look at as much as possible.
+
+\item {\bf button1ScrollsDown}
+I learned this style of scrolling using line-to-top scrolling at Xerox.
+It depends on whether your mental model has the mouse rotated to 3
+o'clock or to 9 o'clock.
+
+\item {\bf backupNameFormat} and {\bf backupDepth}
+I like to put the backups in a subdirectory where they don't clutter
+up my directory but they are there when I need them.
+Since they are out of the way I keep six backups.
+This seems to be enough for almost all screw-ups.
+My format is ``bak/\%n.\%v''.
+
+\item Text colors:
+These are the options {\bf textForeground}, {\bf textBackground},
+{\bf selectedTextForeground} and {\bf selectedTextBackground}.
+What can I say?  Color is fun.
+
+\item Title and icon formats:
+These are the options {\bf browserIconFormat}, {\bf browserTitleFormat},
+{\bf textIconFormat} and {\bf textTitleFormat}.
+
+\item {\bf textFont}
+I use {\tt 6x13} because I like to see as much as possible.
+If you use a larger font you will want to have some smaller fonts
+on the menus so that you can temporarily change to a smaller font
+to see more stuff.
+
+\item {\bf findWholeWords}
+This is handy when you are looking for instance of the identifier
+{\it i} and in other similar cases.
+
+\item {\bf ignoreCase}
+Normally I have this true since I hate to type shifted letters,
+but once in a while you want case to matter to separate the wheat
+from the chaff.
+
+\item {\bf linesOverFind}
+Ordinarily you do not change this interactively but people have
+different ideas about where found string should be.
+I use the middle of the window and so set this to 999.
+
+\item {\bf lmm1n etc.}
+The mouse menu commands are most useful when they are customized
+to the commands you use frequently.
+
+\end{itemize}
+
+
+
+\subsection{Setting local options by directory with .ptdirrc}
+
+Each time Point changes to a new directory it looks for a
+file named {\tt .ptdirrc} in the new directory.
+If there is one, it reads it in as a setup file.
+This allows you to set options by directory.
+
+For example you might want to change the option {\tt textForeground}.
+Then you could tell by the color of the text which directory
+it had come from.
+
+Or you might want to have different {\tt backupDepth}s and
+different {\tt backupNameFormat}s in different directories.
+You might even want to have a message window pop up when
+you change to a directory, an active reminder of something.
+
+
+
+
+
+
+\section{Customizing Point Using Tcl} \label{sect:customize2}
+
+Point is implemented using the Tcl command language and the Tk X toolkit.
+This means that all user actions cause Tcl code to be interpreted.
+All the Point commands are added to the Tcl interpreter hence all the
+functionality of Point is available from Tcl
+as well as  all of the Tk toolkit functionality.
+Together these make a highly configurable text editor.
+
+All the functionality described in this manual is achieved though
+the Tcl code in {\tt ptsetup.tcl}.
+You might want to look through that file (using Point of course!)
+to get an idea of what is there.
+
+All customization of Point is done by editing the {\tt ptsetup.tcl} file.
+In this section we will describe what kinds of changes to make
+to perform various levels of customization in Point.
+
+
+\subsection{Setting Point Options}
+
+You will notice that near the beginning of {\tt ptsetup.tcl}
+there are a number of lines that set Point options that look something like:
+\begin{verbatim}
+     Option set selectedTextBackground lawngreen
+\end{verbatim}
+Any Point option can be set with a similar line.
+The keywords {\tt Option set} determines the command and is
+always the same.
+The third string is the name of the Point option.
+These are listed in a section \ref{sect:options}.
+The fourth string is the new value of the option.
+That's all there is to it.
+
+Another easy thing to do is to change the default geometries
+used in various commands.
+Above the {\tt Option set} lines you see three lines:
+\begin{verbatim}
+     set location1 "502x410+0+0"
+     set location2 "502x390+530+415"
+     set location3 "502x390+530+0"
+\end{verbatim}
+By changing these geometries you can change where the command
+places windows.
+
+Unfortunately not all geometries are specified here
+(I'm working on changing that).
+So you might search through {\tt ptsetup.tcl} for other
+geometry specifications that you can change.
+
+
+
+\subsection{ Rebinding Keys }
+
+There is a command to rebind any key to any command.
+This is done from a dialogue box that you can bring up
+from the menu choice on the browser menu bar
+``MENU/MISC/Change key bindings ...''.
+You must specify three things for each binding:
+
+\begin{enumerate}
+\item {\it The command to execute:} This is just the command name.
+It must be typed into the first text entry box.
+There is a scrolling list of command names.
+When you click on an item in this list the command name is
+inserted into the text entry box.
+Some of the scrolling list entries have command names and command
+arguments but only the command name will be copied into the
+text entry box.
+The argument specifications are for your reference only.
+\item {\it Fixed arguments:}  Most commands require arguments and
+so the arguments to the command (if any) are specified in the
+second text entry box.
+These arguments must be fixed strings.
+If you want different arguments, you must rebind different keys.
+\item {\it The key to bind it to:}  This specifies the key that
+will execute the specified command.
+There is a scrolling list of most of the keys you might want
+to rebind.
+Clicking on a key on this list enters it into the third
+text entry box.
+\end{enumerate}
+
+Once you specify these three things you click on the ``Remap Key''
+button and the key binding will take effect for all existing
+windows.
+Windows created after you rebind the key will not have this new
+key binding.
+
+
+
+\subsection{ Changing the Menus }
+
+The next level of customization involves changing the menus.
+I have set things up so the menus are specified using Tcl
+lists which are structured a bit like Lisp lists except brackets
+are used instead of parentheses.
+Thus you can change the menus without having to learn too much about Tcl
+and the Tk toolkit commands.
+
+{\bf A word of warning:} Tcl lists are fragile in the sense that a missing
+bracket makes the list invalid.
+The way Point is currently set up, if the Tcl menu list is invalid
+then the menu doesn't get made and lots of bad things happen.
+Thus you should always change a copy of {\tt ptsetup.tcl}.
+I use {\tt egrep -n '\{|\}' ptsetup.tcl | more} to find sticky
+problems with mismatched brackets.
+
+I will try to make Point more robust in this respect in the future
+but a possible workaround is to read your old version of
+{\tt ptsetup.tcl} first and then the new one.
+This way, if the new one fails on a tcl syntax error, everything
+will already be defined anyway and so Point will start and work
+correctly (although without the changes you made).
+
+Let us look at the structure of menu specifications.
+The browser menu bar is created using the Tcl variable {\tt BrowserMenuSpec}
+and it is set as follows.
+For this explanation I am using a reduced version of the 
+distributed menu bar specification.
+The full version can be found in {\tt ptsetup.tcl}.
+It has more items on it but they are similar to these items.
+
+\begin{verbatim}
+set BrowserMenuSpec {
+     {button New "  New  " {
+          {OpenFileOrCD 502x410+0+0}
+          {OpenFileOrCD 502x390+530+415}
+          {OpenFileOrCD 502x390+530+0}
+     }}
+     {menu   DIRS "DIRS"   DIRS}
+     {button DelFile "Del File" {
+          {exec rm [selection get];Option set filePattern "*"}
+          Bell
+          Bell
+     }}
+     {button Close "  Close  " {
+          CloseBrowser
+          Bell
+          Bell
+     }}
+     {menu   QUIT "QUIT"   QuitMenu}
+}
+\end{verbatim}
+
+A {\it menu bar specification} is a list of items each of which is
+also a list.
+The specification above has five sublists
+(button, menu, button, button, menu).
+Each sublist will create one button on the menu bar.
+The only two types allowed are ``button'' and ''menu''.
+
+A ``button'' sublist starts with the keyword ``button''.
+The second item is the name of the button.
+This is used to bind other events to that button.
+We will ignore it for now.
+The third string is the text that will appear on the button.
+You can put spaces here to space out the buttons.
+The fourth item on the list is a sublist of three Tcl commands.
+These are the commands that will be executed when the user clicks
+the left, middle and right mouse buttons on this menu bar button.
+The one for ``Close'' is the simplest.
+Note that newlines can be used within bracketed lists for readability.
+The left mouse button action is the Point command ``CloseBrowser''.
+In general any Point command can be put here.
+The Point commands are all listed in section \ref{sect:commands}.
+Note that we use default (ring the bell) actions for the middle
+and right mouse buttons if we do not want to use them.
+The command must be there and the list must have exactly three commands.
+You can use ``Bell'' and ``DoNothing'' as dummy commands.
+
+The ``DelFile'' button is a little more complicated.
+Its left mouse button command consists of two Tcl commands.
+Note that if the command is more than a single string it
+must be a sublist and enclosed in brackets.
+If several Tcl/Point commands are to be executed then they
+must be separated by semicolons or newlines.
+The phrase {\tt [selection get]} is a Tcl expression that inserts
+the current X selection as that argument.
+The {\tt exec} command is a Tcl command to execute a Unix command,
+in this case the {\tt rm} command.
+Thus the first command will delete the file that is named in the
+X selection.
+The second command is a Point command to set the {\tt filePattern} option.
+This will have the effect of forcing Point to reread the directory and
+rewrite the list of files.
+The ``New'' button has a different command for each mouse button.
+Each command has an argument so it must be enclosed in brackets
+so that the command is a single item on the list.
+Each command is the Tcl procedure {\tt OpenFileOrCD} which is given below:
+\begin{verbatim}
+proc OpenFileOrCD {geometry} {
+     set name [selection get]
+     if [file isdirectory $name] \
+          "CD $name" \
+          "OpenWindow $name $geometry"
+}
+\end{verbatim}
+It gets the X selection and tests if it is a file or a directory.
+If it is a directory the browser changes to that directory and if it is a file
+it opens a window on that file.
+
+A ``menu'' sublist starts with the keyword ``menu''.
+The second string is the name of the button.
+This is used to bind other events to that button.
+The third string is the text that will appear on the button.
+The fourth string is the {\it name} of the string where
+the submenu is specified.
+Note that the submenu itself {\it cannot} appear here.
+The submenu must be specified as another Tcl variable and
+the name of that Tcl variable is put here.
+
+Let's look at the specification of {\tt QuitMenu}:
+\begin{verbatim}
+set QuitMenu {
+     {command "And save all" {QuitPoint save}}
+     {command "And ask" MakeQuitBox}
+     {command "And discard edits" {QuitPoint discard}}
+}
+\end{verbatim}
+
+Menu specifications are similar to, but a bit different from,
+menu bar specifications.
+They also consist of a series of sublists,
+each of which specifies one item on the menu.
+There are five types of sublists,
+but only the ``command'' type is used in {\tt QuitMenu}.
+The ``command'' specification is similar to the ``button'' specification.
+It starts with the keyword ``command'' and then the text of the
+menu item.
+(No name is required as it is with a ``button''.)
+The third item is a single command to execute when the button is selected.
+(You cannot give a command for each mouse buttons --- you should
+use a submenu instead.)
+{\tt QuitPoint} is a Point command and {\tt MakeQuitBox} is a Tcl procedure.
+You might look at {\tt MakeQuitBox} in {\tt ptsetup.tcl}
+but to understand it requires familiarity with the Tk toolkit.
+
+You can also look up the {\tt DIRS} menu specification string in
+{\tt ptsetup.tcl}.
+It is not difficult to understand.
+
+The Tcl variable {\tt TextMenuSpec} specifies
+the text window menu bar.
+It works just like the browser menu bar specification.
+
+As a larger example of submenu specifications
+let us look at the {\tt EditMenu} specification
+used in {\tt TextMenuSpec}.
+Below is an abbreviated version of it:
+\begin{verbatim}
+set EditMenu {
+     {command "Redraw window" {Redraw}}
+     {cascade "Copy =>" {
+          {command "Note destination" {CopyToHereMode}}
+          {command "Sel to destination" {CopyToHereMode}}
+          {command "Cancel copy mode" {CancelModes}}
+     }}
+     {separator}
+     {command "Repeat last edit" {Again mostrecent}}
+}
+\end{verbatim}
+This shows two more menu item types: ``separator'' and ``cascade''.
+The ``separator'' one is obvious:
+it generates a horizontal separator line in the menu.
+The ``cascade'' type creates a pull-right (or walking) submenu.
+The second string is the text to put in the menu item.
+The third item in the sublist is yet another menu specification.
+But this time the menu string itself must appear {\it not}
+the name of a variable that it is set to as in menu bar specifications.
+This is an admitted inconsistency based on the idea that these
+submenus would be fairly small but menu bar menus would be larger.
+You could have several levels of submenus but they get tedious for
+the user if they are nested too deeply.
+
+So that is the format of the menu strings.
+To change the browser menu, change the value the Tcl variable
+{\tt BrowserMenuSpec} is set to and similarly for {\tt TextMenuSpec}.
+You might try small changes in the existing menus as build up as you
+gain confidence.
+It is quite easy to remove or rearrange menu items
+and it is fairly easy to add your own items.
+Cascade submenus are also quite easy except for keeping
+the brackets matched.
+
+\subsubsection{ Interactively Changing Menu Bars }
+
+If you change the menu specifications they do not automatically
+go into effect.
+If you save the changed menu specifications, quit Point and
+restart it, then the new menus will be in effect.
+You can also do this while Point is running but it is more work.
+You should do the following things in order:
+
+\begin{enumerate}
+
+\item {\it Change the menus:}  make the changes you want.
+
+\item {\it Tell Point:}  Select the new menu specification and
+execute the command from the text window menu bar
+``EDIT/Execute Selection as Tcl''.
+This will read the new menu specification into Point
+(actually into the tcl interpreter).
+Look in the {\tt xterm} window where you started Point for error
+messages that reading the tcl code might generate.
+
+\item {\it Remake the menus:}  Execute the command {\tt RemakeTextMenus}
+or {\tt RemakeBrowserMenus} (depending on which menu bar you changed).
+This command is not on any menu so there are two ways to execute it.
+The first is to rebind some key to that command.
+The second is to enter the string {\tt RemakeTextMenus} or
+{\tt RemakeBrowserMenus} in a scratch window, select it and
+execute the ``EDIT/Execute Selection as Tcl'' command.
+
+\end{enumerate}
+
+Changes made this way will affect windows created after the
+change is made.
+
+
+\subsection{ Interactively Playing with Tcl }
+
+The command on the text menu bar ``EDIT/Execute Selection as Tcl''
+allows you to access the tcl interpreter and do a lot
+of different things.
+You start by opening up a scratch window.
+Then you enter tcl commands, select them and then execute
+then as tcl using the above command.
+
+Here are some tcl commands you might find useful to try.
+Note many of them are of the form ``{\tt pr [command]}''
+where the {\tt command} generates some information and the
+{\tt pr} tcl proc prints its argument which in this case is
+the output of the command.
+The output is printed in the {\tt xterm} window Point was
+started from.
+A common mistake is to generate the information but forget
+to print it out.
+
+\begin{itemize}
+\item {\tt pr [GetTextWindowList]} ---
+This command prints out a list of all text windows.
+You often need to know the name of a window to get more
+information about it.
+\item {\tt pr [GetBrowserList]} --- prints a list of the browser windows.
+\item {\tt pr [winfo children .]} --- this shows all the children of
+the main Point window, that is, all the text and browser windows.
+\item {\tt pr [winfo children .tw00001]} --- once you find out the
+name of a text window you can print out its children to see the
+way it is constructed.
+\item {\tt pr [bind .tw00001.vScrollAndText.text <Shift-Left>]} ---
+This is one way to find out the binding of a key in a text window.
+The window name is gotten from {\tt GetTextWindowList}.
+\item {\tt bind .tw00001.vScrollAndText.text <Shift-Left>
+	{MoveSel word left}} --- this is a way to bind
+	a command to a key.
+\item {\tt pr [GetWindowInfo .tw00001]} --- print information
+about a window.
+\item {\tt pr [GetFileInfo .tw00006]} --- print information
+about the file in a window.
+\item {\tt pr [selection get]} --- print the X selection
+\item {\tt pr [Sel get]} --- print the Point selection information
+\item {\tt pr [expr 55*78]} --- you can execute arbitrary tcl code.
+\end{itemize}
+
+
+
+\subsection{ Changing the scroll bars to the right }
+
+You can easily change the scroll bars in text window from the
+left to the right.
+Look in the file {\tt tclLib/windows.tcl} and find the tcl proc
+{\tt TextWindow}.
+Inside that proc (it has only one line) change ``left'' to ``right''.
+This only changes the scroll bars in text windows, not for browser
+windows.
+Changing the browser windows requires changes to tk.
+
+
+
+
+\subsection{ Extending Point Using Tcl as a Macro Language }
+
+Since Tcl is an interpreted language you can use it to write Point macros.
+Let's look at a couple of examples.
+
+This is a macro that indents each line that contains some
+part of the selection:
+\begin{verbatim}
+proc IndentSelection {} {
+     set sel [Sel get]
+     set here [lindex $sel 0]
+     set stop [lindex $sel 1]
+     for {} 1 {} {
+          MoveSel line left0
+          set here [lindex [Sel get] 0]
+          if {$here>$stop} \
+               break;
+          InsertString \t
+          set stop [expr $stop+1]
+          MoveSel char down
+     }
+}
+\end{verbatim}
+
+The first three lines get the bounds of the selection.
+The loop beginning in the fourth line continues until a {\tt break}
+is executed.
+We move the selection to the very first character of the line
+and get its location.
+If we are beyond the original selection then the loop is done.
+Otherwise we insert a tab to indent the line.
+Since we have added a character we have to adjust {\tt stop}.
+Finally we move down to the next line and repeat the loop.
+
+This example sends the selection through a Unix command and
+replaces it with the output of the Unix command.
+this is analogous to the ``!'' command in {\tt vi}.
+\begin{verbatim}
+proc Filter {{cmd fmt}} {
+     set s [Sel return]
+     set ret [catch {exec $cmd < $s} ns]
+     if {$ret==0} DeleteToScrap
+     InsertString $ns
+}
+\end{verbatim}
+Note that {\tt fmt} is the default {\tt cmd}.
+This fills the text to 72 character lines.
+First we get the selection and send it to the Unix command.
+We use {\tt catch} in case the Unix command fails.
+If the command succeeds we delete the selection
+and replace it with the standard output of the command.
+Otherwise we insert the error message in front of
+the original selection.
+
+The following three Tcl procedures make it easy to
+experiment with macros:
+\begin{verbatim}
+proc DefineMacro {{id 0}} {
+     set name Macro$id
+     global $name
+     set $name [selection get]
+}
+
+proc ExecMacro {{id 0}} {
+     set name Macro$id
+     global $name
+     # Note the two levels of indirection on name
+     eval [set $name]
+}
+
+proc ExecSel {{id 0}} {
+     eval [selection get]
+}
+\end{verbatim}
+``DefineMacro'' defines the selection as the name of the macro
+and ``ExecMacro'' executes the macro with that name.
+``ExecSel'' is used to read in the macro definition.
+As I was writing the above indenting macro I worked as follows.
+First I defined ``IndentSelection'' as the macro with ``DefineMacro''.
+Then I wrote the ``proc'' definition of ``IndentSelection'', selected
+it and entered the definition with ``ExecSel''.
+Then I selected the sample text and executed ``ExecMacro''.
+When there was an error, I corrected the definition,
+entered it with ``ExecSel'' and retried it with ``ExecMacro''.
+
+
+
+
+
+\input{cmds.tex}
+
+\end{document}
+

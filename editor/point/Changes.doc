@@ -1,0 +1,394 @@
+	Changes to Point
+
+
+
+			*** Chages in Version 1.2 ***
+
+*** Searching ***
+
+Most searches are the same as before, that is, no regular expressions and
+no special characters are recognized in searches.  This includes the 
+searches from the ">>" and "<<" buttons in text window menus, the searches
+from F3 and F4 and most of the seaches in the GOTO/Search for String
+menu.  But there are four new entries on that menu ">> for selected RE",
+"<< for selected RE", ">> for last RE" and "<< for last RE" that use
+a regular expression search.  In addition the search dialog box 
+(available from the "For string ..." menu item or by clicking the middle
+mosue button on either the ">>" or "<<" buttons) has a switch labelled
+"Regular expression search" which determined whether the search from
+the dialog box is a regular expression search or not.
+
+In a regular expression search certain characters are treated specially.
+The format of the regular expressions is the same as found in the Unix
+programs: ed, ex, vi, sed and grep, that is, limited regular expressions
+where you can only the the Kleene star on a single character.  The form
+of the legal regular expressions is:
+
+[1]     char    matches itself, unless it is a special
+                character (metachar): . \ [ ] * + ^ $
+
+[2]     .       matches any character.
+
+[3]     \       matches the character following it, except
+		when followed by a left or right round bracket,
+		a digit 1 to 9 or a left or right angle bracket. 
+		(see [7], [8] and [9])
+		It is used as an escape character for all 
+		other meta-characters, and itself. When used
+		in a set ([4]), it is treated as an ordinary
+		character.
+
+[4]     [set]   matches one of the characters in the set.
+                If the first character in the set is "^",
+                it matches a character NOT in the set, i.e. 
+		complements the set. A shorthand S-E is 
+		used to specify a set of characters S upto 
+		E, inclusive. The special characters "]" and 
+		"-" have no special meaning if they appear 
+		as the first chars in the set.
+                examples:        match:
+
+                        [a-z]    any lowercase alpha
+
+                        [^]-]    any char except ] and -
+
+                        [^A-Z]   any char except uppercase
+                                 alpha
+
+                        [a-zA-Z] any alpha
+
+[5]     *	any regular expression form [1] to [4], followed by
+                closure char (*) matches zero or more matches of
+                that form.
+
+[6]     +       same as [5], except it matches one or more.
+
+[7]     \(      a regular expression in the form [1] to [10], enclosed
+        \)      as \(form\) matches what form matches. The enclosure
+                creates a set of tags, used for [8] and for
+                pattern substution. The tagged forms are numbered
+		starting from 1.
+
+[8]     \N      a \ followed by a digit 1 to 9 matches whatever a
+                previously tagged regular expression ([7]) matched.
+
+[9]	\<	a regular expression starting with a \< construct
+	\>	and/or ending with a \> construct, restricts the
+		pattern matching to the beginning of a word, and/or
+		the end of a word. A word is defined to be a character
+		string beginning and/or ending with the characters
+		A-Z a-z 0-9 and _. It must also be preceded and/or
+		followed by any character outside those mentioned.
+
+[10]            a composite regular expression xy where x and y
+                are in the form [1] to [10] matches the longest
+                match of x followed by a match for y.
+
+[11]	^	a regular expression starting with a ^ character
+	$	and/or ending with a $ character, restricts the
+                pattern matching to the beginning of the line,
+                or the end of line. [anchors] Elsewhere in the
+		pattern, ^ and $ are treated as ordinary characters.
+
+
+*** replacing ***
+
+Once a string matching a regular expression has been found it can be
+replaced with another string that is made up of text and pieces of the
+string found.  The replacement expression is used to construct a string
+to replace as follows:
+
+[1]     char    puts itself into the replacement string, unless it is a
+		special character (metachar): \ or &.
+
+[2]     &       puts the entire matched string into the replacement string.
+
+[3]     \N      Puts the Nth substring (defined by \( and \) in the 
+		regular expression) into the replacement string.
+
+Regular expression replace is accessed with the "Re Search and Replace ..."
+item on the EDIT menu.
+
+
+
+
+
+			*** Changes in Version 1.3 ***
+
+* The cursor keys for left and right motion now work more correctly
+     and don't mess up the display.
+
+* Various bugs fixes as described in "Changes.log"
+
+* Triple clicking (to select a whole line) now prints the line number in
+    the message area in the browsers.
+
+* Several of the menus have be rearranged
+
+*** Macintosh style select and replace ***
+
+* In the Macintosh, selected text is replaced by newly typed characters.
+     This style is handy if you are used to it.  This cannot be easily
+     implemented in Point since zero width selections are not allowed.
+     But I added an option "insertReplaces" (default is False) which
+     when True causes this Macintosh-like behavior if the selection
+     contains two or more characters.
+
+*** User specified window and icon titles ***
+
+* You can now specify the contents of the title and icon name of point
+     text windows.  There are two new options "titleFormat" and 
+     "iconFormat" which are printf-like strings that specify the
+     formats of these two strings.  The Changes file gives the exact
+     specifications for the format strings.  The default title format is:
+         Option set titleFormat "%n%r. readOnly. [%l-%L]%c. (modified)."
+     which prints the name of the file (%n), " readOnly" if the file is
+     read only (else nothing), fir line number of the first line (%l)
+     and the last line (%L) in the window and " (modified)" if the
+     file has been changed but not saved (else nothing).  The default
+     icon name format is:
+     	 Option set iconFormat "pt: %n"
+     which prints the string "pt: " then the file name.
+
+* The pt program now uses the locationN geometries (see Changes).  It also
+    uses its current directory for file names (rather than point's).
+
+* The global "lineNumbers" option has been eliminated and replaced
+    with a line numbers flag for each window and a command to
+    set, unset or toggle this flag (see Changes).
+
+
+
+
+
+
+			*** Changes in Version 1.4 ***
+
+* I added a FAQ (frequently asked questions) file and an options.tcl file
+(which contains the default values of all Point options and shows you
+how to set them).
+
+* pt.c is now included.
+
+* Message lines have been added to windows (under the title bar) and removed
+from browsers.  The "messageFlags" option controls where messages are sent.
+The tcl/tk code in tclLib/windows.tcl determines whether browser and/or
+text windows have message lines.
+
+* If you use full geometry specifications (e.g., 502x410+0+0) then the
+window manager will automatically place the window for you.  If you use
+partial geometry specifications (e.g., 502x410) then it will ask you to
+place the window.
+
+* Keyword search box improved.
+
+* A major performance problem with saves was corrected.  It was writing out
+"progress" messages to the screen which took a lot of time.
+
+* "Close and ask" now works correctly.
+
+* Added tcl code to make it easy to move the text window scroll bar to
+the right of the text.  See window.tcl/TextWindow2.
+
+* "Enter Ascii" now works.
+
+* the "tkScrolling" variable now applies to the browser file lists.
+That is, either "line-to-top" scrolling is used for both text windows
+and browser windows or "Macintosh" scrolling is used for both.
+
+* "Find matching bracket" now works.
+
+* Clicking the middle mouse button in Tk text entry boxes (like in the
+search box) will copy in the current X (or Point) selection.
+
+* User specified backup format strings did not work correctly in many
+cases.  The specification has been changed.  There are three conversions:
+
+%n -- replaced with the full pathname of the file being backed up.
+%N -- replaced with the last component of the pathname of the
+	file being backed up.
+%D -- replaced with the full pathname of the directory the file being
+	backed up is in.
+
+To put all backups in a directory ~/backups use:
+	Option set backupNameFormat "~/backups/%N.%v"
+To put all backups in a directory ./backups use:
+	Option set backupNameFormat "%D/backups/%N.%v"
+To put all backups in the same directory as the file being backed up use:
+	Option set backupNameFormat "%n.%v"
+To make emacs style backups use:
+	Option set backupNameFormat "%n~"
+
+* Now you can specify how you want to format the title and icon name of text
+windows and browser window.  The  options for text windows are:
+	- textTitleFormat
+	- textIconFormat
+
+Each of these is in the format of a "printf-like" string.  That is, all text
+is copied into the title except for the following formats which are
+replaced by some information about the file in the text window:
+	%n -- the file name (affected by pathNames option)
+	%N -- the full path name of the file
+	%s -- the short file name
+	%c/modMsg/ -- "modMsg" if the file has changed and "" otherwise.
+		The matching '/'s can be any character.
+	%r/readOnlyMsg/ -- "readOnlyMsg" if file is read only
+		and "" otherwise.  The matching '/'s can be any character.
+	%o/overtypeMsg/ -- "overtypeMsg" if Point is in overType mode
+		and "" otherwise.  The matching '/'s can be any character.
+	%l -- the line number of the top line in the window
+	%L -- the line number of the bottom line in the window
+	%p -- the character number of the first character in the window
+	%P -- the character number of the last character in the window
+	%S -- the size of the file in characters
+	%v -- the column number of the leftmost column in the window
+	%V -- the column number of the rightmost column in the window
+
+The default value of textTitleFormat is:
+	%n%r. readOnly. [%l-%L]%c. (modified).
+which prints the name, (optionally) the readonly indicator, the line
+numbers, and (optionally) whether the file has been modified.
+e default value of textIconFormat is:
+	Edit:%n
+that is, the text "Edit: " and the name of the file.
+
+The browser relevant options are:
+	- browserTitleFormat
+	- browserIconFormat
+
+Each of these is in the format of a "printf-like" string.  That is, all text
+is copied into the title except for the following format which is
+replaced by some information about the directory:
+	%d -- the name of the directory displayed in the browser.
+
+The default browserTitleFormat is "%d" and the default browserIconFormat
+is "Dir:%d".
+
+
+
+
+
+
+			*** Changes in Version 1.5 ***
+
+
+Point now works with Tk 2.0 ot Tk2.1 and Tcl6.3.
+
+
+A number of minor bug fixes.
+
+
+Added an automatic saving feature.  It is on at:
+	 "MENU/MISC/Automatic saves every 5 minutes"
+and it does just that: saves all unsaved files every 5 minutes.
+Turn this off with:
+	"MENU/MISC/Turn off automatic saves"
+
+
+Added a facility to save the current option setting in a file.  At startup
+a file called "tclLib/options.tcl" is read in automatically and it sets
+every Point option.  Selecting:
+	"MENU/MISC/Save Point Options ..."
+will pop up a dialog box that allows you to create a new version of
+"options.tcl".  Move it into tclLib and it will be read in when you
+start Point.
+
+
+Point now looks for option settings in the X resource database.  But
+*BE WARNED*, the file "tclLib/options.tcl" is now read whenever Point
+starts and it will override option setting from the X resource database.
+So if you want to get options from the database you have to go into
+"tclLib/options.tcl" and delete the lines that set the options set
+by X resources.  Otherwise your resource setting will have no effect.
+
+
+The command at:
+	"MENU/MISC/Change key bindings ..."
+allows you to change the key bindings in all current text windows.  This
+pops up a dialog box.  First you select a command from the scrolling list.
+The commands are arranged alphabeticlaly with categorys.
+Click on it and it will appear in the line below the scrolling list.  Or
+you can type in the command name directly.  This is useful if the command
+calls a tcl macro that you wrote or that is not on the scrolling list.
+Note that some commands on the scrolling list show arguments.  This is just
+for your reference, the argument are not copied into the line.
+If a command requires a arguments that they are typed in the line below
+the line where the command name is entered.  Note that the argument must
+be fixed, that is, the same every time the command is executed.
+Finally you select a key to remap.  Use "xev" to find out the name of a key
+if you do not know it.  Most X installations have "xev".  See the man page.
+Note that these key bindings only apply to existing text windows and will
+not be applied to new windows created after you do the rebinding.
+
+
+You can now change the menus on the fly although it you have to do it
+yourself.  (I'm working on a more convenient version of this facilty.)
+Here are the steps to follow:
+(1) Change the definition of TextMenuSpec, BrowserMenuSpec or
+ThinBrowserMenuSpec.  One way to do this is to select the new definition
+and then issue the command "EDIT/Execute Selection as Tcl".
+(2) Execute RemakeTextMenus or RemakeBrowserMenus.  Again, you can do this
+by selecting the textual name of the command (as written above) and
+executing the selection as tcl.
+
+
+
+
+			*** Changes in Version 1.53 ***
+
+See Changes.log for a complete list of changes.
+
+You can expand and contract the size of the open window list in a browser.
+Control-Button3 inside the open window list makes it one line bigger and
+Control-Button1 makes it one line smaller.
+
+The pt command has been improved so that now it actually works!  I does not
+start a copy of Point anymore.  I added a flag so it does not have to wait
+for a user verification to create the scratch file so it no longer times out.
+I use it as the editor "elm" calls now and it should work any place where
+a program calls an editor as a subprocess.  Just say your editor is:
+	pt -c -w
+The "-c" means to create the file winout asking and the "-w" means to
+wait until the file is closed and then exit.
+
+The binding for the arrow keys is corrected.
+
+Multiple clicking must be within the C double click time period.
+Before there was no time limit between clicks
+
+The keyword search box now allows you to specify the files to be searched.
+
+I added a first version of a major new facility.  It allows you to run
+other Unix program as subprocesses in windows.  Typed input goes to
+the subprocess and the output from the subprocess is inserted into
+the window.  There is one basic command that does this but it is
+packaged into four commands on the browser menu under MENU/SHELL/PTY
+(so named because this facility uses the unix psuedo-ttys (pty)).
+Some possible uses:
+
+(A) to copy a file into a Point window
+	- insert "cat fileName" in the window and select it
+	- execute MENU/SHELL/PTY/"Run and replace selection"
+(B) to insert a directory listing in a window
+	- insert "ls" in the window and select it
+	- execute MENU/SHELL/PTY/"Run and replace selection"
+(C) You can run a shell in an existing with with
+	MENU/SHELL/PTY/"Run csh in file" or in a new window with
+	MENU/SHELL/PTY/"Run csh in window".
+You can change this to another shell such as the Kern shell by changing
+the commands in tclLib/browserMenu.tcl (lines 161-164).
+
+This facility is not completely debugged so beware.
+
+Also remember the the current directory the subprocess inherits is the
+current directory of Point at the time.  This will always be the 
+directory shown in the last browser window that the mouse was in.
+There is no visual indication of this (there should be I guess).
+
+The manual has been updated with all new changes.
+
+Conversions have been added to the browser and text window titles so that
+you can mark the active window and the active browser.  The default titles
+use these conversions.
+
+

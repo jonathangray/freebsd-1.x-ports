@@ -1,0 +1,1072 @@
+\section{Point Commands} \label{sect:commands}
+
+In this section I will describe each of the commands that Point understands.
+Each command entry begins with the command name and then gives a description
+of the effect of the command.
+Some commands have arguments which are given after the command name.
+All arguments are strings.
+
+Commands that insert text insert it at the insertion point.
+Commands that operate on the selection operate on the selection window.
+Other commands operate in the active window (the last window the
+mouse entered) unless the optional ``tkPathName'' argument is present.
+If it is present then it is the Tk path name for the window
+which will be affected by the command.
+
+Some of these commands are native Point commands and some of them
+are implemented with tcl procedures.
+
+
+
+
+\subsection{Insertion Commands}
+
+\subsubsection{InsertAscii numericChar}
+This command allows you to insert any eight bit character into the file.
+The argument ``numericChar'' can specify the character as a decimal integer.
+
+\subsubsection{InsertFromScrap}
+The text in the scrap buffer is inserted at the insertion point.
+The contents of the scrap buffer are unchanged and can be inserted again
+in the same or a different place.
+The other commands that change the scrap buffer are:
+DeleteToScrap, ExchangeWithScrap and CopySelToScrap.
+
+{\bf Usage hint:} {\it  to duplicate a line (or other section of text)
+a number of times: select and delete the lines and then
+insert them as many times as required.}
+
+\subsubsection{InsertString string}
+The specified string is inserted at the insertion point.
+
+\subsubsection{InsertSelectedString}
+The X selection is inserted at the insertion point.
+
+\subsubsection{InsertFile}
+The selection is used as a file name.
+That file replaces the selection in the window.
+
+
+
+
+\subsection{ Selection Editing Commands}
+
+\subsubsection{ChangeCaseOfSel \{toupper$\mid$tolower$\mid$toggle\}}
+This command changes the case
+of each letter in the selection.
+Non-letter characters are unaffected.
+The argument determines how the case is changed:
+to upper case, to lower case or change case
+(lower goes to upper and upper goes to lower).
+If the argument is missing or empty it defaults to ``toggle''.
+
+\subsubsection{DeleteToScrap}
+The selected text is deleted and placed in the scrap buffer.
+The previous contents of the scrap buffer are lost.
+
+\subsubsection{ExchangeWithScrap}
+The contents of the scrap buffer and the selection are exchanged.
+
+{\bf Usage hint:} {\it to exchange two pieces of text:
+select one piece of text
+and invoke CopySelToScrap, then select the other piece of text and
+invoke ExchangeWithScrap, finally select the first piece of text
+and invoke ExchangeWithScrap again.}
+
+\subsubsection{DeleteLine [all]}
+Deletes from the beginning of the selection to the end
+of the line.
+If {\tt all} is 1 (true) the the entire line is deleted.
+
+\subsubsection{IndentSelection [outdent]}
+A tab is inserted at the beginning of each line that contains
+at least one selected character.
+If {\tt outdent} is 1 (true) then the first character
+of each line is deleted.
+Presumably this is a tab character.
+
+\subsubsection{Filter [cmd]}
+The selection is provided to {\tt cmd} as its standard
+input and the standard output of {\tt cmd} replaces
+the selection.
+The default {\tt cmd} is {\tt fmt}.
+
+\subsubsection{JustifySel}
+This command acts on whole lines.
+It acts on all lines in which one or more characters
+in the line are selected.
+All of the lines are justified between column 1 and the column
+specified by the {\bf rightMargin} option variable.
+
+{\bf Usage hint:} {\it To indent and justify, first justify to column 1 and
+then shift all the lines to the right.}
+
+
+
+
+\subsection{Move and Copy Commands}
+
+\subsubsection{CopySelToScrap}
+Copies the selection to the scrap buffer.
+The selection is unaffected.
+The previous contents of the scrap buffer are lost.
+
+{\bf Usage hint:} {\it to copy the selected text somewhere:
+invoke CopySelToScrap, move to the insertion location and
+select it and then invoke InsertFromScrap.}
+
+\subsubsection{CopySelToMouse}
+The selection is copied to the location of the mouse pointer
+when the command was executed.
+The copy is by characters, words or lines depending on the mode
+of the selection.
+If the selection mode is by words or lines the insert is at the
+beginning of the word or line that contains the location
+of the mouse pointer.
+
+{\bf Usage hint:} {\it to copy a line (or lines) of text:
+select the lines in line mode (with a triple click)
+and invoke the CopySelToMouse command anywhere on the line {\bf after}
+you want the lines copied to.}
+
+{\bf Note:} This command is only suitable to attach to a mouse
+button or a mouse menu.
+
+\subsubsection{MoveSelToMouse}
+The selection is moved to the current location of the mouse pointer.
+The move is by characters, words or lines depending on the mode
+of the selection.
+If the selection mode is by words or lines the insert is at the
+beginning of the word or line that contains the location
+of the mouse pointer.
+
+{\bf Usage hint:} {\it to move a line (or lines) of text:
+select the lines in line mode (with a triple click)
+and invoke the MoveSelToMouse command anywhere on the line {\bf after}
+you want the lines moved to.}
+
+{\bf Note:} This command is only suitable to attach to a mouse
+button or a mouse menu.
+
+\subsubsection{CopyToHereMode}
+This command must be invoked twice to complete a copy.
+The first time you invoke the {\tt CopyFromHereMode} command you set the
+location to which the text will be copied.
+You are then in {\em duplicate} mode and the mouse sprite becomes
+a hand with a right pointing hand (this can be changed
+to any cursor font cursor with the {\tt copySpriteName} option).
+You can then continue using Point and execute any commands you like.
+When you invoke the {\tt CopyFromHereMode} command while in duplicate mode
+the current selection will be copied to the location remembered
+from the first invocation of {\tt CopyFromHereMode}.
+
+{\bf Usage hint:} {\it the advantage of this command is that you can copy
+text into your typing stream without losing your insertion point.
+Suppose you are typing a line in C and want to type a variable
+name that appears on a nearby line.
+First invoke the {\tt CopyFromHereMode} command, then select the nearby word
+(with a double click of the left mouse button) and then invoke
+{\tt CopyFromHereMode} again.
+The word is copied into the line and the insertion point is at the
+end of the copied word so you can continue typing the line without
+readjusting the insertion point.
+You can create a line by grabbing pieces of nearby lines one after
+the other.
+A new line of code in an existing routine can usually be created without
+the keyboard at all.}
+
+My rule about copying nearby words is that the break-even point for
+effort is around five or six characters, that is, if the variable name
+you are about to type is longer than that it is probably easier to
+copy it than to retype it.
+Another advantage of copying is that there is no chance you will mistype
+the word.
+
+If the word you want to copy is not visible on the screen it is usually
+not worth the effort to copy it because that would require window
+rearranging.
+It may be worth it if it is a global variable with a long name
+(and global variables should have long descriptive names)
+that would be hard to type correctly.
+And since you will have to type in an external reference to the
+variable anyway you might as well find a copy of the external reference,
+copy it in as a complete line and then copy the global variable name
+from the copied in line.
+
+\subsubsection{MoveFromHereMode}
+This is identical to the {\tt CopyFromHereMode} command except that the text
+is moved (that is, deleted from its original location) when the
+second {\tt MoveFromHereMode} is invoked.
+
+
+
+
+
+\subsection{Again and Undo Commands}
+
+\subsubsection{Again [tkPathName$\mid$mostrecent$\mid$thisfile]}
+The last command (not counting deletes) is repeated in the current context.
+If the last command copied text into the insertion point then that same
+text is copied into the current insertion point.
+If the last two commands were to delete the current selection and replace
+it with new text (either typed in or copied in from somewhere else) then
+this command will replace the current selection with that same text.
+
+The optional argument determines which command is repeated.
+The default is {\tt mostrecent} which means that the most
+recent edit is repeated.
+If the argument is {\tt thisfile} then the most recent edit
+in the file containing the selection is repeated.
+Finally if a window name is given the most recent edit in the
+file in that window is repeated.
+
+{\bf Usage hint:} {\it to perform a selective replace, that is, to replace
+some but not all instances of one text string with another text string:
+search for the string using a SearchForString selection box until you
+find the first instance you want to replace.
+Then search for the following instances of the string
+(either with the dialogue box or with the RepeatSearch command).
+For all the ones you want to replace just invoke Again.}
+
+\subsubsection{Undo [nToUndo] [tkPathName]}
+The last undone command is undone:
+deleted text is reinserted, copied text is deleted,
+moved text is put back where it was moved from.
+If this command is repeated the undo itself is undone
+so only one previous command can be undone with UndoOne.
+If this command is repeated the command before the last command
+is undone and so on.
+The argument {\tt nToUndo} (which defaults to 1) determines how
+many edits will be undone.
+
+\subsubsection{Redo [nToRedo] [tkPathName]}
+The last undone command that has not been redone is redone.
+This command can be used only to redo commands that have been undone.
+The argument {\tt nToRedo} (which defaults to 1) determines how
+many edits will be redone.
+
+
+
+
+\subsection{Search and Replace Commands}
+
+\subsubsection{Search stringToSearchFor
+		[\{forward$\mid$backward\}] [tkPathName] [update]}
+The search is performed in the active window
+(not the selection window), that is, the
+last window the mouse sprite was in unless the third
+argument is given, in which case it names the window to search in.
+If the selection is in that window then
+the search begins at the selection, otherwise the search begins
+at the first character of the file.
+If the fourth argument is missing, empty or is the string ``update''
+then the window will be updated after the string is found.
+Otherwise it will not be updated.
+The search direction is either forward or backward.
+There are several options that affect how the search is done:
+the {\tt ignoreCase} option determines whether case is significant
+in the search, the {\tt findWholeWords} option determines whether
+the string can be a substring of a larger string or not.
+The {\tt linesOverFind} option affects the positioning of the found string
+in the window if the window has to be jumped in order to show the
+found string.
+If the second argument is missing or empty then ``forward''
+is assumed.
+If the third argument is given the second argument must appear also
+(although it can be the empty string).
+
+\subsubsection{RepeatSearch \{forward$\mid$backward\} [tkPathName]}
+The last string searched for is used as the search string
+for a new search.
+The search direction is either forward or backward.
+If the first argument is missing or empty then ``forward''
+is assumed.
+If the second argument is given the first argument must appear also
+(although it can be the empty string).
+
+\subsubsection{RegexSearch regexToSearchFor
+		[\{forward$\mid$backward\}] [tkPathName] [update]}
+This command searches for a regular expression in the text.
+It is identical to the ``Search'' command given above except that
+it is a regular expression search instead of a fixed text search and
+if {\tt regexToSearchFor} is empty then the last regular expression
+that was searched for will be used again.
+
+{\bf Usage hint:} {\it Normally you want a fixed text search.
+Then you do not have to worry about escaping special characters
+and it is a bit faster as well.
+Just use the regular expression search when you really want to
+search for a pattern rather than a fixed string.}
+
+\subsubsection{RepeatSearch \{forward$\mid$backward\} [tkPathName]}
+The last string searched for is used as the search string
+for a new search.
+The search direction is either forward or backward.
+If the first argument is missing or empty then ``forward''
+is assumed.
+If the second argument is given the first argument must appear also
+(although it can be the empty string).
+
+\subsubsection{CTag ctag}
+The {\tt ctag} is looked up in the file {\tt tags}
+(created by the Unix command {\tt ctags}) in the current directory.
+the file containing the flag is loaded into a new window
+or, if the file is already in a window, that window is raised
+to the top.
+The window is jumped to show the {\tt ctag} string and the {\tt ctag} string
+is selected.
+
+\subsubsection{SearchCharacter char [tkPathName]}
+If the `char' is an ASCII character then it is appended
+to the search string maintained by this command and the
+string is searched for (forwards in the file).
+Thus the command implements incremental search.
+If `char' is a non-ASCII character (e.g., a function key)
+then the search string is cleared.
+This search string is different from the search string for the
+search command.
+
+{\bf Usage hint:} {\it I bind this to the menu bar item
+for string search.
+Then I can type characters into that menu item and get incremental
+search.
+It never throws away characters unless you clear the search string
+so get in the habit of pressing a function key before starting
+your search string.}
+
+\subsubsection{Replace searchString replaceString [inselection] [tkPathName]}
+This command replaces each occurrence of the ``searchString'' with the
+``replaceString'' either in the entire file (if the third argument is
+missing or empty) or within the selection (if the third argument is
+``inselection'').
+The search is affected by the normal search options
+({\tt ignoreCase} and {\tt findWholeWords}).
+The replace is done in the active window unless the fourth
+argument names a valid text window.
+
+\subsubsection{RegexReplaceOne regexString replaceString [tkPathName]}
+This command finds the next match of the regular expression
+``regexString'' and replaces it with ``replaceString''.
+
+\subsubsection{RegexReplaceAll regexString replaceString [inselection]}
+This command finds all matches of the regular expression
+``regexString'' and replaces them with ``replaceString''.
+
+\subsubsection{FindMatchingBracket}
+The following brackets are matched in pairs:
+( and ), \{ and \}, [ and ].
+If one of these characters is the first character of the selection,
+Point will search (forward for (, \{ and [; backward for ), \} and ])
+for the matching bracket.
+By matching, we mean that it keeps a count of left and right brackets
+and finds the matching bracket when count is zero.
+
+
+
+
+
+\subsection{Scrolling and Jumping Commands}
+
+\subsubsection{MoveToEndFile [tkPathName]}
+The window is repositioned so that it shows the end of the file.
+The file will be positioned so that the end of file marker is
+on the last line of the window (unless the entire file will
+fit in fewer lines).
+
+\subsubsection{ShowSelection}
+The window containing the selection is brought to the front and
+repositioned so that the beginning of the selection is visible
+in the window.
+The {\tt linesOverFind} option determines the placement of the first
+line of the selection in the window.
+
+\subsubsection{MoveToLastPlace [tkPathName]}
+This repositions the window to the last place you have jumped from.
+Point remembers a separate last place for each window.
+
+{\bf Usage hint:} {\it this command is useful for switching between
+two different places in the file.}
+
+\subsubsection{GotoLine lineNumber \{lof$\mid$top\} [tkPathName]}
+The window is repositioned so that the line number specified
+is show in the window.
+If `lof' is specified then the {\tt linesOverFind} option
+determines where the line is positioned in the window.
+If `top' is specified then the line number is positioned 
+at the top of the window.
+See the description of that option for details.
+If the second argument is missing or empty then ``lof''
+is assumed.
+
+\subsubsection{GotoDigit digit [tkPathName]}
+The `digit' is added to a line number that is collected.
+If `digit' is not a digit, then the line number collected
+so far is jumped to.
+The {\tt linesOverFind} option determines the placement
+of the line gone to in the window.
+
+\subsubsection{ScrollWindow \{up$\mid$down\} \{numberOfLines$\mid$page\}
+		[tkPathName]}
+The window is scrolled by `numberOfLines'.
+If the second argument is ``page'' or missing or empty,
+then the window is scrolled down the number of lines in
+the window minus two (for context).
+The first argument determines the scroll direction.
+If it is missing or empty then ``down'' is assumed.
+
+
+
+
+\subsection{Cursor Positioning Command}
+
+\subsubsection{MoveSel \{char$\mid$word$\mid$line\}
+		\{up$\mid$down$\mid$right$\mid$left$\mid$left0\}}
+This command moves the selection.
+The movement can be by character, by word or to the limits of the line.
+The second argument determines the direction of movement.
+You can only use ``up'' and ``down'' with ``char''.
+For ``line'', ``right'' moves the selection to the last character
+of the line (which will always be the newline character
+that ends the line), ``left'' moves to the first non-white space
+character of the line and ``left0'' moves to the first
+character of the line.
+These commands are usually attached to keys
+or used in macros (like indent selected lines).
+
+
+
+
+
+\subsection{Window Creation Commands}
+
+\subsubsection{OpenWindow fileName geometry doNotAsk}
+A new window is created and 'fileName' is loaded into the new window.
+The `geometry' argument specifies the geometry of the new window.
+If `geometry' is missing or empty then the default
+{\tt textGeometry} is used.
+If {\tt fileName} does not exist then the user will be asked
+for verification before it is created unless the {\tt doNotAsk}
+argument is present and is literally the string ``doNotAsk''.
+This command returns a string that is the Tk path name
+of this window.
+It will always be of the form ``.twDDDDD'' where each D
+is a decimal digit.
+Point assigns window names with a counter so the first window
+will be ``00001'', the second window ``00002'' and so on.
+Text windows, browser windows, and some popup dialogue boxes
+all share the same counter so the numbers of the text windows
+will not necessarily be sequential.
+
+\subsubsection{CloseWindow \{save$\mid$nosave$\mid$ask\} [tkPathName]}
+The window is closed and removed from the screen.
+If the file in the window has been edited and this is the last window
+open on the file then the argument determines whether the
+file will be saved or not.
+If `save' is specified it will be saved, if 'nosave' is specified
+it will not be saved and if 'ask' is specified a dialogue box
+will pop up asking the user whether to save the file or not.
+If the first argument is missing or empty then ``ask'' is assumed.
+
+\subsubsection{Browser geometry [tkPathName]}
+This command creates another file browser.
+The `geometry' argument determines the geometry of the new browser.
+If it is missing or empty then the default {\tt browserGeometry} will be used.
+If the second argument is missing or empty then ``big'' is assumed.
+
+{\bf Usage hint:} Use this command to get a file from another directory
+while keeping a file browser showing the current directory.
+
+\subsubsection{CloseBrowser [tkPathName]}
+The specified browser (the active browser is the default) is closed.
+
+
+
+
+\subsection{File Writing Commands}
+
+
+\subsubsection{SaveFile [tkPathName]}
+The file in the active window (or the window named by {\tt tkPathName})
+is saved on disk.
+
+\subsubsection{SaveAs [tkPathName]}
+The file in the active window (or the window named by {\tt tkPathName})
+is written to disk.
+The name to use for the file is provided by the user through a dialogue box.
+
+\subsubsection{SaveAllFiles}
+All files that have been changed but not yet saved are saved.
+
+
+
+
+
+\subsection{Window Size and Location Commands}
+
+\subsubsection{LowerWindow [tkPathName]}
+Move the active window (or the window named by {\tt tkPathName})
+behind all other windows in the display
+(both Point windows and the windows of other X applications).
+
+\subsubsection{MoveWindow geometry [tkPathName]}
+The window is moved and resized according to `geometry'.
+
+\subsubsection{RaiseListWindow numInList [geometry]}
+This command affects the window which is the `numInList'th
+item on the open window list.
+That window is raised and resized according to `geometry'
+(which defaults to {\tt textGeometry}).
+
+\subsubsection{RaiseWindow [tkPathName]}
+Bring the active window (or the window named by {\tt tkPathName})
+to the front of all other windows in the display
+(both Point windows and the windows of other X applications).
+
+\subsubsection{Zoom [\{vertical$\mid$full\}] [tkPathName]}
+The window is enlarged to be the full height of the screen
+(if the first argument is {\tt vertical}
+or the full size of the screen (if the first argument is {\tt full}.
+If the first argument is missing {\tt vertical} is assumed.
+
+
+
+
+
+\subsection{Font Commands}
+
+\subsubsection{BrowserFont fontName [tkPathname]}
+This command changes the font
+(in the specified browser where the active browser is the default)
+to `fontName'.
+If the font change fails the font in the active browser
+is changed to the default font {\tt browserFont}.
+
+\subsubsection{TextFont fontName [tkPathname]}
+This command changes the font
+(in the specified window where the active window is the default)
+to `fontName'.
+If the font change fails the font in the active window
+is changed to the default font {\tt textFont}.
+
+
+
+
+
+\subsection{ Selection and Mode Commands }
+
+\subsubsection{CancelModes}
+This command cancels duplicate or extract mode
+if either in in effect.
+Otherwise the command has no effect.
+This command is used when you inadvertently enter
+duplicate and extract mode with a erroneous button
+click or keypress.
+The mouse sprite will change back to normal
+(from the right pointing hand that marks duplicate mode).
+
+\subsubsection{ExtendSelToLines}
+The selection is extended so that it consists of only complete lines.
+
+\subsubsection{Sel \{set$\mid$get$\mid$return\} selBegin selEnd [tkPathName]
+			[\{char$\mid$word$\mid$line\}]}
+If the first argument is ``get'' then there are no other arguments
+and the command returns a Tcl list of four strings.
+The first two strings are decimal numbers and are the character positions
+of the first and last character in the selection.
+The third string is the Tk path name of the window containing
+the selection.
+The fourth string is the selection mode and is one of the
+string {\tt char}, {\tt word} or {\tt line}.
+If the first argument is ``set'' then the selection is changed
+so that it begins at character position ``selBegin'' and ends
+at character position ``selEnd''.
+If the third argument is present the selection window is changed to
+the window specified by the Tk path name.
+If the fourth argument is present is changes the
+selection mode.
+If the first argument is ``return'' then the contents of the
+selection are returned.
+
+\subsubsection{SetLineNumbers how}
+This command determines whether line numbers are displayed
+with the text in the window.
+Each window has a line number flag and this command changes it.
+If {\tt how} is "1" then line numbers are displayed.
+If {\tt how} is "0" then line numbers are not displayed.
+If {\tt how} is anything else then the line numbering flag is toggled.
+
+\subsubsection{SetTextColor colorName \{normal$\mid$selected\}
+     \{foreground$\mid$background\} }
+This command sets the text color in the active window.
+You can use it to set either the foreground or the background
+of either normal text or selected text.
+If the second argument is missing or empty then ``normal''
+is assumed.
+If the third argument is missing or empty then ``foreground''
+is assumed.
+
+\subsubsection{ToggleReadOnly [tkPathname]}
+A file can be specified ''read-only'', in which case,
+Point will not allow you to modify it.
+This command toggles the read-only status of the file
+in the active window (or the window named by {\tt tkPathname}).
+
+
+
+
+
+
+
+
+\subsection{ Subprocess Commands }
+
+\subsubsection{ConnectToPty arg1 arg2 arg3 arg4 arg5 arg6}
+Create a Unix pseudo-tty.
+Execute the command {\tt arg1} with arguments {\tt arg2} through
+{\tt arg6} as a subprocess.
+The output of the subprocess is inserted into the window
+containing the selection when this command is executed.
+Input into that window is sent to the subprocess over
+the pseudo-tty.
+
+\subsubsection{WaitForProcess pid}
+Delay until subprocess {\tt pid} finishes.
+
+\subsubsection{RunProgramInFile delsel}
+The selection is used as the name of a program to execute
+in a subprocess and the window containing the selection is connected
+to the subprocess via a Unix pseudo-tty.
+If {\tt delsel} is 1 (true) then the selection is deleted
+after it is used.
+
+\subsubsection{RunProgramInWindow prog}
+{\tt prog} is used as the name of a program to execute
+in a subprocess.
+A window is created and connected to the subprocess via a Unix pseudo-tty.
+
+
+
+
+
+\subsection{ Information and Status Commands }
+
+\subsubsection{MessageLine message}
+The text string {\tt message} is displayed on the message line of
+each text window.
+This command can be used from tcl/tk macros to display messages
+to the user.
+
+\subsubsection{PrintStats}
+Information about the effectiveness of Point's caches is
+printed out to the {\tt xterm} window in which Point was started.
+
+\subsubsection{ShowUndoStack}
+This command pops up a dialogue box that shows the command
+history.
+For each command it gives information about the command
+including whether it has been undone (and not redone) or not.
+
+\subsubsection{GetTextWindowList}
+This command returns a list of the Tk name of all existing text windows.
+
+\subsubsection{GetBrowserList}
+This command returns a list of the Tk name of all existing browsers.
+
+\subsubsection{GetRowCol offset [tkPathName]}
+This command returns a Tcl list of two integers.
+These are the row and column in the window of the
+character in character position ``offset''.
+
+\subsubsection{WindowName set \{active$\mid$selected\} tkPathName}
+Make the specified window (in {\tt tkPathName}) either the
+selection window or the active window.
+
+\subsubsection{WindowName get \{active$\mid$selected\}}
+Return the Tk path name of the selection window or the active window.
+
+\subsubsection{GetWindowInfo [tkPathName]}
+This command returns a Tcl list of information about the
+window whose Tk path name is given by ``tkPathName''
+(the default is the active window).
+If the argument is omitted then the active window is assumed.
+This list consists of (in order):
+the character position of the first character displayed in the window,
+the character position after the last character displayed in the window,
+the line number of the first line displayed in the window,
+the line number of the last line displayed in the window plus one,
+the number of columns the window is scrolled horizontally,
+the number of lines displayed in the window,
+the number of columns displayed in the window,
+the X window id of the window,
+the Tk window id of the toplevel window,
+the Tk window id of the text window.
+
+\subsubsection{GetFileChars firstByte lastByte [tkPathName]}
+Return the characters from the file in the specified window.
+If no window is given the active window is used.
+
+\subsubsection{GetFileInfo [tkPathName]}
+This command returns a Tcl list of information about the
+file displayed in the window whose Tk path name is given by ``tkPathName''.
+If the argument is omitted then the active window is assumed.
+This list consists of (in order):
+the name of the file displayed in the window,
+the current size of the file in bytes,
+the original size of the file when it was loaded
+(before any editing was done),
+a flags field which is the {\it or}ing together
+of the flags:
+0x1 if a backup file has been made,
+0x2 if the file is read only,
+0x4 if the file has been changed (and not yet saved),
+and 0x8 if the file cannot be changed to read/write.
+
+\subsubsection{winfo children .}
+This is really a straight Tk command.
+It returns the path names of all the children of the root window.
+For Point this will be all the toplevel windows.
+All the text windows will have names of the form ``.twDDDDD''.
+All browser windows will have names of the form ``.bwDDDDD''.
+Here each ``D'' is a decimal digit.
+Popup dialogues will have various other names
+but none of these names will start with ``.bw'' or ``.tw''.
+This command will provide you with a list of all of Point's
+text windows.
+You can use other commands to get information about each
+text window (and the file it displays).
+
+
+
+
+\subsection{ Option Commands }
+
+\subsubsection{Option get optionName}
+A string is returned that is the value of the specified
+Point option.
+Integers are returned as decimal strings.
+Booleans are returned as 0 (False) or 1 (True).
+
+\subsubsection{Option set optionName optionValue}
+The specified Point option is set to ``optionValue''.
+Integer arguments can be in octal, decimal or hex.
+Boolean options can be 0, 1, true or false.
+Case is not considered in the strings ``true'' and ``false''.
+
+
+
+
+
+\subsection{Miscellaneous Commands}
+
+\subsubsection{QuitPoint \{save$\mid$discard$\mid$ask\}}
+Quit Point after checking each file to see if it has been changed
+but not yet saved.
+The argument determines whether these files will be saved.
+If the argument is missing then ``ask'' is assumed.
+
+\subsubsection{Redraw}
+This command redraws the entire window so that it corresponds to
+the true state of the file.
+
+\subsubsection{CD directoryName [tkPathname]}
+The Unix current directory of the specified browser
+(the default is the active browser) is changed to `directoryName'.
+If the first argument is missing or empty then the user's home directory
+is assumed.
+
+\subsubsection{SendOnClose tkPathName interpName command}
+This command is intended to be used by a process that
+is sending commands to Point via the Tcl ``send'' command.
+The ``tkPathName'' is the Tk window name that Point
+assigns to the window (and that is returned by the
+OpenWindow command).
+The ``interpName'' is the name of the Tcl interpreter to send
+``command tkPathName'' to when that window is closed.
+That is, when window ``tkPathName'' is closed,
+Point will execute the Tcl command:
+\begin{verbatim}
+     send interpName command tkPathName
+\end{verbatim}
+
+\subsubsection{DoNothing}
+This command does nothing.
+It is a placeholder command if you have to specify
+a command but do not want it to actually do anything.
+
+\subsubsection{WaitForReturnString}
+This command runs a local Tk event loop and does not return
+until the Point option {\tt returnString} is non-empty.
+This is used to create a modal dialogue box.
+You set up the dialogue box so that it sets returnString to
+a non-empty string when it has its input.
+Then you pop up the dialogue box and execute this command.
+When it returns the input will be available.
+As an example look at {\tt proc MakeVerifyBox} and
+{\tt proc DoReplace} in {\tt ptsetup.tcl}
+
+\subsubsection{RemakeTextWindows}
+The menu bar of each text window is destroyed and recreated.
+This is used after the menu bar specification has been changed
+and you want the menus to reflect the new specification.
+
+\subsubsection{RemakeBrowserWindows}
+The menu bar of each browser window is destroyed and recreated.
+This is used after the menu bar specification has been changed
+and you want the menus to reflect the new specification.
+
+Change the cursor of all the text and browser windows.
+The new cursor can be given by name (it must be in the X font cursor
+font) or it can be one of the Point cursors (busy, current, main or dup).
+
+
+
+
+
+\subsection{ Event Callback Commands }
+
+The commands in this section are used by event handlers to get
+Point to do certain things.
+
+\subsubsection{VScroll \{press$\mid$release$\mid$motion\} newY button}
+This command is used by the scrollbar to scroll a window.
+
+\subsubsection{HScroll \{press$\mid$release$\mid$motion\} newY button}
+This command is used by the scrollbar to scroll a window.
+
+\subsubsection{Key keysym shiftState}
+Tells Point that a certain key was pressed.
+
+\subsubsection{Mouse tkPathName command x y clicks}
+Tells Point about a mouse event.
+Command must be one of: BeginSelection, BeginExtend, ExtendSelection,
+EndExtending, BeginMouseMenu1, BeginMouseMenu2, ContinueMouseMenu,
+CancelMouseMenu or EndMouseMenu.
+
+\subsubsection{Configure tkPathName}
+Tells point that a configure event occurred.
+
+\subsubsection{EnterText tkPathName}
+Tells point that the mouse cursor entered a text window.
+
+\subsubsection{EnterBrowser tkPathName}
+Tells point that the mouse cursor entered a browser.
+
+\subsubsection{Expose tkPathName x y width height count}
+Tells point that an expose event occurred.
+
+
+
+
+
+\subsection{ Dialogue Box Commands }
+
+\subsubsection{MakeAsciiBox}
+This command allows you to insert any eight bit character into the file.
+A dialogue box comes up and you can enter the character as a decimal
+(starting with [1-9]) integer, an octal (starting with 0) integer or
+a hexadecimal (starting with 0x) integer.
+
+\subsubsection{MakeAboutBox}
+This command brings up a box that gives information
+about Point.
+Clicking on the dialogue box closes it.
+
+\subsubsection{MakeMsgBox msg}
+Pops up a message box displaying the message in ``msg''.
+
+\subsubsection{MakemmBox}
+Pops up a dialogue box that allows you to set the parameters
+of the mouse menus, that is, the text and command for each
+direction of the two mouse menus.
+
+\subsubsection{MakeColorBox}
+Pops up a dialogue box that allows you to select the color
+or the foreground and background of normal and selected text.
+You select the colors from a scrolling list of of color names from
+the X color database.
+
+\subsubsection{MakeCtagBox}
+Pops up a dialogue box that allows you to search for a C tag.
+
+\subsubsection{MakeKeywordBox}
+Pops up a dialogue box that allows you to search for a keyword.
+
+\subsubsection{FillKeywordBox}
+Starts a search for a keyword based on the keyword in
+the keyword box and fills the list with the file names
+containing that keyword.
+
+\subsubsection{MakeGotoBox}
+Pops up a dialogue box that allows you to jump to a line number.
+
+\subsubsection{MakeDebugBox}
+Pops up a dialogue box that allows you to change the value
+of the debug variable.
+
+\subsubsection{MakeQuitBox}
+Pops up a dialogue box that allows you to choose quit options.
+
+\subsubsection{MakeReplaceBox}
+The {\tt MakeReplaceBox} command brings up a dialogue box
+that allows you to specify
+the string to search for and the string to replace it with.
+There are three checkbox options you can set.
+The first is to verify each replacement.
+If this is turned on then each time the search string is found
+the window is made to show the string found, the string is
+selected and you
+are presented with a dialogue box asking whether you want
+to replace the string or not.
+If you do not choose the verify option you might want to use the
+internal (C) version of search and replace rather than the external
+(Tcl) version which is considerably slower.
+The final checkbox option is to restrict the replace to the selection
+only.
+This is useful, for example, for changing one identifier to another
+over a few lines of code.
+The search uses the standard search options (ignore case, find
+whole words, etc.)
+
+\subsubsection{MakeSearchBox}
+Pops up a dialogue box that allows you to enter a search
+string, change the {\tt findWholeWords}
+and {\tt ignoreCase} search options
+and set the search direction as backward or forward.
+
+\subsubsection{OpenFileOrCD name geometry}
+If ``name'' is a directory the active browser
+is changed to that directory.
+If ``name'' is an ordinary file then a window is opened
+up with geometry ``geometry'' that displays file ``name''.
+
+\subsubsection{MakeSearchOptionsBox}
+Pops up a dialogue box that allows the user to change
+all the search related options.
+
+\subsubsection{MakeOtherOptionsBox}
+Pops up a dialogue box that allows the user to change
+several string valued options.
+
+
+
+
+
+
+
+\subsection{ Point Commands --- Alphabetical List }
+
+This is a list of Point commands and tcl procs that are defined
+in the tcl code distributed with Point.
+
+\begin{description}
+
+\item {Again [tkPathName$\mid$mostrecent$\mid$thisfile]}
+\item {Browser geometry \{big$\mid$small\} [tkPathName]}
+\item {BrowserFont fontName [tkPathname]}
+\item {CD directoryName [tkPathname]}
+\item {CTag ctag}
+\item {CancelModes}
+\item {ChangeCursor
+	\{busy$\mid$current$\mid$main$\mid$dup$\mid$FontCursorName\}}
+\item {CloseBrowser [tkPathName]}
+\item {CloseWindow \{save$\mid$nosave$\mid$ask\} [tkPathName]}
+\item {Configure tkPathName}
+\item {ConnectToPty arg1 arg2 arg3 arg4 arg5 arg6}
+\item {CopySelToMouse}
+\item {CopySelToScrap}
+\item {CopyToHereMode}
+\item {DeleteLine [all]}
+\item {ChangeCaseOfSel \{toupper$\mid$tolower$\mid$toggle\}}
+\item {DeleteToScrap}
+\item {DoNothing}
+\item {EnterBrowser tkPathName}
+\item {EnterText tkPathName}
+\item {ExchangeWithScrap}
+\item {Expose tkPathName x y width height count}
+\item {ExtendSelToLines}
+\item {FillKeywordBox}
+\item {Filter [cmd]}
+\item {FindMatchingBracket}
+\item {GetBrowserList}
+\item {GetFileChars firstByte lastByte [tkPathName]}
+\item {GetFileInfo [tkPathName]}
+\item {GetRowCol offset [tkPathName]}
+\item {GetTextWindowList}
+\item {GetWindowInfo [tkPathName]}
+\item {GotoDigit digit [tkPathName]}
+\item {GotoLine lineNumber \{lof$\mid$top\} [tkPathName]}
+\item {HScroll \{press$\mid$release$\mid$motion\} newY button}
+\item {IndentSelection [outdent]}
+\item {InsertFile}
+\item {InsertFromScrap}
+\item {InsertSelectedString}
+\item {InsertString string}
+\item {JustifySel}
+\item {Key keysym shiftState}
+\item {LowerWindow [tkPathName]}
+\item {MakeAboutBox}
+\item {MakeAsciiBox}
+\item {MakeColorBox}
+\item {MakeCtagBox}
+\item {MakeDebugBox}
+\item {MakeGotoBox}
+\item {MakeKeywordBox}
+\item {MakeMsgBox msg}
+\item {MakeOtherOptionsBox}
+\item {MakeQuitBox}
+\item {MakeReplaceBox}
+\item {MakeSearchBox}
+\item {MakeSearchOptionsBox}
+\item {MakemmBox}
+\item {Mouse tkPathName command x y clicks}
+\item {MoveFromHereMode}
+\item {MoveSel \{char$\mid$word$\mid$line\} \{up$\mid$down$\mid$right$\mid$left$\mid$left0\}}
+\item {MoveSelToMouse}
+\item {MoveToEndFile [tkPathName]}
+\item {MoveToLastPlace [tkPathName]}
+\item {MoveWindow geometry [tkPathName]}
+\item {OpenFileOrCD name geometry}
+\item {OpenWindow fileName geometry doNotAsk}
+\item {Option get optionName}
+\item {Option set optionName optionValue}
+\item {PrintStats}
+\item {QuitPoint \{save$\mid$discard$\mid$ask\}}
+\item {RaiseListWindow numInList [geometry]}
+\item {RaiseWindow [tkPathName]}
+\item {Redo [nToRedo] [tkPathName]}
+\item {Redraw}
+\item {RegexReplaceAll regexString replaceString [inselection]}
+\item {RegexReplaceOne regexString replaceString [tkPathName]}
+\item {RegexSearch regexToSearchFor [\{forward$\mid$backward\}] [tkPathName] [update]}
+\item {RemakeTextWindows}
+\item {RemakeBrowserWindows}
+\item {RepeatSearch \{forward$\mid$backward\} [tkPathName]}
+\item {RepeatSearch \{forward$\mid$backward\} [tkPathName]}
+\item {Replace searchString replaceString [inselection] [tkPathName]}
+\item {RunProgramInFile delsel}
+\item {RunProgramInWindow prog}
+\item {SaveAllFiles}
+\item {SaveAs [tkPathName]}
+\item {SaveFile [tkPathName]}
+\item {ScrollWindow \{up$\mid$down\} \{numberOfLines$\mid$page\} [tkPathName]}
+\item {Search stringToSearchFor [\{forward$\mid$backward\}] [tkPathName] [update]}
+\item {SearchCharacter char [tkPathName]}
+\item {Sel \{set$\mid$get$\mid$return\} selBegin selEnd [tkPathName] [\{char$\mid$word$\mid$line\}]}
+\item {SendOnClose tkPathName interpName command}
+\item {SetLineNumbers how}
+\item {SetTextColor colorName \{normal$\mid$selected\} \{foreground$\mid$background\} }
+\item {ShowSelection}
+\item {ShowUndoStack}
+\item {TextFont fontName [tkPathname]}
+\item {ToggleReadOnly [tkPathname]}
+\item {Undo [nToUndo] [tkPathName]}
+\item {VScroll \{press$\mid$release$\mid$motion\} newY button}
+\item {WaitForProcess pid}
+\item {WaitForReturnString}
+\item {WindowName set \{active$\mid$selected\} tkPathName}
+\item {winfo children .}
+\item {Zoom [\{vertical$\mid$full\}] [tkPathName]}
+
+\end{description}
+
+

@@ -1,0 +1,215 @@
+		Frequently Asked Questions About Point
+
+
+***** (1) How do I change fonts?
+
+Changing text fonts: use the textFont option:
+	Option set textFont	"fixed"
+
+Changing browser fonts: use the browserFont option:
+	Option set browserFont	"fixed"
+
+Changing the fonts used on the menu bar:  You must change the tcl code
+that creates the menus.  This is in makeMenus.tcl.  Suppose you want
+to change the menubar fonts to 9x15.  (You can get a list of the fonts
+your X server has with the "xlsfonts" command.)  Change line 23 to:
+	button $name -text "$text" -relief $raised -bd $bd -font "9x15"
+and change line 87 to:
+	menubutton $name -text $text -relief $raised -bd $bd -menu $name.m \
+		-font "9x15"
+
+You can similarly change the font used in menu items and various boxes.
+See the .tcl files and the Tcl/Tk documentation.  Or write
+crowley@unmvax.cs.unm.edu.
+
+
+
+***** (2) How do I change colors?
+
+Changing the colors of text and background in a text window:
+This involves four options:
+	textForeground
+	textBackground
+	selectedTextForeground
+	selectedTextBackground
+These can be set to any color the X server knows about.  For example:
+	Option set selectedTextBackground	"orange"
+These colors can also be changed interactively from the menus
+"FILE/Select text colors ..." and "PREFS/Set text colors =>/...".
+
+Changing the colors of menus:  this must be done in the tcl
+code that create the menus and menu buttons.  Suppose we wanted to change
+the background of all menus and menu buttons to orange.  The changes
+are all in tclLib/makeMenus.tcl.  We change line 23 to:
+	button $name -text "$text" -relief $raised -bd $bd \
+		-background orange
+and line 39 to:
+	menu $name.$n -background orange
+and line 87 to:
+	menubutton $name -text $text -relief $raised -bd $bd -menu $name.m \
+		-background orange
+and line 88 to:
+	menu $name.m -background orange
+
+The changes to lines 23 and 87 change the colors of the buttons and the
+changes to lines 39 and 88 change the colors of the drop down menus
+themselves.
+
+You can also change the foreground color and the activeForeground and
+activeBackground colors.  These last two are the colors that are used
+then the item is activated.
+
+
+***** (3) How do I arrange things so I get to select the location of new
+	windows?
+
+If you use full geometry specifications (e.g., 502x410+0+0) then the
+window manager will automatically place the window for you.  If you use
+partial geometry specifications (e.g., 502x410) then it will ask you to
+place the window.
+
+
+***** (4) How do I create a button that will change an option interactively?
+
+This is done in the PREFS menu. Look at tclLib/browserMenu.tcl.
+
+
+***** (5) How do I program the DELETE and BACKSPACE key to do different things?
+
+The "Key" tcl command is used to send keystrokes to Point.  It will
+interpret both DELETE and BACKSPACE as a backspace, that is, erase
+the previous character.  To avoid this interpretation it is necessary
+to grab the keystroke before it is sent to Point and then send the
+command you want.  This is done in tclLib/textMenu.tcl in the
+textBindings procedure.  Certain keys are selected for and send
+specific Point commands.  All other keys are sent via the "Key" command.
+
+
+***** (6) How do I find out the current line number?
+
+Triple click on the line and the line number will appear in the message line.
+Or click with the right mouse button on the {\tt Line#} button on the text
+window menubar and line numbers will be listed in the file.
+
+
+***** (7) How do I execute a command on an escape sequence:
+
+Add the following lines at line 231 of textMenu.tcl:
+        # ignore Escape's alone, set a 0 is a no-op
+        #    (escapes will not be sent to Point anymore so it will not be
+        #      possible to insert an escape into a text file)
+        bind $w "<Key-Escape>"          {set a 0}
+        # When an escape is followed by a v, scroll the window up one page
+        bind $w "<Key-Escape><Key-v>"   {ScrollWindow up page}
+        # other escape sequences can also be added
+
+
+***** (8) Why can I close all windows and browsers without Point exiting?
+
+Since Point takes 10-15 seconds to start it is faster to keep a copy of
+Point running all the time and just open the files you want to look at.
+I keep a thin browser around all the time and open files from it.  Point
+allows multiple browsers so you can work in two or more directories at
+the same time.  To avoid having a "master" browser that cannot be closes
+I made all browsers equal and all browsers can be closed.  And all text
+windows can be closed.  When this happens Point is running but has no
+windows.  You can still get to it with the "pt" command which will send
+Point a message to open a window.  the "File/Open ..." command opens
+another browser.
+
+
+***** (9) Why doesn't the middle mouse button insert the X selection?
+
+The effect of all mouse clicks is programmable.
+I decided to use the middle mouse button for a mouse menu and have inserting
+the X selection on a menu.  If you do not want the mouse menu you can
+change it to insert the X selection by changing a line in tclLib/textMenu.tcl.
+
+
+***** (10) How do I change the mouse menus?
+
+They go by strange names.  The mouse menus are controlled by 20 options
+(lmm1, cmm1, lmm1n, cmm1n, lmm1e, cmm1e, lmm1s, cmm1s, lmm1w, cmm1w,
+lmm2, cmm2, lmm2n, cmm2n, lmm2e, cmm2e, lmm2s, cmm2s, lmm2w and cmm2w).
+The ones beginning with ``l'' are the labels used in the mouse menu and
+the ones beginning with ``c'' are the commands to execute.
+The ``mm'' is constant.
+The ``1'' or ``2'' indicated whether you are setting the first or the
+second mouse menu.
+Finally the postfix indicates the direction:
+none for no motion, ``'n'' for north, ``e'' for east,
+``s'' for south and ``w'' for west.
+So to change the north motion of the first mouse menu to search
+backwards for the X selection (which is, in fact, its default value)
+you would put the following tcl commands in ptsetup.tcl
+	Option set lmm1n          { << }
+	Option set cmm1n          {Search [selection get] backward}
+
+
+***** (11) How do I determine the "offical" X name for a key?
+
+Run the X program "xev" (which comes with the X distribution).  All it does
+is print out descriptions of the events it receives, including key press
+and key release events.  The event descriptions will be printed in the
+xterm window that you started xev in.  Start up xev and move the mouse
+cursor into it.  You will see lots of event go by.  Then press and
+release a key you are interested in.  If it was the Delete key you
+would get a message something like:
+
+KeyPress event, serial 15, synthetic NO, window 0x2c00001,
+    root 0x28, subw 0x0, time 1146738546, (89,74), root:(651,348),
+    state 0x0, keycode 100 (keysym 0xffff, Delete), same_screen YES,
+    XLookupString gives 1 characters:  ""
+
+KeyRelease event, serial 15, synthetic NO, window 0x2c00001,
+    root 0x28, subw 0x0, time 1146738658, (89,74), root:(651,348),
+    state 0x0, keycode 100 (keysym 0xffff, Delete), same_screen YES,
+    XLookupString gives 1 characters:  ""
+
+The X name of the key is in parentheses on the third line of the event
+report.  This will work for any key on your keyboard.
+
+
+***** (12) How do I change the binding of keys?
+
+First you need to know the "offical" X name for the key (see the above
+question) and the "offical" Point name of the command you want to
+execute them the key is pressed.  This can be:
+	(i) a Point command described in the reference manual
+	(ii) a tcl proc in somt tclLib/*.tcl file
+	(iii) a tcl proc that you write to achieve some effect
+If you look at the tcl proc TextBindings starting at line 237 in
+tclLub/textMenu.tcl you will see the events that are bound to each
+text window.  The first half is bindings of mouse buttons to various
+commands and the second half is the key bindings.  Suppose you want
+the Delete key to delete the current selection (by default it does
+the same thing as backspace).  You would add the line:
+	bind $w <Delete>	{DeleteToScrap}
+to the TextBindings proc and restart Point.  You can do the same thing
+interactively by invoking the item on the browser menu
+"MENU/MISC/Change key bindings ..."  When you select that command you
+get a dialog box.  You have to specify three things and these are the
+three text entry fields in the dialog box:
+	(i) The name of the command to bind.  Again this can be an
+		internal Point command or a tcl procedure.
+	(ii) The arguments to the command.
+	(iii) The name of the key to bind.
+There is a scrolling list of most Point commands and tcl procedures for
+your convenience.  If you click on a command it is copied into the
+text entry field.  You can also type the command name into the text
+entry field yourself.  Some of the commands have arguments after them
+on the scrolling list.  These arguments are for your information only
+and will not be copied into the text entry box.  Any arguments you want
+the command to have must be entered into the second text entry box.
+There is a scrlling list of key names that you can use or you can enter
+the key name into the third text entry field.  Once all the fields are
+filled in, the "Remap Key" command changes the binding for all text
+windows that are open.  The new binding will not affect windows that
+are created after you bind the key.
+
+
+***** (xx) Why?
+
+Because. (template for future additions)
+
+
