@@ -267,7 +267,7 @@ depend: $(CFILES) term.h
 pkg: pkg_bin
 
 pkg_bin: install
-        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST screen_bin
+	pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST screen_bin
 
 screen.o socket.o: Makefile
 
