@@ -78,7 +78,7 @@ testreadaccess (name, path_index)
   /* Look for it.  Don't use the kpse_find_glyph stuff, since we don't
      have the dpi available separately, and anyway we don't care about
      having pktogf run MakeTeXPK, etc.  */
-  found = kpse_path_search (path, name, 0);
+  found = kpse_path_search (path, name, 1);
 
   /* If we didn't find it, and we're looking for a font, maybe it's
      an alias defined in a mapping file.  This duplicates most of
@@ -101,7 +101,7 @@ testreadaccess (name, path_index)
           string mapped_name;
           while ((mapped_name = *mapped_names++) && !found)
             {
-              found = kpse_path_search (path, mapped_name, 0);
+              found = kpse_path_search (path, mapped_name, 1);
             }
         }
     }

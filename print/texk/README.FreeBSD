@@ -28,7 +28,7 @@ TABLE OF CONTENTS
         kpathsea 1.8 - Karl Berry's path search library
         BibTeX 0.99c - bibliography generator for (La)TeX
         makeindex 2.11 - general-purpose index generator
-        etex 2.5 - Karl Berry's expended TeX
+        etex 2.5 - Karl Berry's expanded TeX
         LaTeX 2.09 - TeX macros to simplify document preparation
         SliTeX 2.09 - LaTeX macros for making slides
         AMSTeX 2.1 - TeX macros from Americal Mathematical Society
@@ -61,8 +61,8 @@ TABLE OF CONTENTS
     `./doc/help/TeX-FAQ-supplement/*' for lists of available styles,
     converters, utilties, etc. and where to get them.  See also the file
     `./doc/tugboat/kwic.dvi' for a bibliography of TeX-related articles.
-    Finally, look at e.g., `FILES.byname' (~2MB), available on one of CTAN
-    hosts:
+    Finally, look at e.g., `FILES.byname' (~2MB), available on one of the 
+    CTAN hosts:
 
     250-Welcome to the Comprehensive TeX Archive Network (CTAN).  The
     250-participating hosts in the CTAN and their root CTAN directories
@@ -154,8 +154,7 @@ TABLE OF CONTENTS
     Metric files (TFMs) - i.e., the ones with the .tfm extension.  Many
     of these are supplied in the distribution.  The utilities dvips, xdvi
     and dvilj, on the other hand, require device-specific PK font files
-    (with the
-    .xxxpk extension), which are built on demand via MakeTeXPK.
+    (with the .xxxpk extension), which are built on demand via MakeTeXPK.
 
     Therefore, it may be necessary to specify the device type and base
     resolution to use, if these differ from the defaults (see DEFAULT
@@ -167,7 +166,13 @@ TABLE OF CONTENTS
     
     where `device' is the device type (METAFONT mode), as specified in
     the file `./texmf/mf/modes.mf', and `bdpi' is the base (horizontal)
-    resolution of the device.
+    resolution of the device.  Alternatively and preferably, you can create 
+    separate configuration files for each device.  Then dvips would be 
+    invoked as:
+
+	% dvips -P device filename.dvi
+
+    where `config.<device>' is the configuration file to use.
 
     For xdvi, the syntax is
     
@@ -254,7 +259,7 @@ TABLE OF CONTENTS
     prefix		root directory			/usr/gnu^
     bindir		binary directory		$(prefix)/bin
     texmf_prefix	library directory		$(prefix)/texmf
-    texinputdir	macros/inputs directory		$(texmf_prefix)/tex
+    texinputdir		macros/inputs directory		$(texmf_prefix)/tex
     fontdir		fonts directory			$(texmf_prefix)/fonts
     default_mfmode	device type (METAFONT mode)	CanonCX (hplaser)^^
     default_bdpi	device resolution (dpi)		300
@@ -296,8 +301,7 @@ TABLE OF CONTENTS
     directory, e.g., $(fontdir)/public/cm/pk/CanonCX/, and the ls-R data
     base should be rebuilt, e.g., `ls -R /usr/gnu/lib/texmf
     >/usr/gnu/lib/texmf/ls-R'.  The ls-R data base is not mandatory, but
-    helps speed the search fonts, inputs, etc. for utilties that use
-    kpathsea.
+    helps speed the search for fonts, inputs, etc.
 
     To allow any user to generate fonts,  the $(fontdir)/tmp directory is
     made world writable upon installation.  This is a potential security
@@ -360,7 +364,7 @@ TABLE OF CONTENTS
 
 9) SOURCE SITES
 ---------------
-    Karl Berry's TeX package is available via anonymouse FTP from (among
+    Karl Berry's TeX package is available via anonymous FTP from (among
     other places) ftp.cs.umb.edu as:  pub/tex/{web.tar.gz, web2c.tar.gz,
     lib.tar.gz, src.tar.gz, eplain.tar.gz, fontname.tar.gz, dvipsk.tar.gz,
     dviljk.tar.gz, and xdvik.tar.gz}.
@@ -1548,3 +1552,110 @@ The third set of diffs should be applied after the second (previous) set...
  # End of installation directory definitions.
  
 
+Again, the following  diffs should be applied after the previous.
+
+--- ./web2c-6.1/web2c/mf/Makefile.in~	Thu May  5 19:04:37 1994
++++ ./web2c-6.1/web2c/mf/Makefile.in	Thu May  5 19:07:52 1994
+@@ -36,7 +36,7 @@
+ 
+ CC = @CC@
+ CFLAGS = -g
+-CPPFLAGS = -DMF -I$(srcdir)/../lib -I../..
++CPPFLAGS = $(DEFS) -DMF -I$(srcdir)/../lib -I../..
+ 
+ CCLD = $(CC)
+ RANLIB = @RANLIB@
+--- ./web2c-6.1/web2c/lib/ourpaths.c~	Thu May  5 19:20:40 1994
++++ ./web2c-6.1/web2c/lib/ourpaths.c	Thu May  5 17:32:18 1994
+@@ -78,7 +78,7 @@
+   /* Look for it.  Don't use the kpse_find_glyph stuff, since we don't
+      have the dpi available separately, and anyway we don't care about
+      having pktogf run MakeTeXPK, etc.  */
+-  found = kpse_path_search (path, name, 0);
++  found = kpse_path_search (path, name, 1);
+ 
+   /* If we didn't find it, and we're looking for a font, maybe it's
+      an alias defined in a mapping file.  This duplicates most of
+@@ -101,7 +101,7 @@
+           string mapped_name;
+           while ((mapped_name = *mapped_names++) && !found)
+             {
+-              found = kpse_path_search (path, mapped_name, 0);
++              found = kpse_path_search (path, mapped_name, 1);
+             }
+         }
+     }
+--- ./web2c-6.1/web2c/lib/MakeTeXTFM.in~	Thu May  5 21:57:10 1994
++++ ./web2c-6.1/web2c/lib/MakeTeXTFM.in	Thu May  5 23:49:38 1994
+@@ -19,19 +19,10 @@
+ # TEMPDIR needs to be unique for each process because of the possibility
+ # of simultaneous processes running this script.
+ TEMPDIR=${TMPDIR-/tmp}/mttfm.$$
+-NAME=$1
++NAME=`basename "$1" .tfm`
+ MODE=${2-@default_mfmode@}
+ 
+-if test -n "$3"; then
+-  case "$3" in
+-    /*) DESTDIR="$3";;
+-     *) DESTDIR="$DESTDIR/$3";;
+-  esac
+-else
+-  DESTDIR=$DESTDIR/$MODE
+-fi
+-
+-TFMNAME=$NAME.'tfm'
++TFMNAME=${NAME}.tfm
+ 
+ # check also in the standard place
+ if test -r $DESTDIR/$TFMNAME; then
+@@ -88,3 +79,7 @@
+ 
+ cd $DESTDIR || exit 1
+ mv tfmtmp.$$ $TFMNAME
++
++# If this line (or an equivalent) is not present, TeX
++# will think MakeTeXTFM failed.  Any other output to stdout will also.
++echo $DESTDIR/$TFMNAME
+--- ./web2c-6.1/web2c/tex/Makefile.in~	Thu May  5 19:04:38 1994
++++ ./web2c-6.1/web2c/tex/Makefile.in	Thu May  5 19:14:50 1994
+@@ -37,7 +37,7 @@
+ # The -DTeX here is used for patgen, too, but that doesn't hurt anything.
+ CC = @CC@
+ CFLAGS = -g
+-CPPFLAGS = -DTeX -I$(srcdir)/../lib -I../..
++CPPFLAGS = $(DEFS) -DTeX -I$(srcdir)/../lib -I../..
+ 
+ CCLD = $(CC)
+ LDFLAGS = $(CFLAGS) $(XLDFLAGS)
+--- ./web2c-6.1/web2c/Makefile.in~	Thu May  5 23:52:54 1994
++++ ./web2c-6.1/web2c/Makefile.in	Thu May  5 19:07:05 1994
+@@ -51,6 +51,11 @@
+ # this directory, named for the typeface families of these directories.
+ psfontdir = $(fontdir)/adobe
+ 
++# If you don't want latex.fmt to preload John Sauter's true-size fonts,
++# then set install_sauter=false.  See the file `$(fontdir)/sauter/README'
++# for details.
++install_sauter = true
++
+ # Where the configuration files get installed.
+ dvips_prefix = $(texmf_prefix)/dvips
+ configdir = $(dvips_prefix)
+@@ -96,7 +101,7 @@
+ 
+ 
+ # Compilation options.
+-DEFS = $(XDEFS)
++DEFS = $(XDEFS) -DMAKE_TEX_MF_BY_DEFAULT=1 -DMAKE_TEX_TFM_BY_DEFAULT=1
+ 
+ # CFLAGS is used for both compilation and linking.
+ CFLAGS = -g $(XCFLAGS)
+@@ -167,6 +172,7 @@
+   prefix=$(prefix) exec_prefix=$(exec_prefix)				\
+   bindir=$(bindir) scriptdir=$(scriptdir)				\
+   mtt_destdir=$(mtt_destdir)						\
++  install_sauter=$(install_sauter)					\
+   RANLIB='$(RANLIB)' LN='$(LN)' DEFS='$(DEFS)'                          \
+   CCLD='$(CCLD)' LDFLAGS='$(LDFLAGS)' LIBS='$(LIBS)' 			\
+   x_extra_libs='$(x_extra_libs)' x_include_flags='$(x_include_flags)'	\
