@@ -87,6 +87,11 @@ clean: bash-Makefile directory-frob
 	rm -f .notified
 	$(MAKE) $(MFLAGS) $(MAKEARGS) bindir=$(bindir) -f bash-Makefile $@
 
+pkg:    pkg_bin
+
+pkg_bin: install pkg/+DESC pkg/+ONELINE pkg/+PLIST
+        pkg_create -c pkg/+ONELINE -d pkg/+DESC -f pkg/+PLIST bash_bin
+
 directory-frob:
 
 .NOEXPORT:
