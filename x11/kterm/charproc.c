@@ -1,6 +1,6 @@
 /*
  * $XConsortium: charproc.c,v 1.176.1.1 93/11/03 17:24:20 gildea Exp $
- * $Id: charproc.c,v 1.2 1994/06/27 17:29:35 asami Exp $
+ * $Id: charproc.c,v 1.3 1994/06/27 17:46:15 asami Exp $
  */
 
 /*
@@ -2072,8 +2072,8 @@ in_put()
 	else
 		select_timeout.tv_usec = 50000;
 	i = select(max_plus1, 
-		   &select_mask, &write_mask, (int *)NULL,
-		   select_timeout);
+		   &select_mask, &write_mask, NULL,
+		   &select_timeout);
 	if (i < 0) {
 	    if (errno != EINTR)
 		SysError(ERROR_SELECT);

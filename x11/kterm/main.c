@@ -1,6 +1,6 @@
 #ifndef lint
 static char *rid="$XConsortium: main.c,v 1.200.1.1 93/11/02 17:14:14 gildea Exp $";
-static char *ktermid = "$Id: main.c,v 1.3 1994/06/27 17:42:05 asami Exp $";
+static char *ktermid = "$Id: main.c,v 1.4 1994/06/27 17:46:16 asami Exp $";
 #endif /* lint */
 
 /*
@@ -3069,7 +3069,11 @@ nonblocking_wait()
 	/* cannot do non-blocking wait */
 	int pid = 0;
 #else	/* defined(USE_SYSV_SIGNALS) && (defined(CRAY) || !defined(SIGTSTP)) */
+#ifdef __FreeBSD__
+	int status;
+#else
 	union wait status;
+#endif
 	register int pid;
 
 	pid = wait3 (&status, WNOHANG, (struct rusage *)NULL);

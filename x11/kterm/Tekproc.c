@@ -712,7 +712,7 @@ again:
 				XFlush(screen->display);
 				Tselect_mask = Select_mask;
 				if((i = select(max_plus1, &Tselect_mask,
-					(int *)NULL, (int *)NULL,
+					NULL, NULL,
 					(struct timeval *)NULL)) < 0){
 					if (errno != EINTR)
 						SysError(ERROR_TSELECT);
