@@ -201,8 +201,8 @@ extern char *sys_errlist[];     /* this too... */
      !defined(__UMAXV__)                 && \
      !defined(bsd43)                     && \
      !defined(macII)                     && \
-     !defined(sequent)
-
+     !defined(sequent)			 && \
+     !defined(__FreeBSD__)
 
 #  if defined(hp300) || defined(hp800) || defined(NeXT)
 #   include <sys/malloc.h>                /* it's in 'sys' on HPs and NeXT */

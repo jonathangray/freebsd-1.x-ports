@@ -3,7 +3,7 @@
 
 # -------------------------------------------------------------------------
 # Makefile generated from "Imake.tmpl" and <Imakefile>
-# $XFree86: mit/config/Imake.tmpl,v 2.8 1993/12/18 11:42:19 dawes Exp $
+# $XFree86: mit/config/Imake.tmpl,v 2.9 1994/02/10 21:22:16 dawes Exp $
 # $XConsortium: Imake.tmpl,v 1.139 91/09/16 08:52:48 rws Exp $
 #
 # Platform-specific parameters may be set in the appropriate <vendor>.cf
@@ -19,21 +19,21 @@
 # site-specific configuration parameters that need to come before
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.33 1994/01/13 08:47:22 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.36 1994/02/12 13:10:13 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
 # -------------------------------------------------------------------------
 # platform-specific configuration parameters - edit x386.cf to change
 
-# $XFree86: mit/config/x386.cf,v 2.36 1994/01/13 08:47:26 dawes Exp $
+# $XFree86: mit/config/x386.cf,v 2.38 1994/02/10 21:22:23 dawes Exp $
 # platform:  $XConsortium: x386.cf,v 1.7 91/08/16 19:30:10 gildea Exp $
 
 # -------------------------------------------------------------------------
 # XFree86 version definition
-# $XFree86: mit/config/xf86_vers.def,v 2.8 1993/12/23 13:22:41 dawes Exp $
+# $XFree86: mit/config/xf86_vers.def,v 2.9 1994/02/12 11:03:55 dawes Exp $
 
 # -------------------------------------------------------------------------
-# XFree86 version: 2001
+# XFree86 version: 2002
 # -------------------------------------------------------------------------
 
 # $XFree86: mit/config/bsdLib.rules,v 2.1 1993/12/03 13:11:55 dawes Exp $
@@ -45,7 +45,7 @@
 # site-specific configuration parameters that go after
 # the platform-specific parameters - edit site.def to change
 
-# $XFree86: mit/config/site.def,v 2.33 1994/01/13 08:47:22 dawes Exp $
+# $XFree86: mit/config/site.def,v 2.36 1994/02/12 13:10:13 dawes Exp $
 # site:  $XConsortium: site.def,v 1.2 91/07/30 20:26:44 rws Exp $
 
             SHELL = 	/bin/sh
@@ -54,7 +54,7 @@
       CURRENT_DIR = .
 
                AR = ar clq
-  BOOTSTRAPCFLAGS = 	-DFreeBSD
+  BOOTSTRAPCFLAGS = 	-D__FreeBSD__
                CC = 		gcc
                AS = as
               LEX = lex
@@ -85,8 +85,8 @@
             NROFF = nroff
              NEQN = neqn
      STD_INCLUDES =
-  STD_CPP_DEFINES = -traditional 		-DFreeBSD
-      STD_DEFINES = 		-DFreeBSD
+  STD_CPP_DEFINES = -traditional 		-D__FreeBSD__
+      STD_DEFINES = 		-D__FreeBSD__
  EXTRA_LOAD_FLAGS =
   EXTRA_LIBRARIES = 		-lgnumalloc
      OS_LIBRARIES =
@@ -338,13 +338,12 @@ OBJS4=	xcmap.o
 PROGRAMS= xv bggen vdcomp xcmap
 
 all::
-	@echo ""
-	@echo "  Did you remember to 'make depend' first?"
-	@echo ""
-
-all::
 	@echo "  building xv ..."
 	@echo ""
+	@echo "Making sure that libtiff and libjpeg are built first.."
+	@echo ""
+	@(cd ../tiff; make all install)
+	@(cd ../jpeg; make all install)
 
 SRCS = $(SRCS1) $(SRCS2) $(SRCS3) $(SRCS4)
 
