@@ -359,7 +359,7 @@ for Ultrix
 #define OS_TYPE "POSIX 1003.1-1988"
 #endif
 #define isposix
-#undef USE_FSYNC
+/* #undef USE_FSYNC */
 #else
 /* It's ultrix disguised as POSIX; still use BSD calls until they fix it */
 #undef OS_TYPE

@@ -1,7 +1,10 @@
+#	$Id: Makefile,v 1.3 1994/02/17 17:22:51 rgrimes Exp $
+
 PROG=	iozone
-SRCS=	iozone.c
+#SRCS=	iozone.c
 NOMAN=	YES
 BINDIR?= /usr/local/bin
+CFLAGS+= -DUSE_FSYNC
 
 pkg: pkg_bin
 
