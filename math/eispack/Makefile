@@ -1,4 +1,8 @@
 # EISPACK sources
+
+SHLIB_MAJOR= 1
+SHLIB_MINOR= 0
+
 LIB=eispack
 SRCS =	csroot.f epslon.f pythag.f bakvec.f balanc.f balbak.f bandr.f \
 	bandv.f bisect.f bqr.f cbabk2.f cbal.f cg.f ch.f cinvit.f combak.f \
