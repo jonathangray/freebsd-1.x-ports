@@ -3,16 +3,16 @@ PROGS = src/sml src/smld cml-0.9.8/cml eXene-0.4/eXene
 all: $(PROGS)
 
 src/sml:
-	(cd src; makeml -i386 FreeBSD)
+	(cd src; ./makeml -i386 FreeBSD)
 
 src/smld:
-	(cd src; makeml -i386 FreeBSD -debug -i)
+	(cd src; ./makeml -i386 FreeBSD -debug -i)
 
 cml-0.9.8/cml: src/sml
-	(cd cml-0.9.8; install-cml -sml ../src/sml)
+	(cd cml-0.9.8; ./install-cml -sml ../src/sml)
 
 eXene-0.4/eXene: cml-0.9.8/cml
-	(cd eXene-0.4; install -cml ../cml-0.9.8/cml -lib ../smlnj-lib-0.2)
+	(cd eXene-0.4; ./install -cml ../cml-0.9.8/cml -lib ../smlnj-lib-0.2)
 
 clean:
 	rm -f $(PROGS)
