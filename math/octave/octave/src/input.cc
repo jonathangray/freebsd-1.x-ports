@@ -334,7 +334,7 @@ initialize_readline (void)
   rl_readline_name = "Octave";
 
 // Tell the completer that we want to try first.
-  rl_attempted_completion_function = (Function *) command_completer;
+  rl_attempted_completion_function = (CPPFunction *) command_completer;
 }
 
 /*
