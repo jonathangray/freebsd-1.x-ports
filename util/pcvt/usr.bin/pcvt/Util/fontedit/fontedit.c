@@ -20,30 +20,31 @@
  *      Nov 21, 1987 - Fixed man page to say "Fontedit" instead of "Top"
  *      Nov 22, 1987 - Added BSD Compatible ioctl, turned cursor on/off
  *                     - eap@bucsf.bu.edu
+ *		Apr 14, 2015 - Added support for linux
  */
 
 void clear_screen();
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef SYSV
-# include <sys/termio.h>
+#include <sys/termio.h>
 #endif
 #ifdef BSD
-# include <sys/ioctl.h>
+#include <sys/ioctl.h>
 #endif
 #if defined (__NetBSD__) || defined (__FreeBSD__)
-# include <sys/termios.h>
-# include <sys/ioctl.h>
+#include <sys/termios.h>
+#include <sys/ioctl.h>
 #endif
 #if defined (__linux) || defined (linux) || defined (__linux__)
-# include <linux/termios.h>
-# include <linux/ioctl.h>
+#include <linux/termios.h>
+#include <linux/ioctl.h>
 #endif
 #include <signal.h>
 
 #ifdef CURFIX
-# define CURSORON  "\033[?25h"
-# define CURSOROFF "\033[?25l"
+#define CURSORON  "\033[?25h"
+#define CURSOROFF "\033[?25l"
 #endif
 
 #define	MAX_ROWS	10
